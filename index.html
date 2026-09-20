@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fidonect — Connect. Know. Prepare. Belong.</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">F</span> Fidonect</div>
+  <div class="top-actions">
+    <input id="globalSearch" type="search" placeholder="Search students, schools, mentors…" />
+    <button id="notifBtn" title="Notifications">🔔<span id="notifCount" class="badge hidden">0</span></button>
+  </div>
+</header>
+
+<div id="authView" class="view">
+  <div class="hero">
+    <h1>Connect. Know.<br/>Prepare. Belong.</h1>
+    <p>Meet future classmates, mentors and campus guides before you resume.</p>
+    <div class="card">
+      <h2>Create account</h2>
+      <input id="regName" placeholder="Full name" />
+      <input id="regEmail" placeholder="Email" type="email" />
+      <input id="regPhone" placeholder="Phone number" />
+      <select id="regType">
+        <option value="prospective">Prospective Student</option>
+        <option value="existing">Existing Student</option>
+        <option value="alumni">Alumni</option>
+      </select>
+      <button id="registerBtn" class="primary">Join Fidonect</button>
+      <button id="demoBtn" class="ghost">Try demo account</button>
+      <p class="muted small">By joining you agree to community guidelines. Phone/email verification, block & report ship in MVP.</p>
+    </div>
+  </div>
+</div>
+
+<div id="onboardView" class="view hidden">
+  <div class="card narrow">
+    <h2>Select your school path</h2>
+    <label>Institution<select id="obInstitution"></select></label>
+    <label>Faculty<select id="obFaculty"></select></label>
+    <label>Department<select id="obDepartment"></select></label>
+    <label>Programme<select id="obProgramme"></select></label>
+    <label>Academic Session<select id="obSession">
+      <option>2024/2025</option><option selected>2026/2027</option><option>2027/2028</option>
+    </select></label>
+    <label>Interests (comma separated)<input id="obInterests" placeholder="e.g. Biology, Football, Coding" /></label>
+    <button id="onboardBtn" class="primary">Continue →</button>
+  </div>
+</div>
+
+<div id="appView" class="view hidden">
+  <nav class="tabs">
+    <button data-tab="discover" class="active">Discover</button>
+    <button data-tab="community">Community</button>
+    <button data-tab="fido">Fido AI</button>
+    <button data-tab="mentors">Mentors</button>
+    <button data-tab="messages">Messages</button>
+    <button data-tab="hub">Info Hub</button>
+    <button data-tab="admin">Admin</button>
+    <button data-tab="profile">Profile</button>
+  </nav>
+
+  <main>
+    <section id="tab-discover">
+      <h2>People you may know <span id="discoverCtx" class="pill"></span></h2>
+      <div id="discoverList" class="grid"></div>
+    </section>
+
+    <section id="tab-community" class="hidden">
+      <h2 id="communityTitle">Communities</h2>
+      <div class="row">
+        <select id="communityPicker"></select>
+        <input id="communityInput" placeholder="Ask or share with your community…" />
+        <button id="communityPostBtn" class="primary">Post</button>
+      </div>
+      <div id="communityFeed"></div>
+    </section>
+
+    <section id="tab-fido" class="hidden">
+      <h2>Fido AI Assistant</h2>
+      <p class="muted">Answers are labelled: <span class="tag official">Official</span> <span class="tag community">Community</span> <span class="tag ai">AI guidance</span></p>
+      <div id="fidoChat" class="chat"></div>
+      <div class="row">
+        <input id="fidoInput" placeholder='Ask e.g. "What documents for clearance?"' />
+        <button id="fidoSend" class="primary">Ask</button>
+      </div>
+      <div class="suggest">
+        <button data-q="What should I prepare before resuming?">Before resuming?</button>
+        <button data-q="What documents might I need for clearance?">Clearance docs?</button>
+        <button data-q="How can I prepare for my first semester studying Biology?">First semester?</button>
+      </div>
+    </section>
+
+    <section id="tab-mentors" class="hidden">
+      <h2>Mentors</h2>
+      <button id="becomeMentorBtn" class="ghost">Apply to become a mentor</button>
+      <div id="mentorList" class="grid"></div>
+    </section>
+
+    <section id="tab-messages" class="hidden">
+      <h2>Messages</h2>
+      <div class="msg-wrap">
+        <div id="convoList" class="convos"></div>
+        <div class="thread">
+          <div id="threadBox" class="chat"></div>
+          <div class="row"><input id="msgInput" placeholder="Write a message…" /><button id="msgSend" class="primary">Send</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-hub" class="hidden">
+      <h2>Campus Information Hub</h2>
+      <select id="hubPicker"></select>
+      <div id="hubContent" class="card"></div>
+    </section>
+
+    <section id="tab-admin" class="hidden">
+      <h2>Admin Dashboard</h2>
+      <div class="cards3">
+        <div class="card"><h3 id="statUsers">0</h3><p>Users</p></div>
+        <div class="card"><h3 id="statConns">0</h3><p>Connections</p></div>
+        <div class="card"><h3 id="statMsgs">0</h3><p>Messages</p></div>
+      </div>
+      <div class="card"><h3>Reports & moderation</h3><div id="reportList"></div></div>
+      <div class="card"><h3>Announce</h3><div class="row"><input id="announceInput" placeholder="Post an institutional update…" /><button id="announceBtn" class="primary">Send</button></div></div>
+    </section>
+
+    <section id="tab-profile" class="hidden">
+      <h2>Your profile</h2>
+      <div class="card" id="profileCard"></div>
+      <button id="logoutBtn" class="ghost">Log out</button>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
