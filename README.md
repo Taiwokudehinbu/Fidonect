@@ -10,7 +10,7 @@ Open `index.html` in a browser. Data persists in `localStorage`.
 
 - `index.html` — app shell
 - `styles.css` — mobile-first styles
-- `app.js` — MVP logic + seed data (UNILAG, UI, OAU, YabaTech)
+- `app.js` — MVP logic + seed data (FUTA, UNILAG, UI, OAU, YabaTech)
 
 ## Backend scaffold (optional, needs Node)
 ```
