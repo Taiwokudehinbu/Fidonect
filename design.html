@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fidonect — Design System</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#f6f7fb;color:#17202a;padding:24px}
+.wrap{max-width:800px;margin:0 auto}
+.card{background:#fff;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 4px 16px rgba(15,42,67,.08)}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.swatch{border-radius:12px;padding:12px;color:#fff;font-size:13px}
+.swatch.light{color:#17202a;border:1px solid #d7dee8}
+.btn{cursor:pointer;border-radius:999px;border:1px solid #0a1f33;padding:12px 22px;background:#0a1f33;color:#fff;font-weight:700;transition:background .15s}
+.btn:hover{background:#071627;border-color:#071627}
+.btn:focus-visible{outline:3px solid #2dd4bf;outline-offset:2px}
+.btn.ghost{background:#fff;color:#0a1f33;border-color:#0a1f33}
+.input{width:100%;padding:10px;margin:6px 0;border:1px solid #d7dee8;border-radius:10px;font:inherit}
+.muted{color:#637083}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Fidonect Theme</h1>
+<p class="muted">Single-file preview matching <code>styles.css</code>.</p>
+
+<div class="card">
+<h2>Colors</h2>
+<div class="swatches">
+<div class="swatch" style="background:#0f2a43">Primary Navy<br/>#0f2a43</div>
+<div class="swatch" style="background:#2dd4bf;color:#062a26">Accent Teal<br/>#2dd4bf</div>
+<div class="swatch light" style="background:#f6f7fb">Background<br/>#f6f7fb</div>
+<div class="swatch light" style="background:#ffffff">Card<br/>#ffffff</div>
+<div class="swatch light" style="background:#eef2f7">Message<br/>#eef2f7</div>
+<div class="swatch light" style="background:#dcfce7">Message (me)<br/>#dcfce7</div>
+<div class="swatch" style="background:#ef4444">Badge Red<br/>#ef4444</div>
+<div class="swatch light" style="background:#dbeafe">Official tag<br/>#dbeafe</div>
+<div class="swatch light" style="background:#fef3c7">Community tag<br/>#fef3c7</div>
+<div class="swatch light" style="background:#f3e8ff">AI tag<br/>#f3e8ff</div>
+</div>
+</div>
+
+<div class="card">
+<h2>Fonts</h2>
+<p style="font-weight:800;font-size:24px;margin:4px 0">Heading — system-ui 800 (e.g. Connect. Know. Prepare.)</p>
+<p style="font-size:16px;margin:4px 0">Body — system-ui / -apple-system / Segoe UI / Roboto / Arial 400</p>
+<p class="muted" style="font-size:12px">Small muted — #637083, 12px</p>
+</div>
+
+<div class="card">
+<h2>Button</h2>
+<button class="btn">Join Fidonect</button>
+<button class="btn ghost">Ghost</button>
+</div>
+
+<div class="card">
+<h2>Input</h2>
+<input class="input" placeholder="Search students, schools, mentors…" />
+<input class="input" value="B.Sc. Biology, 2026/2027" />
+</div>
+</div>
+</body>
+</html>
