@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../fidonect.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String?
+  type      String   @default("prospective")
+  school    String?
+  faculty   String?
+  dept      String?
+  programme String?
+  session   String?
+  interests String?
+  photoPath String?
+  createdAt DateTime @default(now())
+  connectionsA Connection[] @relation("fromUser")
+  connectionsB Connection[] @relation("toUser")
+  posts     Post[]
+  reports   Report[]
+}
+
+model Institution {
+  id       Int      @id @default(autoincrement())
+  name     String   @unique
+  location String?
+  faculties Faculty[]
+  hubPage  HubPage?
+}
+
+model Faculty {
+  id            Int          @id @default(autoincrement())
+  name          String
+  institution   Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  institutionId Int
+  departments   Department[]
+  @@unique([institutionId, name])
+}
+
+model Department {
+  id        Int         @id @default(autoincrement())
+  name      String
+  faculty   Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  facultyId Int
+  programmes Programme[]
+  @@unique([facultyId, name])
+}
+
+model Programme {
+  id           Int        @id @default(autoincrement())
+  name         String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId Int
+  @@unique([departmentId, name])
+}
+
+model Connection {
+  id        Int      @id @default(autoincrement())
+  from      User     @relation("fromUser", fields: [fromId], references: [id], onDelete: Cascade)
+  fromId    Int
+  to        User     @relation("toUser", fields: [toId], references: [id], onDelete: Cascade)
+  toId      Int
+  status    String   @default("accepted")
+  createdAt DateTime @default(now())
+  @@unique([fromId, toId])
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  school    String
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId  Int?
+  authorName String
+  text      String
+  createdAt DateTime @default(now())
+}
+
+model Mentor {
+  id       Int      @id @default(autoincrement())
+  name     String
+  dept     String?
+  school   String?
+  level    String?
+  areas    String?
+  verified Boolean  @default(false)
+}
+
+model HubPage {
+  id            Int         @id @default(autoincrement())
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  institutionId Int         @unique
+  overview      String?
+  clearance     String?
+  fees          String?
+  accommodation String?
+  source        String      @default("Community")
+  updatedAt     DateTime    @updatedAt
+}
+
+model Report {
+  id        Int      @id @default(autoincrement())
+  target    String
+  reason    String
+  reporter  User?    @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+  reporterId Int?
+  createdAt DateTime @default(now())
+}

@@ -1,13 +1,21 @@
 // Fidonect backend stub — run with `npm install && npm start` (requires Node 18+).
 // Phase-1 stub: in-memory stores. Replace with DB + auth + RAG in Phase 2.
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const supabase = require("./supabaseClient");
 const app = express();
 app.use(cors()); app.use(express.json());
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 
 app.get("/health", (req, res) => res.json({ ok: true, service: "fidonect-api", phase: "mvp-stub" }));
+app.get("/api/institutions/test", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in backend/.env" });
+  const { data, error } = await supabase.from("institutions").select("id,name,location").limit(10);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
 app.post("/api/users", (req, res) => { const u = { id: Date.now(), ...req.body }; db.users.push(u); res.json(u); });
 app.get("/api/discover", (req, res) => res.json(db.users));
 app.post("/api/connections", (req, res) => { db.connections.push(req.body); res.json({ ok: true }); });

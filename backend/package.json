@@ -3,6 +3,23 @@
   "version": "0.1.0",
   "description": "Fidonect backend stub (Phase 1 MVP)",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "dependencies": { "cors": "^2.8.5", "express": "^4.19.2" }
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node prisma/seed.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "@supabase/supabase-js": "^2.117.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^18.0.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0"
+  }
 }
