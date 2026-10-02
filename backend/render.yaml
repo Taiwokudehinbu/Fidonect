@@ -1,0 +1,15 @@
+# Render blueprint — dashboard > New > Blueprint > select this repo.
+# Fill SUPABASE_URL + SUPABASE_ANON_KEY in the Render dashboard (never commit secrets).
+services:
+  - type: web
+    name: fidonect-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false

@@ -114,9 +114,12 @@ document.getElementById("resultMsg").textContent=n+" school(s) found for \""+ (q
 document.getElementById("schoolSearch").onkeydown=function(e){if(e.key==="Enter")document.getElementById("findBtn").click();};
 document.getElementById("loadLive").onclick=async function(){
 var msg=document.getElementById("liveMsg"), grid=document.getElementById("liveGrid");
+// API base: ?api=https://your-backend.onrender.com > window.FIDONECT_API > localhost default.
+// Set window.FIDONECT_API in a <script> tag before this file when hosted, no rebuild needed.
+var apiBase=(new URLSearchParams(location.search).get("api")||window.FIDONECT_API||"http://localhost:3000").replace(/\/$/,"");
 msg.textContent="Loading from backend…"; grid.innerHTML="";
 try{
-var r=await fetch("http://localhost:3000/api/institutions/test");
+var r=await fetch(apiBase+"/api/institutions/test");
 var rows=await r.json();
 if(!r.ok) throw new Error(rows.error||("HTTP "+r.status));
 if(!rows.length){msg.textContent="Connected OK — table is empty. Run backend/supabase-setup.sql in Supabase SQL Editor.";return;}
