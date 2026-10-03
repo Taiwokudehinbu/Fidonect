@@ -106,13 +106,13 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 var schools = [
 {name:"University of Lagos (UNILAG)", loc:"Akoka, Lagos", students:1240},
 {name:"University of Ibadan (UI)", loc:"Ibadan, Oyo", students:860},
-{name:"Yaba College of Technology (YabaTech)", loc:"Yaba, Lagos", students:640}
+{name:"Federal University of Technology, Akure (FUTA)", loc:"Akure, Ondo", students:890}
 ];
 var students = [
 {name:"Adaeze O.", dept:"Biology", school:"University of Lagos (UNILAG)", session:"2026/2027"},
 {name:"Tunde B.", dept:"Biology", school:"University of Lagos (UNILAG)", session:"2026/2027"},
 {name:"Mariam S.", dept:"Computer Science", school:"University of Ibadan (UI)", session:"2026/2027"},
-{name:"Fatima A.", dept:"SLT", school:"Yaba College of Technology (YabaTech)", session:"2026/2027"}
+{name:"Fatima A.", dept:"Microbiology", school:"Federal University of Technology, Akure (FUTA)", session:"2026/2027"}
 ];
 var liveSchools=null; // live rows from Supabase when reachable; mocks otherwise
 function normSchools(list){return list.map(function(s){return {id:s.id,name:s.name,loc:s.location||s.loc,live:!!s.id};});}
@@ -181,7 +181,7 @@ function setSess(s){if(s)localStorage.setItem("fidonect_session",JSON.stringify(
 async function loadSchoolOptions(){
 try{var r=await fetch(apiBase()+"/api/institutions/test");var rows=await r.json();
 if(r.ok&&rows.length)document.getElementById("authSchool").innerHTML='<option value="">Select school…</option>'+rows.map(function(s){return '<option>'+s.name+'</option>';}).join("");
-else document.getElementById("authSchool").innerHTML='<option value="">Select school…</option><option>University of Lagos (UNILAG)</option><option>University of Ibadan (UI)</option><option>Yaba College of Technology (YabaTech)</option>';
+else document.getElementById("authSchool").innerHTML='<option value="">Select school…</option><option>University of Lagos (UNILAG)</option><option>University of Ibadan (UI)</option><option>Federal University of Technology, Akure (FUTA)</option>';
 }catch(e){/* offline: leave default */}
 }
 async function fetchProfile(token){

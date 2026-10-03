@@ -43,12 +43,12 @@ async function main() {
   });
 
   await prisma.institution.upsert({
-    where: { name: "Yaba College of Technology (YabaTech)" },
+    where: { name: "Federal University of Technology, Akure (FUTA)" },
     update: {},
     create: {
-      name: "Yaba College of Technology (YabaTech)",
-      location: "Yaba, Lagos",
-      faculties: { create: [{ name: "School of Science", departments: { create: [{ name: "Science Laboratory Technology", programmes: { create: [{ name: "ND SLT" }, { name: "HND SLT" }] } }] } }] }
+      name: "Federal University of Technology, Akure (FUTA)",
+      location: "Akure, Ondo",
+      faculties: { create: [{ name: "School of Sciences", departments: { create: [{ name: "Microbiology", programmes: { create: [{ name: "B.Sc. Microbiology" }] } }] } }] }
     }
   });
 
@@ -57,7 +57,7 @@ async function main() {
     { name: "Mariam S.", dept: "Computer Science", school: "University of Ibadan (UI)", level: "200-level", areas: "Resumption, Study tips", verified: false }
   ]) await prisma.mentor.create({ data: m });
 
-  console.log("Seeded:", unilag.name, "+ UI + YabaTech + 2 mentors");
+  console.log("Seeded:", unilag.name, "+ UI + FUTA + 2 mentors");
 }
 
 main().finally(() => prisma.$disconnect());

@@ -54,8 +54,8 @@ insert into institutions (name, location)
 select 'University of Ibadan (UI)', 'Ibadan, Oyo'
 where not exists (select 1 from institutions where name = 'University of Ibadan (UI)');
 insert into institutions (name, location)
-select 'Yaba College of Technology (YabaTech)', 'Yaba, Lagos'
-where not exists (select 1 from institutions where name = 'Yaba College of Technology (YabaTech)');
+select 'Federal University of Technology, Akure (FUTA)', 'Akure, Ondo'
+where not exists (select 1 from institutions where name = 'Federal University of Technology, Akure (FUTA)');
 
 -- 8: seed faculties
 insert into faculties (institution_id, name)
@@ -68,7 +68,7 @@ insert into faculties (institution_id, name)
 select id, 'Faculty of Science' from institutions where name = 'University of Ibadan (UI)'
 on conflict (institution_id, name) do nothing;
 insert into faculties (institution_id, name)
-select id, 'School of Science' from institutions where name = 'Yaba College of Technology (YabaTech)'
+select id, 'School of Sciences' from institutions where name = 'Federal University of Technology, Akure (FUTA)'
 on conflict (institution_id, name) do nothing;
 
 -- 9: seed departments
@@ -89,8 +89,8 @@ select f.id, 'Biology' from faculties f join institutions i on i.id = f.institut
 where i.name = 'University of Ibadan (UI)' and f.name = 'Faculty of Science'
 on conflict (faculty_id, name) do nothing;
 insert into departments (faculty_id, name)
-select f.id, 'Science Laboratory Technology' from faculties f join institutions i on i.id = f.institution_id
-where i.name = 'Yaba College of Technology (YabaTech)' and f.name = 'School of Science'
+select f.id, 'Microbiology' from faculties f join institutions i on i.id = f.institution_id
+where i.name = 'Federal University of Technology, Akure (FUTA)' and f.name = 'School of Sciences'
 on conflict (faculty_id, name) do nothing;
 
 -- 10: seed programmes
@@ -115,9 +115,8 @@ select d.id, 'B.Sc. Zoology' from departments d join faculties f on f.id = d.fac
 where i.name = 'University of Ibadan (UI)' and d.name = 'Biology'
 on conflict (department_id, name) do nothing;
 insert into programmes (department_id, name)
-select d.id, x.p from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
-cross join (values ('ND SLT'), ('HND SLT')) as x(p)
-where i.name = 'Yaba College of Technology (YabaTech)' and d.name = 'Science Laboratory Technology'
+select d.id, 'B.Sc. Microbiology' from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
+where i.name = 'Federal University of Technology, Akure (FUTA)' and d.name = 'Microbiology'
 on conflict (department_id, name) do nothing;
 
 -- 11: seed UNILAG hub page
