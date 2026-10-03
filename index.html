@@ -114,9 +114,10 @@ document.getElementById("resultMsg").textContent=n+" school(s) found for \""+ (q
 document.getElementById("schoolSearch").onkeydown=function(e){if(e.key==="Enter")document.getElementById("findBtn").click();};
 document.getElementById("loadLive").onclick=async function(){
 var msg=document.getElementById("liveMsg"), grid=document.getElementById("liveGrid");
-// API base: ?api=https://your-backend.onrender.com > window.FIDONECT_API > localhost default.
-// Set window.FIDONECT_API in a <script> tag before this file when hosted, no rebuild needed.
-var apiBase=(new URLSearchParams(location.search).get("api")||window.FIDONECT_API||"http://localhost:3000").replace(/\/$/,"");
+// API base: ?api=... > window.FIDONECT_API > same origin when hosted > localhost default.
+// Local double-click (file://) and localhost keep using http://localhost:3000.
+var isLocal = location.protocol==="file:" || /^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname);
+var apiBase=(new URLSearchParams(location.search).get("api")||window.FIDONECT_API||(isLocal?"http://localhost:3000":location.origin)).replace(/\/$/,"");
 msg.textContent="Loading from backend…"; grid.innerHTML="";
 try{
 var r=await fetch(apiBase+"/api/institutions/test");

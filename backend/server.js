@@ -3,9 +3,14 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const supabase = require("./supabaseClient");
 const app = express();
 app.use(cors()); app.use(express.json());
+
+// Serve the homepage from the same service (repo-root index.html).
+// Only this file is exposed — backend/.env and other files are never served.
+app.get(["/", "/index.html"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 
