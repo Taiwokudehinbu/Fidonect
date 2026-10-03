@@ -78,6 +78,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div id="schools">
 <h2>Sample institutions (mock data)</h2>
 <div class="grid" id="schoolGrid"></div>
+<div id="schoolDetail"></div>
 </div>
 
 <div id="students">
@@ -113,13 +114,33 @@ var students = [
 {name:"Mariam S.", dept:"Computer Science", school:"University of Ibadan (UI)", session:"2026/2027"},
 {name:"Fatima A.", dept:"SLT", school:"Yaba College of Technology (YabaTech)", session:"2026/2027"}
 ];
+var liveSchools=null; // live rows from Supabase when reachable; mocks otherwise
+function normSchools(list){return list.map(function(s){return {id:s.id,name:s.name,loc:s.location||s.loc,live:!!s.id};});}
+async function loadSchools(){
+try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
+if(r.ok&&rows.length){liveSchools=normSchools(rows);return;}}catch(e){}
+liveSchools=null;
+}
 function renderSchools(filter){
 var q=(filter||"").toLowerCase();
-var list=schools.filter(function(s){return !q || s.name.toLowerCase().indexOf(q)>-1;});
+var base=liveSchools||normSchools(schools);
+var list=base.filter(function(s){return !q || s.name.toLowerCase().indexOf(q)>-1;});
 document.getElementById("schoolGrid").innerHTML=list.map(function(s){
-return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+' • <span class="pill">'+s.students+' students</span></p></div>';
+return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+'</p><p><button class="btn ghost" onclick="showTree('+(s.live?s.id:'null')+')">View departments</button></p></div>';
 }).join("")||'<p class="muted">No schools match.</p>';
 return list.length;
+}
+async function showTree(id){
+var box=document.getElementById("schoolDetail");
+if(id===null){box.innerHTML='<p class="muted">Offline mock — start the backend and reload for live departments.</p>';return;}
+box.innerHTML='<p class="muted">Loading departments…</p>';
+try{var r=await fetch(apiBase()+"/api/institutions/"+id+"/tree");var t=await r.json();
+if(!r.ok)throw new Error(t.error||("HTTP "+r.status));
+var html='<div class="card"><h3>'+t.name+'</h3>';
+html+=t.faculties.map(function(f){return '<p><b>'+f.name+'</b><br/>'+f.departments.map(function(d){return d.name+' ('+d.programmes.map(function(p){return p.name;}).join(", ")+')';}).join("<br/>")+'</p>';}).join("")||'<p class="muted">No faculties yet.</p>';
+if(t.hub)html+='<p><b>Campus info</b> <span class="pill">'+t.hub.source+'</span><br/>'+t.hub.overview+'<br/><span class="muted">Clearance: '+t.hub.clearance+'<br/>Fees: '+t.hub.fees+'<br/>Housing: '+t.hub.accommodation+'</span></p>';
+html+='</div>';box.innerHTML=html;
+}catch(e){box.innerHTML='<p class="muted">Failed: '+e.message+'</p>';}
 }
 function renderStudents(filter){
 var q=(filter||"").toLowerCase();
@@ -128,10 +149,13 @@ document.getElementById("studentGrid").innerHTML=list.map(function(s,i){
 return '<div class="person"><h4>'+s.name+'</h4><div>'+s.dept+' — '+s.school+'</div><div class="muted">'+s.session+'</div><p><button class="btn ghost" onclick="this.textContent=\'✓ Connected\'">Connect</button></p></div>';
 }).join("")||'<p class="muted">No students match.</p>';
 }
-document.getElementById("findBtn").onclick=function(){
+document.getElementById("findBtn").onclick=async function(){
+document.getElementById("schoolDetail").innerHTML="";
+await loadSchools();
 var q=document.getElementById("schoolSearch").value;
 var n=renderSchools(q); renderStudents(q);
-document.getElementById("resultMsg").textContent=n+" school(s) found for \""+ (q||"all schools") +"\" (mock data).";
+var live=liveSchools?" (live)":" (mock data)";
+document.getElementById("resultMsg").textContent=n+" school(s) found for \""+ (q||"all schools") +"\""+live+".";
 };
 document.getElementById("schoolSearch").onkeydown=function(e){if(e.key==="Enter")document.getElementById("findBtn").click();};
 document.getElementById("loadLive").onclick=async function(){
@@ -202,7 +226,7 @@ renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
 };
 document.getElementById("logoutBtn").onclick=function(){setSess(null);document.getElementById("authMsg").textContent="Logged out.";};
 loadSchoolOptions();renderAuth();
-renderSchools(""); renderStudents("");
+(async function(){await loadSchools();renderSchools("");renderStudents("");})();
 </script>
 </body>
 </html>

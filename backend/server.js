@@ -28,6 +28,46 @@ app.get("/api/institutions/test", async (req, res) => {
   res.json(data);
 });
 
+// ---- Phase 2: Institution data (public reads; RLS enforced in the database) ----
+app.get("/api/institutions", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const { data, error } = await supabase.from("institutions").select("id,name,location").order("name");
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.get("/api/institutions/:id/tree", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return bad(res, "id must be a positive integer");
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const { data: inst, error: iErr } = await supabase.from("institutions").select("id,name,location").eq("id", id).single();
+  if (iErr || !inst) return res.status(404).json({ error: "Institution not found" });
+  const { data: facs, error: fErr } = await supabase.from("faculties").select("id,name").eq("institution_id", id).order("name");
+  if (fErr) return res.status(500).json({ error: fErr.message });
+  const facIds = (facs || []).map(f => f.id);
+  let depts = [];
+  if (facIds.length) {
+    const { data, error } = await supabase.from("departments").select("id,faculty_id,name").in("faculty_id", facIds).order("name");
+    if (error) return res.status(500).json({ error: error.message });
+    depts = data || [];
+  }
+  const deptIds = depts.map(d => d.id);
+  let progs = [];
+  if (deptIds.length) {
+    const { data, error } = await supabase.from("programmes").select("id,department_id,name").in("department_id", deptIds).order("name");
+    if (error) return res.status(500).json({ error: error.message });
+    progs = data || [];
+  }
+  const { data: hub } = await supabase.from("hub_pages").select("overview,clearance,fees,accommodation,source").eq("institution_id", id).single();
+  const tree = (facs || []).map(f => ({
+    ...f,
+    departments: depts.filter(d => d.faculty_id === f.id).map(d => ({
+      ...d, programmes: progs.filter(p => p.department_id === d.id)
+    }))
+  }));
+  res.json({ ...inst, faculties: tree, hub: hub || null });
+});
+
 // ---- Phase 1: Auth + profiles (Supabase Auth; RLS enforced in the database) ----
 function authedClient(req) {
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
