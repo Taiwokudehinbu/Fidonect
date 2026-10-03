@@ -29,6 +29,7 @@ to be expanded in Phase 2.
 - Phase 2: mentorship verification + verified institutional info + improved AI (RAG)
 - Phase 3: accommodation + marketplace + services
 - Phase 4: institution partnerships + alumni + recruitment
+- Monetization, privacy/safety, and responsible-AI requirements: `PRD.md` §§22–28 (MVP vs future split; no payment/ads code in MVP; pre-production gates in §28).
 
 ## Trust & Safety
 Phone/email verification, reporting, blocking, moderation, privacy controls
