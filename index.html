@@ -44,6 +44,28 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p class="muted">Welcome to Fidonect — meet future classmates, mentors and campus guides before you resume.</p>
 </div>
 
+<div class="card" id="auth">
+<h2>Join Fidonect (MVP test)</h2>
+<div id="authForm">
+<input id="authName" class="input" placeholder="Full name" />
+<input id="authEmail" class="input" placeholder="Email" type="email" />
+<input id="authPass" class="input" placeholder="Password (min 6 chars)" type="password" />
+<div class="search-row">
+<select id="authType" class="input"><option value="prospective">Prospective student</option><option value="existing">Existing student</option><option value="alumni">Alumni</option></select>
+<select id="authSchool" class="input"><option value="">Select school…</option></select>
+<select id="authVis" class="input"><option value="connections">Visible to: connections</option><option value="public">Visible to: everyone</option><option value="private">Visible to: only me</option></select>
+</div>
+<p style="font-size:13px"><label><input type="checkbox" id="authConsent" style="width:auto" /> I agree to Fidonect storing my profile for student matching (PRD §23).</label></p>
+<div class="search-row"><button id="signupBtn" class="btn">Create account</button><button id="loginBtn" class="btn ghost">Log in</button></div>
+<p id="authMsg" class="muted">Not logged in. Session stays in this browser only.</p>
+</div>
+<div id="authedView" style="display:none">
+<p><b id="meName"></b> <span id="meVis" class="pill"></span></p>
+<p class="muted" id="meDetail"></p>
+<div class="search-row"><select id="visEdit" class="input"><option value="public">Visible to: everyone</option><option value="connections">Visible to: connections</option><option value="private">Visible to: only me</option></select><button id="visSave" class="btn ghost">Save</button><button id="logoutBtn" class="btn ghost">Log out</button></div>
+</div>
+</div>
+
 <div class="card">
 <h2>Find your school</h2>
 <div class="search-row">
@@ -73,7 +95,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <div class="card" id="about">
 <h2>About this demo</h2>
-<p class="muted">Static homepage only. No database, backend, API, or login. All data below is mock data in this file.</p>
+<p class="muted">Mock data below is local; the Live test section reads Supabase via the backend.</p>
 </div>
 </div>
 
@@ -128,6 +150,58 @@ msg.textContent="Connected OK — "+rows.length+" institution(s) from Supabase."
 grid.innerHTML=rows.map(function(s){return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+(s.location||"")+'</p></div>';}).join("");
 }catch(e){msg.textContent="Failed: "+e.message+" — is backend running (npm start) and SQL executed?";}
 };
+// ---- Phase 1: Auth (Supabase Auth via backend; token in this browser only) ----
+function apiBase(){return (new URLSearchParams(location.search).get("api")||window.FIDONECT_API||(location.protocol==="file:"||/^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname)?"http://localhost:3000":location.origin)).replace(/\/$/,"");}
+function sess(){try{return JSON.parse(localStorage.getItem("fidonect_session")||"null");}catch(e){return null;}}
+function setSess(s){if(s)localStorage.setItem("fidonect_session",JSON.stringify(s));else localStorage.removeItem("fidonect_session");renderAuth();}
+async function loadSchoolOptions(){
+try{var r=await fetch(apiBase()+"/api/institutions/test");var rows=await r.json();
+if(r.ok&&rows.length)document.getElementById("authSchool").innerHTML='<option value="">Select school…</option>'+rows.map(function(s){return '<option>'+s.name+'</option>';}).join("");
+else document.getElementById("authSchool").innerHTML='<option value="">Select school…</option><option>University of Lagos (UNILAG)</option><option>University of Ibadan (UI)</option><option>Yaba College of Technology (YabaTech)</option>';
+}catch(e){/* offline: leave default */}
+}
+async function fetchProfile(token){
+var r=await fetch(apiBase()+"/api/profile",{headers:{Authorization:"Bearer "+token}});
+return {ok:r.ok,body:await r.json()};
+}
+async function renderAuth(){
+var s=sess(),form=document.getElementById("authForm"),view=document.getElementById("authedView");
+if(!s){form.style.display="";view.style.display="none";return;}
+var p=await fetchProfile(s.access_token);
+if(!p.ok){setSess(null);document.getElementById("authMsg").textContent="Session expired — logged out.";return;}
+form.style.display="none";view.style.display="";
+document.getElementById("meName").textContent=p.body.name+" ("+p.body.user_type+")";
+document.getElementById("meVis").textContent=p.body.visibility;
+document.getElementById("meDetail").textContent=(p.body.school||"No school yet")+" • "+p.body.email;
+document.getElementById("visEdit").value=p.body.visibility;
+}
+document.getElementById("signupBtn").onclick=async function(){
+var m=document.getElementById("authMsg");
+var body={name:document.getElementById("authName").value,email:document.getElementById("authEmail").value,password:document.getElementById("authPass").value,type:document.getElementById("authType").value,school:document.getElementById("authSchool").value,visibility:document.getElementById("authVis").value,consent:document.getElementById("authConsent").checked};
+m.textContent="Creating account…";
+try{var r=await fetch(apiBase()+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+var j=await r.json();
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.needsConfirmation){m.textContent=j.message;return;}
+setSess(j.session);m.textContent="Account created — logged in.";
+}catch(e){m.textContent="Failed: "+e.message;}
+};
+document.getElementById("loginBtn").onclick=async function(){
+var m=document.getElementById("authMsg");m.textContent="Logging in…";
+try{var r=await fetch(apiBase()+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:document.getElementById("authEmail").value,password:document.getElementById("authPass").value})});
+var j=await r.json();
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+setSess(j.session);m.textContent="Logged in.";
+}catch(e){m.textContent="Failed: "+e.message;}
+};
+document.getElementById("visSave").onclick=async function(){
+var m=document.getElementById("authMsg"),s=sess();if(!s)return;
+try{var r=await fetch(apiBase()+"/api/profile",{method:"PUT",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({visibility:document.getElementById("visEdit").value})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
+};
+document.getElementById("logoutBtn").onclick=function(){setSess(null);document.getElementById("authMsg").textContent="Logged out.";};
+loadSchoolOptions();renderAuth();
 renderSchools(""); renderStudents("");
 </script>
 </body>
