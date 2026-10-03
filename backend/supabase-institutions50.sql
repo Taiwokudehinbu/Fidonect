@@ -1,6 +1,6 @@
--- 50 institutions in Federal / State / Private categories.
--- Supabase dashboard > SQL Editor, ONE statement at a time (6 statements total).
--- Rerunnable: guards skip existing rows. Live `profiles`/`connections` untouched.
+-- DO NOT PASTE THIS FILE into the SQL Editor. Run backend/seed/01-alter.sql
+-- through backend/seed/06-private.sql instead, one file per query (Ctrl+A, paste, Run).
+-- This file is reference only. The runnable statements live in backend/seed/.
 
 -- 1/5: category columns (public read policy already covers new columns)
 alter table institutions add column if not exists ownership text, add column if not exists state text;
