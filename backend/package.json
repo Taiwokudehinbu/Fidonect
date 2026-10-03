@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Fidonect backend stub (Phase 1 MVP)",
   "main": "server.js",
-  "engines": { "node": "20.x" },
+  "engines": { "node": "22.x" },
   "scripts": {
     "start": "node server.js",
     "seed": "node prisma/seed.js"
