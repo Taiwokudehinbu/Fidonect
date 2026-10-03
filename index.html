@@ -13,10 +13,21 @@ body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-s
 nav a{color:#fff;text-decoration:none;margin:0 8px;font-size:14px}
 nav a:hover{text-decoration:underline}
 .wrap{max-width:900px;margin:0 auto;padding:16px}
-.hero{text-align:center;padding:20px 8px}
-.hero h1{font-size:36px;line-height:1.1;margin:8px 0}
+.hero{text-align:center;margin:-16px -16px 12px;padding:52px 20px 40px;color:#fff;border-radius:0 0 26px 26px;background:radial-gradient(600px 200px at 15% 0%,rgba(45,212,191,.35),transparent),radial-gradient(500px 220px at 85% 10%,rgba(251,191,36,.28),transparent),linear-gradient(160deg,#0a1f33 0%,#123a5c 60%,#0f2a43 100%)}
+.hero h1{font-size:38px;line-height:1.1;margin:8px 0;color:#fff}
+.hero h1 .accent{color:#fbbf24}
+.hero p{color:#cbd5e1;max-width:560px;margin:8px auto}
+.cta-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.btn-gold{background:#f59e0b;border-color:#f59e0b;color:#0a1f33}
+.btn-gold:hover{background:#d97706;border-color:#d97706}
+.btn-light{background:#fff;border-color:#fff;color:#0a1f33}
+.stats{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.stat b{display:block;color:#fbbf24;font-size:22px}
+.stat span{font-size:12px;color:#cbd5e1}
 .muted{color:#637083}
-.card{background:#fff;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 4px 16px rgba(15,42,67,.08)}
+.card{background:#fff;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 4px 16px rgba(15,42,67,.08);transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,42,67,.14)}
+h2{border-left:4px solid #f59e0b;padding-left:10px}
 .search-row{display:flex;gap:8px;flex-wrap:wrap}
 .input{flex:1;min-width:200px;padding:12px;border:1px solid #d7dee8;border-radius:10px;font:inherit}
 .btn{cursor:pointer;border-radius:999px;border:1px solid #0a1f33;padding:12px 22px;background:#0a1f33;color:#fff;font-weight:700}
@@ -40,8 +51,10 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <div class="wrap" id="home">
 <div class="hero">
-<h1>Connect. Know. Prepare. Belong.</h1>
-<p class="muted">Welcome to Fidonect — meet future classmates, mentors and campus guides before you resume.</p>
+<h1>Connect. Know. Prepare. <span class="accent">Belong.</span></h1>
+<p>Welcome to Fidonect — meet future classmates, mentors and campus guides before you resume. Your campus journey starts with confidence.</p>
+<div class="cta-row"><a href="#auth" class="btn btn-gold" style="text-decoration:none">Join free</a><a href="#schools" class="btn btn-light" style="text-decoration:none">Explore schools</a></div>
+<div class="stats"><div class="stat"><b>2,400+</b><span>students connecting</span></div><div class="stat"><b>3</b><span>institutions live</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
 </div>
 
 <div class="card" id="auth">
@@ -84,6 +97,13 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div id="students">
 <h2>Sample student connections (mock data)</h2>
 <div class="grid" id="studentGrid"></div>
+</div>
+
+<div class="card" id="requests" style="display:none">
+<h2>Connection requests</h2>
+<div id="reqIncoming"></div>
+<div id="reqOutgoing"></div>
+<div id="reqAccepted"></div>
 </div>
 
 <div class="card" id="live">
@@ -153,7 +173,7 @@ document.getElementById("findBtn").onclick=async function(){
 document.getElementById("schoolDetail").innerHTML="";
 await loadSchools();
 var q=document.getElementById("schoolSearch").value;
-var n=renderSchools(q); renderStudents(q);
+var n=renderSchools(q); var sn=await refreshStudents(q);
 var live=liveSchools?" (live)":" (mock data)";
 document.getElementById("resultMsg").textContent=n+" school(s) found for \""+ (q||"all schools") +"\""+live+".";
 };
@@ -190,7 +210,7 @@ return {ok:r.ok,body:await r.json()};
 }
 async function renderAuth(){
 var s=sess(),form=document.getElementById("authForm"),view=document.getElementById("authedView");
-if(!s){form.style.display="";view.style.display="none";return;}
+if(!s){form.style.display="";view.style.display="none";document.getElementById("requests").style.display="none";return;}
 var p=await fetchProfile(s.access_token);
 if(!p.ok){setSess(null);document.getElementById("authMsg").textContent="Session expired — logged out.";return;}
 form.style.display="none";view.style.display="";
@@ -198,6 +218,7 @@ document.getElementById("meName").textContent=p.body.name+" ("+p.body.user_type+
 document.getElementById("meVis").textContent=p.body.visibility;
 document.getElementById("meDetail").textContent=(p.body.school||"No school yet")+" • "+p.body.email;
 document.getElementById("visEdit").value=p.body.visibility;
+if(typeof refreshStudents==="function"){refreshStudents("");loadRequests();}
 }
 document.getElementById("signupBtn").onclick=async function(){
 var m=document.getElementById("authMsg");
@@ -225,8 +246,59 @@ var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
 };
 document.getElementById("logoutBtn").onclick=function(){setSess(null);document.getElementById("authMsg").textContent="Logged out.";};
+// ---- Phase 3: Connections UI (live when logged in, mocks otherwise) ----
+var connState={};
+async function refreshStudents(filter){
+var s=sess();
+if(!s){document.getElementById("requests").style.display="none";return renderStudents(filter);}
+try{
+var r=await fetch(apiBase()+"/api/students",{headers:{Authorization:"Bearer "+s.access_token}});
+var rows=await r.json();if(!r.ok)throw new Error(rows.error||("HTTP "+r.status));
+var m=await fetch(apiBase()+"/api/connections/mine",{headers:{Authorization:"Bearer "+s.access_token}});
+var conns=await m.json();if(!m.ok)throw new Error(conns.error||"");
+connState={};var me=s.user.id;
+conns.forEach(function(c){var oid=c.requester_id===me?c.addressee_id:c.requester_id;connState[oid]=c.status==="accepted"?"connected":(c.requester_id===me?"pending":"incoming");});
+var q=(filter||"").toLowerCase();
+var list=rows.filter(function(p){return !q||(p.name+(p.dept||"")+(p.school||"")).toLowerCase().indexOf(q)>-1;});
+document.getElementById("studentGrid").innerHTML=list.map(function(p){
+var st=connState[p.id];
+var btn=st==="connected"?'<button class="btn ghost" disabled>✓ Connected</button>':st==="pending"?'<button class="btn ghost" disabled>Request sent</button>':st==="incoming"?'<button class="btn ghost" onclick="document.getElementById(\'requests\').scrollIntoView()">Incoming — review below</button>':'<button class="btn ghost" onclick="sendRequest(\''+p.id+'\')">Connect</button>';
+return '<div class="person"><h4>'+p.name+'</h4><div>'+(p.dept||"")+' — '+(p.school||"")+'</div><div class="muted">'+(p.session||"")+'</div><p>'+btn+'</p></div>';
+}).join("")||'<p class="muted">No students yet — invite a classmate to register.</p>';
+loadRequests();return list.length;
+}catch(e){return renderStudents(filter);}
+}
+async function sendRequest(toId){
+var s=sess();if(!s){location.hash="#auth";return;}
+try{var r=await fetch(apiBase()+"/api/connections/request",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({toId:toId})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+refreshStudents(document.getElementById("schoolSearch").value);
+}catch(e){alert("Failed: "+e.message);}
+}
+async function respondReq(id,action){
+var s=sess();if(!s)return;
+try{var r=await fetch(apiBase()+"/api/connections/"+id+"/respond",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({action:action})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+loadRequests();refreshStudents(document.getElementById("schoolSearch").value);
+}catch(e){alert("Failed: "+e.message);}
+}
+async function loadRequests(){
+var s=sess(),card=document.getElementById("requests");
+if(!s){card.style.display="none";return;}
+try{var r=await fetch(apiBase()+"/api/connections/mine",{headers:{Authorization:"Bearer "+s.access_token}});
+var conns=await r.json();if(!r.ok)throw new Error();
+var me=s.user.id;
+var inc=conns.filter(function(c){return c.addressee_id===me&&c.status==="pending";});
+var out=conns.filter(function(c){return c.requester_id===me&&c.status==="pending";});
+var acc=conns.filter(function(c){return c.status==="accepted";});
+card.style.display="";
+document.getElementById("reqIncoming").innerHTML="<h3>Incoming ("+inc.length+")</h3>"+(inc.map(function(c){var n=c.other?c.other.name:c.requester_id;return '<p>'+n+' <button class="btn ghost" onclick="respondReq('+c.id+',\'accept\')">Accept</button> <button class="btn ghost" onclick="respondReq('+c.id+',\'decline\')">Decline</button></p>';}).join("")||'<p class="muted">None.</p>');
+document.getElementById("reqOutgoing").innerHTML="<h3>Sent ("+out.length+")</h3>"+(out.map(function(c){var n=c.other?c.other.name:c.addressee_id;return '<p class="muted">'+n+' — awaiting reply</p>';}).join("")||'<p class="muted">None.</p>');
+document.getElementById("reqAccepted").innerHTML="<h3>Connected ("+acc.length+")</h3>"+(acc.map(function(c){var n=c.other?(c.other.name+" — "+(c.other.school||"")):"?";return '<p>'+n+'</p>';}).join("")||'<p class="muted">None yet.</p>');
+}catch(e){card.style.display="none";}
+}
 loadSchoolOptions();renderAuth();
-(async function(){await loadSchools();renderSchools("");renderStudents("");})();
+(async function(){await loadSchools();renderSchools("");await refreshStudents("");})();
 </script>
 </body>
 </html>

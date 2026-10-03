@@ -145,6 +145,61 @@ app.put("/api/profile", async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
+
+// ---- Phase 3: Connections (Supabase; RLS enforced in the database) ----
+app.get("/api/students", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("profiles")
+    .select("id,name,user_type,school,dept,session").neq("visibility", "private").neq("id", auth.user.id).limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post("/api/connections/request", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const toId = req.body && req.body.toId;
+  if (typeof toId !== "string" || !toId) return bad(res, "toId is required");
+  if (toId === auth.user.id) return bad(res, "cannot connect to yourself");
+  const { data, error } = await auth.me.from("connections")
+    .insert({ requester_id: auth.user.id, addressee_id: toId }).select().single();
+  if (error) {
+    if (error.code === "23505") return res.status(409).json({ error: "Request already exists" });
+    return res.status(500).json({ error: error.message });
+  }
+  res.json(data);
+});
+
+app.get("/api/connections/mine", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("connections").select("*")
+    .or("requester_id.eq." + auth.user.id + ",addressee_id.eq." + auth.user.id).order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  const ids = [...new Set((data || []).flatMap(c => [c.requester_id, c.addressee_id]).filter(id => id !== auth.user.id))];
+  let names = {};
+  if (ids.length) {
+    const { data: profs } = await auth.me.from("profiles").select("id,name,school").in("id", ids);
+    (profs || []).forEach(p => { names[p.id] = p; });
+  }
+  res.json((data || []).map(c => ({ ...c, other: names[c.requester_id === auth.user.id ? c.addressee_id : c.requester_id] || null })));
+});
+
+app.post("/api/connections/:id/respond", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = Number(req.params.id);
+  const action = req.body && req.body.action;
+  if (!Number.isInteger(id) || id <= 0) return bad(res, "id must be a positive integer");
+  if (!["accept", "decline"].includes(action)) return bad(res, "action must be accept or decline");
+  const { data, error } = await auth.me.from("connections")
+    .update({ status: action === "accept" ? "accepted" : "declined" })
+    .eq("id", id).eq("addressee_id", auth.user.id).eq("status", "pending").select();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data || !data.length) return res.status(404).json({ error: "Pending request not found" });
+  res.json(data[0]);
+});
 app.post("/api/users", (req, res) => {
   if (!req.body || !isText(req.body.name, 100)) return bad(res, "name is required (text, max 100 chars)");
   if (req.body.email !== undefined && !isEmail(req.body.email)) return bad(res, "email is invalid");
