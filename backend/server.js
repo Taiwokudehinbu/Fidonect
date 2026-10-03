@@ -231,17 +231,39 @@ app.post("/api/connections", (req, res) => {
   if (!req.body || req.body.fromId === undefined || req.body.toId === undefined) return bad(res, "fromId and toId are required");
   db.connections.push(req.body); res.json({ ok: true });
 });
-app.get("/api/communities/:school/posts", (req, res) => res.json(db.posts.filter(p => p.school === req.params.school)));
-app.post("/api/communities/:school/posts", (req, res) => {
+app.get("/api/communities/:school/posts", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Log in to read the community" });
+  if (!isText(req.params.school)) return bad(res, "school is required");
+  const { data, error } = await auth.me.from("posts").select("id,author_name,text,created_at")
+    .eq("school", req.params.school).order("created_at", { ascending: false }).limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+app.post("/api/communities/:school/posts", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Log in to post" });
   if (!isText(req.params.school)) return bad(res, "school is required");
   if (!req.body || !isText(req.body.text, 1000)) return bad(res, "text is required (max 1000 chars)");
-  const p = { school: req.params.school, ...req.body }; db.posts.push(p); res.json(p);
+  const { data: prof } = await auth.me.from("profiles").select("name").eq("id", auth.user.id).single();
+  const { data, error } = await auth.me.from("posts").insert({
+    school: req.params.school, author_id: auth.user.id,
+    author_name: (prof && prof.name) || "Student", text: req.body.text.trim()
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 app.post("/api/fido/ask", (req, res) => res.json({ source: "AI guidance", answer: "Stub: wire LLM + institutional knowledge base with source attribution (Official/Community/AI)." }));
 app.get("/api/mentors", (req, res) => res.json(db.mentors));
-app.post("/api/reports", (req, res) => {
+app.post("/api/reports", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Log in to report" });
   if (!req.body || !isText(req.body.target, 200) || !isText(req.body.reason, 500)) return bad(res, "target and reason are required");
-  db.reports.push(req.body); res.json({ ok: true });
+  const { data, error } = await auth.me.from("reports").insert({
+    reporter_id: auth.user.id, target: req.body.target.trim(), reason: req.body.reason.trim()
+  }).select("id,created_at").single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true, id: data.id });
 });
 
 const PORT = process.env.PORT || 3000;

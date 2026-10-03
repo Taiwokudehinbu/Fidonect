@@ -186,7 +186,8 @@ if(!r.ok)throw new Error(t.error||("HTTP "+r.status));
 var html='<div class="card"><h3>'+t.name+'</h3><p class="muted">'+(t.location||"")+((t.state&&t.location.indexOf(t.state)<0)?", "+t.state:"")+(t.ownership?" • "+t.ownership:"")+'</p>';
 html+=t.faculties.map(function(f){return '<p><b>'+f.name+'</b><br/>'+f.departments.map(function(d){return d.name+' ('+d.programmes.map(function(p){return p.name;}).join(", ")+')';}).join("<br/>")+'</p>';}).join("")||'<p class="muted">No faculties yet.</p>';
 if(t.hub)html+='<p><b>Campus info</b> <span class="pill">'+t.hub.source+'</span><br/>'+t.hub.overview+'<br/><span class="muted">Clearance: '+t.hub.clearance+'<br/>Fees: '+t.hub.fees+'<br/>Housing: '+t.hub.accommodation+'</span></p>';
-html+='</div>';box.innerHTML=html;
+html+='<div id="commWrap"><h3>Community</h3><p class="muted small">Stay safe: never share passwords, bank details, ID documents, or your exact home address.</p><div id="postList"></div><div class="search-row" id="postBox" style="display:none"><input id="postInput" class="input" /><button class="btn" onclick="sendPost()">Post</button></div><p class="muted" id="postLogin">Log in above to join the discussion.</p></div>';
+html+='</div>';box.innerHTML=html;currentSchool=t.name;loadPosts();
 }catch(e){box.innerHTML='<p class="muted">Failed: '+e.message+'</p>';}
 }
 function renderStudents(filter){
@@ -295,6 +296,34 @@ return '<div class="person"><h4>'+p.name+'</h4><div>'+(p.dept||"")+' — '+(p.sc
 }).join("")||'<p class="muted">No students yet — invite a classmate to register.</p>';
 loadRequests();return list.length;
 }catch(e){return renderStudents(filter);}
+}
+var currentSchool="";
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+async function loadPosts(){
+var s=sess();
+var box=document.getElementById("postBox"),login=document.getElementById("postLogin"),list=document.getElementById("postList");
+if(!list)return;
+if(!s){box.style.display="none";login.style.display="";list.innerHTML='<p class="muted">Log in to read the community.</p>';return;}
+box.style.display="";login.style.display="none";
+try{var r=await fetch(apiBase()+"/api/communities/"+encodeURIComponent(currentSchool)+"/posts",{headers:{Authorization:"Bearer "+s.access_token}});
+var rows=await r.json();if(!r.ok)throw new Error(rows.error||("HTTP "+r.status));
+list.innerHTML=rows.map(function(p){return '<div class="person"><b>'+esc(p.author_name)+'</b> <span class="muted small">'+new Date(p.created_at).toLocaleString()+'</span><p>'+esc(p.text)+'</p><button class="btn ghost" onclick="reportPost('+p.id+',\''+esc(p.author_name).replace(/'/g,"")+'\')">Report</button></div>';}).join("")||'<p class="muted">No posts yet — start the conversation.</p>';
+}catch(e){list.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
+}
+async function sendPost(){
+var s=sess();if(!s||!currentSchool)return;
+var inp=document.getElementById("postInput");
+try{var r=await fetch(apiBase()+"/api/communities/"+encodeURIComponent(currentSchool)+"/posts",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({text:inp.value})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+inp.value="";loadPosts();}catch(e){alert("Failed: "+e.message);}
+}
+async function reportPost(id,author){
+var s=sess();if(!s)return;
+var reason=prompt("Report this post by "+author+" — what happened? (harassment, scam, spam, other)");
+if(!reason)return;
+try{var r=await fetch(apiBase()+"/api/reports",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({target:"Post #"+id+" by "+author,reason:reason})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+alert("Report received. Moderators will review.");}catch(e){alert("Failed: "+e.message);}
 }
 async function sendRequest(toId){
 var s=sess();if(!s){location.hash="#auth";return;}
