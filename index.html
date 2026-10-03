@@ -24,6 +24,20 @@ nav a:hover{text-decoration:underline}
 .stats{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;margin-top:22px}
 .stat b{display:block;color:#fbbf24;font-size:22px}
 .stat span{font-size:12px;color:#cbd5e1}
+.orb-wrap{padding:6px 0 2px}
+.orb{position:relative;width:250px;height:250px;border-radius:50%;margin:4px auto;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;background:radial-gradient(circle at 32% 28%,#1d4e79,#0a1f33 72%);border:4px solid #f59e0b;box-shadow:0 0 42px rgba(245,158,11,.35),0 0 90px rgba(45,212,191,.22)}
+.orb::before{content:"";position:absolute;inset:-12px;border-radius:50%;border:2px dashed rgba(45,212,191,.55);animation:spin 14s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#orbWord{transition:opacity .4s}
+#orbWord.fade{opacity:0}
+.tagline{color:#cbd5e1;max-width:560px;margin:10px auto 0}
+.cat-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.cat{cursor:pointer;border-radius:999px;border:1px solid #d7dee8;padding:8px 16px;background:#fff;font-weight:600}
+.cat.active{background:#0a1f33;color:#fff;border-color:#0a1f33}
+.pill-fed{background:#0a1f33;color:#fff;border-radius:999px;padding:2px 10px;font-size:12px}
+.pill-state{background:#e6f6f3;color:#0b5e54;border-radius:999px;padding:2px 10px;font-size:12px}
+.pill-priv{background:#ede9fe;color:#5b21b6;border-radius:999px;padding:2px 10px;font-size:12px}
+@media(prefers-reduced-motion:reduce){.orb::before{animation:none}.card:hover{transform:none}}
 .muted{color:#637083}
 .card{background:#fff;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 4px 16px rgba(15,42,67,.08);transition:transform .15s,box-shadow .15s}
 .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,42,67,.14)}
@@ -51,10 +65,10 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <div class="wrap" id="home">
 <div class="hero">
-<h1>Connect. Know. Prepare. <span class="accent">Belong.</span></h1>
-<p>Welcome to Fidonect — meet future classmates, mentors and campus guides before you resume. Your campus journey starts with confidence.</p>
+<div class="orb-wrap"><div class="orb"><span id="orbWord">Connect.</span></div></div>
+<p class="tagline">Know. Prepare. Belong. — meet future classmates, mentors and campus guides before you resume. Your campus journey starts with confidence.</p>
 <div class="cta-row"><a href="#auth" class="btn btn-gold" style="text-decoration:none">Join free</a><a href="#schools" class="btn btn-light" style="text-decoration:none">Explore schools</a></div>
-<div class="stats"><div class="stat"><b>2,400+</b><span>students connecting</span></div><div class="stat"><b>3</b><span>institutions live</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
+<div class="stats"><div class="stat"><b>2,400+</b><span>students connecting</span></div><div class="stat"><b>50</b><span>institutions listed</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
 </div>
 
 <div class="card" id="auth">
@@ -89,7 +103,10 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 
 <div id="schools">
-<h2>Sample institutions (mock data)</h2>
+<h2>Institutions <span id="schoolCount" class="pill"></span></h2>
+<div class="cat-row" id="catRow">
+<button class="cat active" data-cat="">All</button><button class="cat" data-cat="Federal">Federal</button><button class="cat" data-cat="State">State</button><button class="cat" data-cat="Private">Private</button>
+</div>
 <div class="grid" id="schoolGrid"></div>
 <div id="schoolDetail"></div>
 </div>
@@ -124,9 +141,9 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <script>
 var schools = [
-{name:"University of Lagos (UNILAG)", loc:"Akoka, Lagos", students:1240},
-{name:"University of Ibadan (UI)", loc:"Ibadan, Oyo", students:860},
-{name:"Federal University of Technology, Akure (FUTA)", loc:"Akure, Ondo", students:890}
+{name:"University of Lagos (UNILAG)", loc:"Akoka, Lagos", students:1240, ownership:"Federal"},
+{name:"University of Ibadan (UI)", loc:"Ibadan, Oyo", students:860, ownership:"Federal"},
+{name:"Federal University of Technology, Akure (FUTA)", loc:"Akure, Ondo", students:890, ownership:"Federal"}
 ];
 var students = [
 {name:"Adaeze O.", dept:"Biology", school:"University of Lagos (UNILAG)", session:"2026/2027"},
@@ -135,7 +152,16 @@ var students = [
 {name:"Fatima A.", dept:"Microbiology", school:"Federal University of Technology, Akure (FUTA)", session:"2026/2027"}
 ];
 var liveSchools=null; // live rows from Supabase when reachable; mocks otherwise
-function normSchools(list){return list.map(function(s){return {id:s.id,name:s.name,loc:s.location||s.loc,live:!!s.id};});}
+var currentCat="";
+function normSchools(list){return list.map(function(s){return {id:s.id,name:s.name,loc:s.location||s.loc,ownership:s.ownership||"",state:s.state||"",live:!!s.id};});}
+function ownPill(o){if(o==="Federal")return ' <span class="pill-fed">Federal</span>';if(o==="State")return ' <span class="pill-state">State</span>';if(o==="Private")return ' <span class="pill-priv">Private</span>';return '';}
+document.getElementById("catRow").onclick=function(e){
+if(!e.target.dataset||e.target.dataset.cat===undefined)return;
+currentCat=e.target.dataset.cat;
+var btns=document.getElementById("catRow").querySelectorAll(".cat");
+for(var i=0;i<btns.length;i++)btns[i].classList.toggle("active",btns[i]===e.target);
+renderSchools(document.getElementById("schoolSearch").value);
+};
 async function loadSchools(){
 try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
 if(r.ok&&rows.length){liveSchools=normSchools(rows);return;}}catch(e){}
@@ -144,9 +170,10 @@ liveSchools=null;
 function renderSchools(filter){
 var q=(filter||"").toLowerCase();
 var base=liveSchools||normSchools(schools);
-var list=base.filter(function(s){return !q || s.name.toLowerCase().indexOf(q)>-1;});
+var list=base.filter(function(s){return (!q || s.name.toLowerCase().indexOf(q)>-1) && (!currentCat || s.ownership===currentCat);});
+document.getElementById("schoolCount").textContent=list.length+" shown";
 document.getElementById("schoolGrid").innerHTML=list.map(function(s){
-return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+'</p><p><button class="btn ghost" onclick="showTree('+(s.live?s.id:'null')+')">View departments</button></p></div>';
+return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+ownPill(s.ownership)+'</p><p><button class="btn ghost" onclick="showTree('+(s.live?s.id:'null')+')">View departments</button></p></div>';
 }).join("")||'<p class="muted">No schools match.</p>';
 return list.length;
 }
@@ -175,7 +202,8 @@ await loadSchools();
 var q=document.getElementById("schoolSearch").value;
 var n=renderSchools(q); var sn=await refreshStudents(q);
 var live=liveSchools?" (live)":" (mock data)";
-document.getElementById("resultMsg").textContent=n+" school(s) found for \""+ (q||"all schools") +"\""+live+".";
+var cat=currentCat?(" — "+currentCat):"";
+document.getElementById("resultMsg").textContent=n+" school(s)"+cat+" found for \""+ (q||"all schools") +"\""+live+".";
 };
 document.getElementById("schoolSearch").onkeydown=function(e){if(e.key==="Enter")document.getElementById("findBtn").click();};
 document.getElementById("loadLive").onclick=async function(){
@@ -199,7 +227,7 @@ function apiBase(){return (new URLSearchParams(location.search).get("api")||wind
 function sess(){try{return JSON.parse(localStorage.getItem("fidonect_session")||"null");}catch(e){return null;}}
 function setSess(s){if(s)localStorage.setItem("fidonect_session",JSON.stringify(s));else localStorage.removeItem("fidonect_session");renderAuth();}
 async function loadSchoolOptions(){
-try{var r=await fetch(apiBase()+"/api/institutions/test");var rows=await r.json();
+try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
 if(r.ok&&rows.length)document.getElementById("authSchool").innerHTML='<option value="">Select school…</option>'+rows.map(function(s){return '<option>'+s.name+'</option>';}).join("");
 else document.getElementById("authSchool").innerHTML='<option value="">Select school…</option><option>University of Lagos (UNILAG)</option><option>University of Ibadan (UI)</option><option>Federal University of Technology, Akure (FUTA)</option>';
 }catch(e){/* offline: leave default */}
@@ -298,6 +326,10 @@ document.getElementById("reqAccepted").innerHTML="<h3>Connected ("+acc.length+")
 }catch(e){card.style.display="none";}
 }
 loadSchoolOptions();renderAuth();
+// Orb: cycling word display (respects reduced-motion)
+(function(){var words=["Connect.","Know.","Prepare.","Belong."];var i=0;var el=document.getElementById("orbWord");if(!el)return;
+if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+setInterval(function(){el.classList.add("fade");setTimeout(function(){i=(i+1)%words.length;el.textContent=words[i];el.classList.remove("fade");},400);},2200);})();
 (async function(){await loadSchools();renderSchools("");await refreshStudents("");})();
 </script>
 </body>

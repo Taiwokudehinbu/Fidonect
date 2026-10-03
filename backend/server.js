@@ -31,7 +31,22 @@ app.get("/api/institutions/test", async (req, res) => {
 // ---- Phase 2: Institution data (public reads; RLS enforced in the database) ----
 app.get("/api/institutions", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
-  const { data, error } = await supabase.from("institutions").select("id,name,location").order("name");
+  const own = req.query.ownership;
+  if (own !== undefined && !["Federal", "State", "Private"].includes(own)) return bad(res, "ownership must be Federal, State, or Private");
+  const cols = "id,name,location,ownership,state";
+  const run = (select) => {
+    let q = supabase.from("institutions").select(select).order("name");
+    if (own && select.includes("ownership")) q = q.eq("ownership", own);
+    return q;
+  };
+  let { data, error } = await run(cols);
+  if (error && /column/i.test(error.message)) {
+    // Pre-upgrade schema (no ownership/state columns yet): basic list only.
+    // Category is unknown pre-upgrade, so filtered views honestly return empty.
+    const r2 = await run("id,name,location");
+    if (r2.error) return res.status(500).json({ error: r2.error.message });
+    return res.json(own ? [] : (r2.data || []));
+  }
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
