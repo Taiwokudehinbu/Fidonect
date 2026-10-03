@@ -1,5 +1,5 @@
 -- 50 institutions in Federal / State / Private categories.
--- Supabase dashboard > SQL Editor, ONE statement at a time (5 statements total).
+-- Supabase dashboard > SQL Editor, ONE statement at a time (6 statements total).
 -- Rerunnable: guards skip existing rows. Live `profiles`/`connections` untouched.
 
 -- 1/5: category columns (public read policy already covers new columns)
@@ -9,7 +9,12 @@ alter table institutions add column if not exists ownership text, add column if 
 update institutions set ownership = 'Federal', state = 'Lagos'
 where name = 'University of Lagos (UNILAG)';
 
--- 3/5: Federal (20 incl. UNILAG, skipped if present)
+-- 3/6: backfill rows seeded earlier without categories (e.g. Phase 2 UI/FUTA)
+update institutions set ownership = 'Federal',
+  state = case when name like '%Ibadan%' then 'Oyo' when name like '%FUTA%' or name like '%Akure%' then 'Ondo' else state end
+where ownership is null and (name like '%Ibadan%' or name like '%FUTA%' or name like '%Akure%');
+
+-- 4/6: Federal (20 incl. UNILAG, skipped if present)
 insert into institutions (name, location, ownership, state)
 select v.name, v.location, v.ownership, v.state from (values
 ('University of Lagos (UNILAG)', 'Akoka, Lagos', 'Federal', 'Lagos'),
@@ -35,7 +40,7 @@ select v.name, v.location, v.ownership, v.state from (values
 ) as v(name, location, ownership, state)
 where not exists (select 1 from institutions i where i.name = v.name);
 
--- 4/5: State (15)
+-- 5/6: State (15)
 insert into institutions (name, location, ownership, state)
 select v.name, v.location, v.ownership, v.state from (values
 ('Lagos State University (LASU)', 'Ojo, Lagos', 'State', 'Lagos'),
@@ -56,7 +61,7 @@ select v.name, v.location, v.ownership, v.state from (values
 ) as v(name, location, ownership, state)
 where not exists (select 1 from institutions i where i.name = v.name);
 
--- 5/5: Private (15)
+-- 6/6: Private (15)
 insert into institutions (name, location, ownership, state)
 select v.name, v.location, v.ownership, v.state from (values
 ('Covenant University', 'Ota, Ogun', 'Private', 'Ogun'),

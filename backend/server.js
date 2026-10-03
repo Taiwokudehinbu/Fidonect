@@ -55,7 +55,13 @@ app.get("/api/institutions/:id/tree", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return bad(res, "id must be a positive integer");
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
-  const { data: inst, error: iErr } = await supabase.from("institutions").select("id,name,location").eq("id", id).single();
+  const { data: inst, error: iErr } = await (async () => {
+    const full = await supabase.from("institutions").select("id,name,location,ownership,state").eq("id", id).single();
+    if (full.error && /column/i.test(full.error.message)) {
+      return supabase.from("institutions").select("id,name,location").eq("id", id).single();
+    }
+    return full;
+  })();
   if (iErr || !inst) return res.status(404).json({ error: "Institution not found" });
   const { data: facs, error: fErr } = await supabase.from("faculties").select("id,name").eq("institution_id", id).order("name");
   if (fErr) return res.status(500).json({ error: fErr.message });
