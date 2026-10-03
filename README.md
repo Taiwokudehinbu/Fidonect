@@ -1,5 +1,7 @@
 # Fidonect — Connect. Know. Prepare. Belong.
 
+**Live app:** https://fidonect-api.onrender.com/ (homepage + API; data from Supabase)
+
 AI-powered student & campus connection platform for Nigerian universities & polytechnics.
 MVP: registration, institution/department selection, student discovery, connections,
 messaging, communities, Fido AI (with Official / Community / AI labels), mentors,
