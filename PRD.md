@@ -118,6 +118,13 @@ Registration, profile, institution/course exploration, community discovery, stud
 ### 22.3 Future revenue (documented only — NOT built in MVP)
 Premium student features (matching, recommendations, resources, discovery tools); institution partnerships (verified communities, announcements, promotion, engagement, info pages, aggregated insights); sponsored listings/ads (accommodation, education, tech, data, transport); premium guides/webinars/career resources.
 Binding rules: sponsored content clearly labeled; NEVER sell student personal information; NEVER show a "verified" badge for institutions, mentors, or listings without a real, documented verification process (see §6, §24).
+
+### 22.3a Premium tiers (specification only — no billing code in MVP)
+- **Free (current MVP):** registration, profile, discovery, connections, communities, basic Fido, safety tools. Free forever for these essentials.
+- **Student Premium (future):** advanced institution/course matching, AI-powered recommendations, enhanced networking and discovery, premium guides/resources, extra personalization. Price: TBD NGN/month (decision required).
+- **Institution Partner (future):** verified community badge (only via real verification), approved announcements, programme/event promotion, engagement tools, privacy-conscious aggregated insights (never raw student data). Price: TBD NGN/term (decision required).
+- Billing provider: TBD — Paystack vs Flutterwave evaluation recorded as pending (Nigeria-first). No provider SDK, keys, webhooks, or billing tables until chosen.
+- Reserved future tables (do NOT create in MVP): `subscriptions`, `invoices`, `partner_plans`, `ad_campaigns`.
 ### 22.4 Monetization roadmap
 MVP: no payment processing, no subscriptions, no ads platform, no institution billing. Architecture must simply avoid blocking them.
 Future: subscriptions, payments (provider TBD — Paystack/Flutterwave to be evaluated for Nigeria), institution plans, sponsored listings, ad controls, premium resources, business dashboards.
