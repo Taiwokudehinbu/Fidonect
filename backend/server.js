@@ -4,9 +4,11 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const multer = require("multer");
 const supabase = require("./supabaseClient");
 const app = express();
 app.use(cors()); app.use(express.json({ limit: "100kb" }));
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 // Cheap-slice input validation: valid requests behave exactly as before;
 // malformed bodies get 400 instead of polluting the stores.
@@ -167,6 +169,26 @@ app.put("/api/profile", async (req, res) => {
   const { data, error } = await auth.me.from("profiles").update(patch).eq("id", auth.user.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
+});
+
+app.post("/api/profile/photo", upload.single("photo"), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  if (!req.file) return bad(res, "photo file is required");
+  if (!["image/jpeg", "image/png", "image/webp"].includes(req.file.mimetype)) return bad(res, "photo must be JPG, PNG, or WebP");
+  const ext = req.file.mimetype === "image/jpeg" ? "jpg" : req.file.mimetype.split("/")[1];
+  const objectPath = auth.user.id + "/" + Date.now() + "." + ext;
+  const { error: upErr } = await auth.me.storage.from("avatars").upload(objectPath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+  if (upErr) return res.status(500).json({ error: upErr.message });
+  const { data: pub } = auth.me.storage.from("avatars").getPublicUrl(objectPath);
+  const { data, error } = await auth.me.from("profiles").update({ photo_url: pub.publicUrl }).eq("id", auth.user.id).select("id,photo_url").single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.use((err, req, res, next) => {
+  if (err && err.code === "LIMIT_FILE_SIZE") return bad(res, "photo must be under 2MB");
+  next(err);
 });
 
 // ---- Phase 3: Connections (Supabase; RLS enforced in the database) ----

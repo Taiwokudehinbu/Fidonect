@@ -87,9 +87,10 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p id="authMsg" class="muted">Not logged in. Session stays in this browser only.</p>
 </div>
 <div id="authedView" style="display:none">
-<p><b id="meName"></b> <span id="meVis" class="pill"></span></p>
+<p><img id="mePhoto" alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;display:none;vertical-align:middle" /> <b id="meName"></b> <span id="meVis" class="pill"></span></p>
 <p class="muted" id="meDetail"></p>
 <div class="search-row"><select id="visEdit" class="input"><option value="public">Visible to: everyone</option><option value="connections">Visible to: connections</option><option value="private">Visible to: only me</option></select><button id="visSave" class="btn ghost">Save</button><button id="logoutBtn" class="btn ghost">Log out</button></div>
+<div class="search-row"><input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp" class="input" /><button id="photoBtn" class="btn ghost">Upload photo</button></div>
 </div>
 </div>
 
@@ -277,6 +278,8 @@ document.getElementById("meName").textContent=p.body.name+" ("+p.body.user_type+
 document.getElementById("meVis").textContent=p.body.visibility;
 document.getElementById("meDetail").textContent=(p.body.school||"No school yet")+" • "+p.body.email;
 document.getElementById("visEdit").value=p.body.visibility;
+var photo=document.getElementById("mePhoto");
+if(p.body.photo_url){photo.src=p.body.photo_url;photo.style.display="";}else{photo.style.display="none";}
 if(typeof refreshStudents==="function"){refreshStudents("");loadRequests();}
 }
 document.getElementById("signupBtn").onclick=async function(){
@@ -303,6 +306,17 @@ var m=document.getElementById("authMsg"),s=sess();if(!s)return;
 try{var r=await fetch(apiBase()+"/api/profile",{method:"PUT",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({visibility:document.getElementById("visEdit").value})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
+};
+document.getElementById("photoBtn").onclick=async function(){
+var s=sess();if(!s)return;
+var f=document.getElementById("photoFile").files[0];
+var m=document.getElementById("authMsg");
+if(!f){m.textContent="Choose a JPG/PNG/WebP photo first.";return;}
+m.textContent="Uploading photo…";
+try{var fd=new FormData();fd.append("photo",f);
+var r=await fetch(apiBase()+"/api/profile/photo",{method:"POST",headers:{Authorization:"Bearer "+s.access_token},body:fd});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+m.textContent="Photo updated.";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
 };
 document.getElementById("logoutBtn").onclick=function(){setSess(null);document.getElementById("authMsg").textContent="Logged out.";};
 // ---- Phase 3: Connections UI (live when logged in, mocks otherwise) ----
