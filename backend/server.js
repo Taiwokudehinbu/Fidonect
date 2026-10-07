@@ -139,6 +139,33 @@ app.post("/api/auth/login", async (req, res) => {
   res.json({ user: data.user, session: data.session });
 });
 
+app.post("/api/auth/resend", async (req, res) => {
+  const { email } = req.body || {};
+  if (!isEmail(email)) return bad(res, "email is invalid");
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true, message: "Confirmation email re-sent if the account exists." });
+});
+
+app.post("/api/profile/complete", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { name, type, school, visibility, consent } = req.body || {};
+  if (!isText(name, 100)) return bad(res, "name is required (text, max 100 chars)");
+  if (consent !== true) return bad(res, "consent is required (see PRD §23.2)");
+  const vis = ["public", "connections", "private"].includes(visibility) ? visibility : "connections";
+  const { data: existing } = await auth.me.from("profiles").select("id").eq("id", auth.user.id).single();
+  if (existing) return res.status(409).json({ error: "Profile already exists" });
+  const { data, error } = await auth.me.from("profiles").insert({
+    id: auth.user.id, email: auth.user.email, name: name.trim(),
+    user_type: ["prospective", "existing", "alumni"].includes(type) ? type : "prospective",
+    school: school || null, visibility: vis, consent_at: new Date().toISOString()
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 app.get("/api/profile", async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });

@@ -87,8 +87,20 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <select id="authVis" class="input"><option value="connections">Visible to: connections</option><option value="public">Visible to: everyone</option><option value="private">Visible to: only me</option></select>
 </div>
 <p style="font-size:13px"><label><input type="checkbox" id="authConsent" style="width:auto" /> I agree to Fidonect storing my profile for student matching (PRD §23).</label></p>
-<div class="search-row"><button id="signupBtn" class="btn">Create account</button><button id="loginBtn" class="btn ghost">Log in</button></div>
+<div class="search-row"><button id="signupBtn" class="btn">Create account</button><button id="loginBtn" class="btn ghost">Log in</button><button id="resendBtn" class="btn ghost">Resend confirmation</button></div>
 <p id="authMsg" class="muted">Not logged in. Session stays in this browser only.</p>
+</div>
+<div id="completeBox" style="display:none">
+<p><b>One step left — complete your profile.</b></p>
+<input id="cmpName" class="input" placeholder="Full name" />
+<div class="search-row">
+<select id="cmpType" class="input"><option value="prospective">Prospective student</option><option value="existing">Existing student</option><option value="alumni">Alumni</option></select>
+<select id="cmpSchool" class="input"><option value="">Select school…</option></select>
+<select id="cmpVis" class="input"><option value="connections">Visible to: connections</option><option value="public">Visible to: everyone</option><option value="private">Visible to: only me</option></select>
+</div>
+<p style="font-size:13px"><label><input type="checkbox" id="cmpConsent" style="width:auto" /> I agree to Fidonect storing my profile for student matching (PRD §23).</label></p>
+<div class="search-row"><button id="cmpBtn" class="btn">Save profile</button></div>
+<p id="cmpMsg" class="muted"></p>
 </div>
 <div id="authedView" style="display:none">
 <p><img id="mePhoto" alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;display:none;vertical-align:middle" /> <b id="meName"></b> <span id="meVis" class="pill"></span></p>
@@ -289,13 +301,19 @@ else document.getElementById("authSchool").innerHTML='<option value="">Select sc
 }
 async function fetchProfile(token){
 var r=await fetch(apiBase()+"/api/profile",{headers:{Authorization:"Bearer "+token}});
-return {ok:r.ok,body:await r.json()};
+return {ok:r.ok,status:r.status,body:await r.json()};
 }
 async function renderAuth(){
 var s=sess(),form=document.getElementById("authForm"),view=document.getElementById("authedView");
-if(!s){form.style.display="";view.style.display="none";document.getElementById("requests").style.display="none";return;}
+if(!s){form.style.display="";view.style.display="none";document.getElementById("requests").style.display="none";document.getElementById("completeBox").style.display="none";return;}
 var p=await fetchProfile(s.access_token);
-if(!p.ok){setSess(null);document.getElementById("authMsg").textContent="Session expired — logged out.";return;}
+if(!p.ok){
+if(p.status===404){form.style.display="none";view.style.display="none";
+var cb=document.getElementById("completeBox");cb.style.display="";
+document.getElementById("cmpSchool").innerHTML=document.getElementById("authSchool").innerHTML;
+document.getElementById("cmpMsg").textContent="Email confirmed — finish your profile to continue.";return;}
+setSess(null);document.getElementById("authMsg").textContent="Session expired — logged out.";return;}
+document.getElementById("completeBox").style.display="none";
 form.style.display="none";view.style.display="";
 document.getElementById("meName").textContent=p.body.name+" ("+p.body.user_type+")";
 document.getElementById("meVis").textContent=p.body.visibility;
@@ -340,6 +358,22 @@ try{var fd=new FormData();fd.append("photo",f);
 var r=await fetch(apiBase()+"/api/profile/photo",{method:"POST",headers:{Authorization:"Bearer "+s.access_token},body:fd});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 m.textContent="Photo updated.";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
+};
+document.getElementById("cmpBtn").onclick=async function(){
+var s=sess();if(!s)return;
+var m=document.getElementById("cmpMsg");
+var body={name:document.getElementById("cmpName").value,type:document.getElementById("cmpType").value,school:document.getElementById("cmpSchool").value,visibility:document.getElementById("cmpVis").value,consent:document.getElementById("cmpConsent").checked};
+m.textContent="Saving profile…";
+try{var r=await fetch(apiBase()+"/api/profile/complete",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(body)});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+document.getElementById("completeBox").style.display="none";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
+};
+document.getElementById("resendBtn").onclick=async function(){
+var m=document.getElementById("authMsg");var email=document.getElementById("authEmail").value;
+m.textContent="Sending…";
+try{var r=await fetch(apiBase()+"/api/auth/resend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+m.textContent=j.message;}catch(e){m.textContent="Failed: "+e.message;}
 };
 document.getElementById("logoutBtn").onclick=function(){setSess(null);document.getElementById("authMsg").textContent="Logged out.";};
 // ---- Phase 3: Connections UI (live when logged in, mocks otherwise) ----
