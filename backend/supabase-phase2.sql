@@ -51,72 +51,72 @@ create policy "public read" on hub_pages for select to anon using (true);
 
 -- 7: seed missing institutions (UNILAG row already exists)
 insert into institutions (name, location)
-select 'University of Ibadan (UI)', 'Ibadan, Oyo'
-where not exists (select 1 from institutions where name = 'University of Ibadan (UI)');
+select 'University of Ibadan', 'Ibadan, Oyo'
+where not exists (select 1 from institutions where name = 'University of Ibadan');
 insert into institutions (name, location)
-select 'Federal University of Technology, Akure (FUTA)', 'Akure, Ondo'
-where not exists (select 1 from institutions where name = 'Federal University of Technology, Akure (FUTA)');
+select 'Federal University of Technology, Akure', 'Akure, Ondo'
+where not exists (select 1 from institutions where name = 'Federal University of Technology, Akure');
 
 -- 8: seed faculties
 insert into faculties (institution_id, name)
-select id, 'Faculty of Science' from institutions where name = 'University of Lagos (UNILAG)'
+select id, 'Faculty of Science' from institutions where name = 'University of Lagos'
 on conflict (institution_id, name) do nothing;
 insert into faculties (institution_id, name)
-select id, 'Faculty of Engineering' from institutions where name = 'University of Lagos (UNILAG)'
+select id, 'Faculty of Engineering' from institutions where name = 'University of Lagos'
 on conflict (institution_id, name) do nothing;
 insert into faculties (institution_id, name)
-select id, 'Faculty of Science' from institutions where name = 'University of Ibadan (UI)'
+select id, 'Faculty of Science' from institutions where name = 'University of Ibadan'
 on conflict (institution_id, name) do nothing;
 insert into faculties (institution_id, name)
-select id, 'School of Sciences' from institutions where name = 'Federal University of Technology, Akure (FUTA)'
+select id, 'School of Sciences' from institutions where name = 'Federal University of Technology, Akure'
 on conflict (institution_id, name) do nothing;
 
 -- 9: seed departments
 insert into departments (faculty_id, name)
 select f.id, 'Biology' from faculties f join institutions i on i.id = f.institution_id
-where i.name = 'University of Lagos (UNILAG)' and f.name = 'Faculty of Science'
+where i.name = 'University of Lagos' and f.name = 'Faculty of Science'
 on conflict (faculty_id, name) do nothing;
 insert into departments (faculty_id, name)
 select f.id, 'Chemistry' from faculties f join institutions i on i.id = f.institution_id
-where i.name = 'University of Lagos (UNILAG)' and f.name = 'Faculty of Science'
+where i.name = 'University of Lagos' and f.name = 'Faculty of Science'
 on conflict (faculty_id, name) do nothing;
 insert into departments (faculty_id, name)
 select f.id, 'Computer Engineering' from faculties f join institutions i on i.id = f.institution_id
-where i.name = 'University of Lagos (UNILAG)' and f.name = 'Faculty of Engineering'
+where i.name = 'University of Lagos' and f.name = 'Faculty of Engineering'
 on conflict (faculty_id, name) do nothing;
 insert into departments (faculty_id, name)
 select f.id, 'Biology' from faculties f join institutions i on i.id = f.institution_id
-where i.name = 'University of Ibadan (UI)' and f.name = 'Faculty of Science'
+where i.name = 'University of Ibadan' and f.name = 'Faculty of Science'
 on conflict (faculty_id, name) do nothing;
 insert into departments (faculty_id, name)
 select f.id, 'Microbiology' from faculties f join institutions i on i.id = f.institution_id
-where i.name = 'Federal University of Technology, Akure (FUTA)' and f.name = 'School of Sciences'
+where i.name = 'Federal University of Technology, Akure' and f.name = 'School of Sciences'
 on conflict (faculty_id, name) do nothing;
 
 -- 10: seed programmes
 insert into programmes (department_id, name)
 select d.id, 'B.Sc. Biology' from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
-where i.name = 'University of Lagos (UNILAG)' and d.name = 'Biology'
+where i.name = 'University of Lagos' and d.name = 'Biology'
 on conflict (department_id, name) do nothing;
 insert into programmes (department_id, name)
 select d.id, 'B.Sc. Microbiology' from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
-where i.name = 'University of Lagos (UNILAG)' and d.name = 'Biology'
+where i.name = 'University of Lagos' and d.name = 'Biology'
 on conflict (department_id, name) do nothing;
 insert into programmes (department_id, name)
 select d.id, 'B.Sc. Chemistry' from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
-where i.name = 'University of Lagos (UNILAG)' and d.name = 'Chemistry'
+where i.name = 'University of Lagos' and d.name = 'Chemistry'
 on conflict (department_id, name) do nothing;
 insert into programmes (department_id, name)
 select d.id, 'B.Eng. Computer Engineering' from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
-where i.name = 'University of Lagos (UNILAG)' and d.name = 'Computer Engineering'
+where i.name = 'University of Lagos' and d.name = 'Computer Engineering'
 on conflict (department_id, name) do nothing;
 insert into programmes (department_id, name)
 select d.id, 'B.Sc. Zoology' from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
-where i.name = 'University of Ibadan (UI)' and d.name = 'Biology'
+where i.name = 'University of Ibadan' and d.name = 'Biology'
 on conflict (department_id, name) do nothing;
 insert into programmes (department_id, name)
 select d.id, 'B.Sc. Microbiology' from departments d join faculties f on f.id = d.faculty_id join institutions i on i.id = f.institution_id
-where i.name = 'Federal University of Technology, Akure (FUTA)' and d.name = 'Microbiology'
+where i.name = 'Federal University of Technology, Akure' and d.name = 'Microbiology'
 on conflict (department_id, name) do nothing;
 
 -- 11: seed UNILAG hub page
@@ -127,5 +127,5 @@ select id,
   'See official portal; varies by faculty.',
   'Hostels limited — apply early; private hostels in Akoka/Bariga.',
   'Official + Community'
-from institutions where name = 'University of Lagos (UNILAG)'
+from institutions where name = 'University of Lagos'
 on conflict (institution_id) do nothing;

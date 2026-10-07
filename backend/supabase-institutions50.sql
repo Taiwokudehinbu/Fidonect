@@ -1,6 +1,6 @@
--- DO NOT PASTE THIS FILE into the SQL Editor. Run backend/seed/01-alter.sql
--- through backend/seed/06-private.sql instead, one file per query (Ctrl+A, paste, Run).
--- This file is reference only. The runnable statements live in backend/seed/.
+-- SUPERSEDED by backend/seed/institutions-all.csv (328 NUC universities + 2
+-- polytechnics, canonical NUC names). Kept as reference only — do not run.
+-- To load: delete existing rows in Table Editor, then Import CSV.
 
 -- 1/5: category columns (public read policy already covers new columns)
 alter table institutions add column if not exists ownership text, add column if not exists state text;

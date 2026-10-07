@@ -1,0 +1,331 @@
+name,location,ownership,state
+Abubakar Tafawa Balewa University Bauchi,"Bauchi, Bauchi",Federal,Bauchi
+"Ahmadu Bello University, Zaria","Zaria, Kaduna",Federal,Kaduna
+"Bayero University, Kano","Kano, Kano",Federal,Kano
+"Federal University Gashua, Yobe","Gashua, Yobe",Federal,Yobe
+"Federal University of Petroleum Resources, Effurun","Effurun, Delta",Federal,Delta
+"Federal University of Technology, Akure","Akure, Ondo",Federal,Ondo
+"Federal University of Technology, Minna","Minna, Niger",Federal,Niger
+"Federal University of Technology, Owerri","Owerri, Imo",Federal,Imo
+"Federal University, Dutse, Jigawa State","Dutse, Jigawa",Federal,Jigawa
+"Federal University, Dutsin-Ma, Katsina","Dutsin-Ma, Katsina",Federal,Katsina
+"Federal University, Kashere, Gombe State","Kashere, Gombe",Federal,Gombe
+"Federal University, Lafia, Nasarawa State","Lafia, Nasarawa",Federal,Nasarawa
+"Federal University, Lokoja, Kogi State","Lokoja, Kogi",Federal,Kogi
+"Alex Ekwueme University, Ndufu-Alike, Ebonyi State","Ndufu-Alike, Ebonyi",Federal,Ebonyi
+"Federal University, Otuoke, Bayelsa","Otuoke, Bayelsa",Federal,Bayelsa
+"Federal University, Oye-Ekiti, Ekiti State","Oye-Ekiti, Ekiti",Federal,Ekiti
+"Federal University, Wukari, Taraba State","Wukari, Taraba",Federal,Taraba
+"Federal University, Birnin Kebbi","Birnin Kebbi, Kebbi",Federal,Kebbi
+"Federal University, Gusau Zamfara","Gusau, Zamfara",Federal,Zamfara
+Michael Okpara University of Agricultural Umudike,"Umudike, Abia",Federal,Abia
+"Modibbo Adama University of Technology, Yola","Yola, Adamawa",Federal,Adamawa
+"National Open University of Nigeria, Abuja","Abuja, FCT",Federal,FCT
+Nigeria Police Academy Wudil,"Wudil, Kano",Federal,Kano
+Nigerian Defence Academy Kaduna,"Kaduna, Kaduna",Federal,Kaduna
+"Nnamdi Azikiwe University, Awka","Awka, Anambra",Federal,Anambra
+"Obafemi Awolowo University, Ile-Ife","Ile-Ife, Osun",Federal,Osun
+"University of Abuja, Gwagwalada","Gwagwalada, FCT",Federal,FCT
+"Federal University of Agriculture, Abeokuta","Abeokuta, Ogun",Federal,Ogun
+"Joseph Sarwuan Tarka University, Makurdi","Makurdi, Benue",Federal,Benue
+University of Benin,"Benin City, Edo",Federal,Edo
+University of Calabar,"Calabar, Cross River",Federal,Cross River
+University of Ibadan,"Ibadan, Oyo",Federal,Oyo
+University of Ilorin,"Ilorin, Kwara",Federal,Kwara
+University of Jos,"Jos, Plateau",Federal,Plateau
+University of Lagos,"Akoka, Lagos",Federal,Lagos
+University of Maiduguri,"Maiduguri, Borno",Federal,Borno
+"University of Nigeria, Nsukka","Nsukka, Enugu",Federal,Enugu
+University of Port-Harcourt,"Choba, Rivers",Federal,Rivers
+University of Uyo,"Uyo, Akwa Ibom",Federal,Akwa Ibom
+Usumanu Danfodiyo University,"Sokoto, Sokoto",Federal,Sokoto
+"Nigerian Maritime University Okerenkoko, Delta State","Okerenkoko, Delta",Federal,Delta
+"Air Force Institute of Technology, Kaduna","Kaduna, Kaduna",Federal,Kaduna
+Nigerian Army University Biu,"Biu, Borno",Federal,Borno
+"Federal University of Health Sciences, Otukpo, Benue State","Otukpo, Benue",Federal,Benue
+"Federal University of Agriculture, Zuru, Kebbi State","Zuru, Kebbi",Federal,Kebbi
+"Federal University of Technology, Babura, Jigawa State","Babura, Jigawa",Federal,Jigawa
+"Federal University of Technology, Ikot Abasi, Akwa Ibom State","Ikot Abasi, Akwa Ibom",Federal,Akwa Ibom
+"Federal University of Health Sciences, Azare, Bauchi State","Azare, Bauchi",Federal,Bauchi
+"Federal University of Health Sciences, Ila Orangun, Osun State","Ila Orangun, Osun",Federal,Osun
+"David Nweze Umahi Federal University of Medical Sciences, Uburu","Uburu, Ebonyi",Federal,Ebonyi
+"Admiralty University Ibusa, Delta State","Ibusa, Delta",Federal,Delta
+"Federal University of Transportation Daura, Katsina","Daura, Katsina",Federal,Katsina
+African Aviation and Aerospace University,"Abuja, FCT",Federal,FCT
+"National University of Science and Technology, Abuja","Abuja, FCT",Federal,FCT
+"Federal University of Agriculture Bassam-Biri, Bayelsa","Bassam-Biri, Bayelsa",Federal,Bayelsa
+"Federal University of Health Sciences Kwale, Delta State","Kwale, Delta",Federal,Delta
+"Federal University of Health Sciences, Katsina","Katsina, Katsina",Federal,Katsina
+"Federal University of Agriculture, Mubi","Mubi, Adamawa",Federal,Adamawa
+"Federal University of Education, Zaria, Kaduna State","Zaria, Kaduna",Federal,Kaduna
+"Alvan Ikoku Federal University of Education, Owerri, Imo State","Owerri, Imo",Federal,Imo
+"Yusuf Maitama Sule Federal University of Education, Kano","Kano, Kano",Federal,Kano
+"Adeyemi Federal University of Education, Ondo","Ondo, Ondo",Federal,Ondo
+"Federal University of Allied Health Sciences, Enugu","Enugu, Enugu",Federal,Enugu
+"Federal University of Medicine and Medical Sciences, Abeokuta","Abeokuta, Ogun",Federal,Ogun
+"Federal University of Education Pankshin, Plateau State","Pankshin, Plateau",Federal,Plateau
+"Federal University of Education Kontagora, Niger State","Kontagora, Niger",Federal,Niger
+"University of Maritime Studies, Oron, Akwa Ibom State","Oron, Akwa Ibom",Federal,Akwa Ibom
+"Federal University of Environment and Technology, Tai Town, Ogoniland, Rivers State","Tai, Rivers",Federal,Rivers
+"Federal University of Applied Sciences, Kachia, Kaduna State","Kachia, Kaduna",Federal,Kaduna
+"Tai Solarin Federal University of Education, Ijagun, Ijebu Ode","Ijagun, Ogun",Federal,Ogun
+"Federal University of Agriculture and Developmental Studies, Iragbuji, Osun State","Iragbuji, Osun",Federal,Osun
+"Federal University of Technology and Environmental Studies, Iyin-Ekiti, Ekiti State","Iyin-Ekiti, Ekiti",Federal,Ekiti
+"Federal University of Agriculture and Technology Okeho, Oyo State","Okeho, Oyo",Federal,Oyo
+"Federal University of Health Science and Technology, Tsafe","Tsafe, Zamfara",Federal,Zamfara
+Federal University of Agriculture and Technology Obio-Akpa Akwa Ibom State,"Obio-Akpa, Akwa Ibom",Federal,Akwa Ibom
+"Federal University of Science and Technology, Epe","Epe, Lagos",Federal,Lagos
+"Federal University of Science and Technology, Kabo, Kano","Kabo, Kano",Federal,Kano
+Rivers State University,"Port Harcourt, Rivers",State,Rivers
+"Ambrose Alli University, Ekpoma","Ekpoma, Edo",State,Edo
+"Abia State University, Uturu","Uturu, Abia",State,Abia
+Ekiti State University,"Ado-Ekiti, Ekiti",State,Ekiti
+"Enugu State University of Science and Technology, Enugu","Enugu, Enugu",State,Enugu
+"Olabisi Onabanjo University, Ago Iwoye","Ago Iwoye, Ogun",State,Ogun
+"Lagos State University, Ojo","Ojo, Lagos",State,Lagos
+"Ladoke Akintola University of Technology, Ogbomoso","Ogbomoso, Oyo",State,Oyo
+"Rev. Fr. Moses Orshio Adasu University, Makurdi","Makurdi, Benue",State,Benue
+"Delta State University, Abraka","Abraka, Delta",State,Delta
+"Imo State University, Owerri","Owerri, Imo",State,Imo
+"Adekunle Ajasin University, Akungba","Akungba, Ondo",State,Ondo
+"Prince Abubakar Audu University, Anyigba","Anyigba, Kogi",State,Kogi
+"Chukwuemeka Odumegwu Ojukwu University, Uli","Uli, Anambra",State,Anambra
+"Ebonyi State University, Abakaliki","Abakaliki, Ebonyi",State,Ebonyi
+"Aliko Dangote University of Science and Technology, Wudil","Wudil, Kano",State,Kano
+"Niger Delta University, Yenagoa","Yenagoa, Bayelsa",State,Bayelsa
+"Adamawa State University, Mubi","Mubi, Adamawa",State,Adamawa
+"Nasarawa State University, Keffi","Keffi, Nasarawa",State,Nasarawa
+"University of Cross River State, Calabar","Calabar, Cross River",State,Cross River
+"Gombe State University, Gombe","Gombe, Gombe",State,Gombe
+"Kaduna State University, Kaduna","Kaduna, Kaduna",State,Kaduna
+"Ibrahim Badamasi Babangida University, Lapai","Lapai, Niger",State,Niger
+"Plateau State University, Bokkos","Bokkos, Plateau",State,Plateau
+"Yobe State University, Damaturu","Damaturu, Yobe",State,Yobe
+"Kebbi State University of Science and Technology, Aliero","Aliero, Kebbi",State,Kebbi
+"Umar Musa Yar'Adua University, Katsina","Katsina, Katsina",State,Katsina
+"Osun State University, Osogbo","Osogbo, Osun",State,Osun
+"Olusegun Agagu University of Science and Technology, Okitipupa","Okitipupa, Ondo",State,Ondo
+"Taraba State University, Jalingo","Jalingo, Taraba",State,Taraba
+"Kwara State University, Ilorin","Ilorin, Kwara",State,Kwara
+Sokoto State University,"Sokoto, Sokoto",State,Sokoto
+"Akwa Ibom State University, Ikot Akpaden","Ikot Akpaden, Akwa Ibom",State,Akwa Ibom
+"Ignatius Ajuru University of Education, Rumuolumeni","Rumuolumeni, Rivers",State,Rivers
+"Bauchi State University, Gadau","Gadau, Bauchi",State,Bauchi
+"Northwest University, Kano","Kano, Kano",State,Kano
+"First Technical University, Ibadan","Ibadan, Oyo",State,Oyo
+"Sule Lamido University, Kafin Hausa, Jigawa","Kafin Hausa, Jigawa",State,Jigawa
+"University of Medical Sciences, Ondo City","Ondo City, Ondo",State,Ondo
+"Edo State University, Iyamho","Iyamho, Edo",State,Edo
+"Kingsley Ozumba Mbadiwe University, Ogboko","Ogboko, Imo",State,Imo
+"University of Africa, Toru Orua","Toru Orua, Bayelsa",State,Bayelsa
+"Kashim Ibrahim University, Maiduguri","Maiduguri, Borno",State,Borno
+"Moshood Abiola University of Science and Technology, Abeokuta","Abeokuta, Ogun",State,Ogun
+Zamfara State University,"Gusau, Zamfara",State,Zamfara
+Bayelsa Medical University,"Yenagoa, Bayelsa",State,Bayelsa
+"University of Agriculture and Environmental Sciences, Umuagwo","Umuagwo, Imo",State,Imo
+"Confluence University of Science and Technology, Osara","Osara, Kogi",State,Kogi
+"Bamidele Olumilua University of Science and Technology, Ikere","Ikere, Ekiti",State,Ekiti
+"University of Delta, Agbor","Agbor, Delta",State,Delta
+"Delta University of Science and Technology, Ozoro","Ozoro, Delta",State,Delta
+"Dennis Osadebe University, Asaba","Asaba, Delta",State,Delta
+"Lagos State University of Education, Ijanikin","Ijanikin, Lagos",State,Lagos
+"Lagos State University of Science and Technology, Ikorodu","Ikorodu, Lagos",State,Lagos
+"Shehu Shagari University of Education, Sokoto","Sokoto, Sokoto",State,Sokoto
+"State University of Medical and Applied Sciences, Igbo-Eno","Igbo-Eno, Enugu",State,Enugu
+"University of Ilesa, Osun State","Ilesa, Osun",State,Osun
+"Emanuel Alayande University of Education, Oyo","Oyo, Oyo",State,Oyo
+"Kogi State University, Kabba","Kabba, Kogi",State,Kogi
+"AbdulKadir Kure University, Minna","Minna, Niger",State,Niger
+"Kwara State University of Education, Ilorin","Ilorin, Kwara",State,Kwara
+"Abdulsalam Abubakar University of Agriculture and Climate Action, Mokwa","Mokwa, Niger",State,Niger
+"Ebonyi State University of ICT, Science and Technology, Oferekpe","Oferekpe, Ebonyi",State,Ebonyi
+"Cross River University of Education and Entrepreneurship, Akampa","Akampa, Cross River",State,Cross River
+"Benue State University of Agriculture Science and Technology, Ihugh","Ihugh, Benue",State,Benue
+"University of Aeronautics and Aerospace Engineering, Ezza","Ezza, Ebonyi",State,Ebonyi
+"University of Innovation, Science and Technology, Omuma","Omuma, Imo",State,Imo
+"Taraba State University of Tropical Agriculture, Science, Technology and Climate Action, Gembu","Gembu, Taraba",State,Taraba
+"Jigawa State University of Medical and Allied Health Sciences, Majia","Majia, Jigawa",State,Jigawa
+"Babcock University, Ilishan-Remo","Ilishan-Remo, Ogun",Private,Ogun
+Igbinedion University Okada,"Okada, Edo",Private,Edo
+"Madonna University, Okija","Okija, Anambra",Private,Anambra
+"Bowen University, Iwo","Iwo, Osun",Private,Osun
+"Benson Idahosa University, Benin City","Benin City, Edo",Private,Edo
+"Covenant University, Ota","Ota, Ogun",Private,Ogun
+"Pan-Atlantic University, Lagos","Lekki, Lagos",Private,Lagos
+"American University of Nigeria, Yola","Yola, Adamawa",Private,Adamawa
+"Ajayi Crowther University, Ibadan","Ibadan, Oyo",Private,Oyo
+"Al-Hikmah University, Ilorin","Ilorin, Kwara",Private,Kwara
+"Al-Qalam University, Katsina","Katsina, Katsina",Private,Katsina
+"Bells University of Technology, Ota","Ota, Ogun",Private,Ogun
+"Bingham University, New Karu","New Karu, Nasarawa",Private,Nasarawa
+"Caritas University, Enugu","Enugu, Enugu",Private,Enugu
+Crawford University Igbesa,"Igbesa, Ogun",Private,Ogun
+Crescent University,"Abeokuta, Ogun",Private,Ogun
+"Kwararafa University, Wukari","Wukari, Taraba",Private,Taraba
+"Lead City University, Ibadan","Ibadan, Oyo",Private,Oyo
+"Novena University, Ogume","Ogume, Delta",Private,Delta
+"Redeemer's University, Ede","Ede, Osun",Private,Osun
+"Renaissance University, Enugu","Enugu, Enugu",Private,Enugu
+"University of Mkar, Mkar","Mkar, Benue",Private,Benue
+"Joseph Ayo Babalola University, Ikeji-Arakeji","Ikeji-Arakeji, Osun",Private,Osun
+"Achievers University, Owo","Owo, Ondo",Private,Ondo
+"Caleb University, Lagos","Imota, Lagos",Private,Lagos
+"Fountain University, Oshogbo","Oshogbo, Osun",Private,Osun
+"African University of Science and Technology, Abuja","Abuja, FCT",Private,FCT
+"Obong University, Obong Ntak","Obong Ntak, Akwa Ibom",Private,Akwa Ibom
+"Salem University, Lokoja","Lokoja, Kogi",Private,Kogi
+"Tansian University, Umunya","Umunya, Anambra",Private,Anambra
+"Veritas University, Abuja","Abuja, FCT",Private,FCT
+"Wesley University, Ondo","Ondo, Ondo",Private,Ondo
+"Western Delta University, Oghara","Oghara, Delta",Private,Delta
+"Afe Babalola University, Ado-Ekiti","Ado-Ekiti, Ekiti",Private,Ekiti
+"Godfrey Okoye University, Ugwuomu-Nike","Ugwuomu-Nike, Enugu",Private,Enugu
+"Nile University of Nigeria, Abuja","Abuja, FCT",Private,FCT
+"Oduduwa University, Ipetumodu","Ipetumodu, Osun",Private,Osun
+"Paul University, Awka","Awka, Anambra",Private,Anambra
+"Rhema University, Obeama-Asa","Obeama-Asa, Rivers",Private,Rivers
+"Wellspring University, Evbuobanosa","Evbuobanosa, Edo",Private,Edo
+"Adeleke University, Ede","Ede, Osun",Private,Osun
+Baze University,"Abuja, FCT",Private,FCT
+"Landmark University, Omu-Aran","Omu-Aran, Kwara",Private,Kwara
+"Glorious Vision University, Ogwa","Ogwa, Edo",Private,Edo
+"Elizade University, Ilara-Mokin","Ilara-Mokin, Ondo",Private,Ondo
+"Evangel University, Akaeze","Akaeze, Ebonyi",Private,Ebonyi
+"Gregory University, Uturu","Uturu, Abia",Private,Abia
+"Mcpherson University, Seriki Sotayo","Seriki Sotayo, Ogun",Private,Ogun
+"Southwestern University, Oku Owa","Oku Owa, Ogun",Private,Ogun
+Augustine University,"Ilara, Lagos",Private,Lagos
+Chrisland University,"Abeokuta, Ogun",Private,Ogun
+"Edwin Clark University, Kaigbodo","Kaigbodo, Delta",Private,Delta
+"Hallmark University, Ijebi Itele","Ijebi Itele, Ogun",Private,Ogun
+"Hezekiah University, Umudi","Umudi, Imo",Private,Imo
+"Kings University, Ode Omu","Ode Omu, Osun",Private,Osun
+"Micheal and Cecilia Ibru University","Agbarha-Otor, Delta",Private,Delta
+Mountain Top University,"Makogi Oba, Ogun",Private,Ogun
+"Ritman University, Ikot Ekpene","Ikot Ekpene, Akwa Ibom",Private,Akwa Ibom
+"Summit University, Offa","Offa, Kwara",Private,Kwara
+"Christopher University, Mowe","Mowe, Ogun",Private,Ogun
+"Kola Daisi University, Ibadan","Ibadan, Oyo",Private,Oyo
+"Anchor University, Ayobo","Ayobo, Lagos",Private,Lagos
+"Dominican University, Ibadan","Ibadan, Oyo",Private,Oyo
+"Legacy University, Okija","Okija, Anambra",Private,Anambra
+"Arthur Javis University, Akpoyubo","Akpoyubo, Cross River",Private,Cross River
+"Ojaja University, Eiyenkorin","Eiyenkorin, Kwara",Private,Kwara
+"Coal City University, Enugu","Enugu, Enugu",Private,Enugu
+"Clifford University, Owerrinta","Owerrinta, Abia",Private,Abia
+"Spiritan University, Nneochi","Nneochi, Abia",Private,Abia
+"Precious Cornerstone University, Oyo","Oyo, Oyo",Private,Oyo
+"PAMO University of Medical Sciences, Portharcourt","Portharcourt, Rivers",Private,Rivers
+"Atiba University, Oyo","Oyo, Oyo",Private,Oyo
+"Eko University of Medical and Health Sciences, Ijanikin","Ijanikin, Lagos",Private,Lagos
+"Skyline University, Kano","Kano, Kano",Private,Kano
+"Greenfield University, Kaduna","Kaduna, Kaduna",Private,Kaduna
+"Dominion University, Ibadan","Ibadan, Oyo",Private,Oyo
+"Trinity University, Ofada","Ofada, Ogun",Private,Ogun
+"Westland University, Iwo","Iwo, Osun",Private,Osun
+"Topfaith University, Mkpatak","Mkpatak, Akwa Ibom",Private,Akwa Ibom
+"Thomas Adewumi University, Oko-Irese","Oko-Irese, Kwara",Private,Kwara
+"Maranatha University, Lagos","Lagos, Lagos",Private,Lagos
+"Ave Maria University, Piyanko","Piyanko, Nasarawa",Private,Nasarawa
+"Al-Istiqama University, Sumaila","Sumaila, Kano",Private,Kano
+"Mudiame University, Irrua","Irrua, Edo",Private,Edo
+"Havilla University, Nde-Ikom","Nde-Ikom, Cross River",Private,Cross River
+"Claretian University of Nigeria, Nekede","Nekede, Imo",Private,Imo
+"Karl-Kumm University, Vom","Vom, Plateau",Private,Plateau
+"James Hope University, Lagos","Lagos, Lagos",Private,Lagos
+"Maryam Abacha American University of Nigeria, Kano","Kano, Kano",Private,Kano
+"Capital City University, Kano","Kano, Kano",Private,Kano
+"Ahman Pategi University, Pategi","Pategi, Kwara",Private,Kwara
+"University of Offa, Kwara State","Offa, Kwara",Private,Kwara
+"Mewar International University, Masaka","Masaka, Nasarawa",Private,Nasarawa
+"Edusoko University, Bida","Bida, Niger",Private,Niger
+"Philomath University, Kuje","Kuje, FCT",Private,FCT
+"Anan University, Kwall","Kwall, Plateau",Private,Plateau
+"North Eastern University, Gombe","Gombe, Gombe",Private,Gombe
+"Al-Ansar University, Maiduguri","Maiduguri, Borno",Private,Borno
+"Margaret Lawrence University, Umunede","Umunede, Delta",Private,Delta
+"Khalifa Isiyaku Rabiu University, Kano","Kano, Kano",Private,Kano
+"Sports University, Idumuje Ugboko","Idumuje Ugboko, Delta",Private,Delta
+"Baba Ahmed University, Kano","Kano, Kano",Private,Kano
+"Saisa University of Medical Sciences and Technology, Sokoto","Sokoto, Sokoto",Private,Sokoto
+"Nigerian British University, Asa","Asa, Abia",Private,Abia
+"Peter University, Achina-Onneh","Achina-Onneh, Anambra",Private,Anambra
+"Newgate University, Minna","Minna, Niger",Private,Niger
+"European University of Nigeria, Duboyi","Duboyi, FCT",Private,FCT
+"NorthWest University, Sokoto","Sokoto, Sokoto",Private,Sokoto
+"Rayhaan University, Kebbi","Birnin Kebbi, Kebbi",Private,Kebbi
+"Muhammad Kamalud University, Kwara","Ilorin, Kwara",Private,Kwara
+"Sam Maris University, Ondo","Ondo, Ondo",Private,Ondo
+"Aletheia University, Ago-Iwoye","Ago-Iwoye, Ogun",Private,Ogun
+"Lux Mundi University, Umuahia","Umuahia, Abia",Private,Abia
+"Maduka University, Ekwegbe","Ekwegbe, Enugu",Private,Enugu
+"PeaceLand University, Enugu","Enugu, Enugu",Private,Enugu
+"Amadeus University, Amizi","Amizi, Abia",Private,Abia
+"Vision University, Ikogbo","Ikogbo, Ogun",Private,Ogun
+"Azman University, Kano","Kano, Kano",Private,Kano
+"Huda University, Gusau","Gusau, Zamfara",Private,Zamfara
+"Franco British International University, Kaduna","Kaduna, Kaduna",Private,Kaduna
+"Canadian University of Nigeria, Abuja","Abuja, FCT",Private,FCT
+"Gerar University of Medical Science, Imope Ijebu","Imope Ijebu, Ogun",Private,Ogun
+"British Canadian University, Obufu","Obufu, Cross River",Private,Cross River
+"Hensard University, Toru-Orua","Toru-Orua, Bayelsa",Private,Bayelsa
+"Amaj University, Kwali","Kwali, FCT",Private,FCT
+"Phoenix University, Agwada","Agwada, Nasarawa",Private,Nasarawa
+"Wigwe University, Isiokpo","Isiokpo, Rivers",Private,Rivers
+"Hillside University of Science and Technology, Okemisi","Okemisi, Ekiti",Private,Ekiti
+"University on the Niger, Umunya","Umunya, Anambra",Private,Anambra
+"Elrazi Medical University, Yargaya","Yargaya, Kano",Private,Kano
+"Venite University, Iloro-Ekiti","Iloro-Ekiti, Ekiti",Private,Ekiti
+"Shanahan University, Onitsha","Onitsha, Anambra",Private,Anambra
+"The Duke Medical University, Calabar","Calabar, Cross River",Private,Cross River
+"Mercy Medical University, Iwo","Iwo, Ogun",Private,Ogun
+"Cosmopolitan University, Abuja","Abuja, FCT",Private,FCT
+"Miva Open University, Abuja","Abuja, FCT",Private,FCT
+"Iconic Open University, Sokoto","Sokoto, Sokoto",Private,Sokoto
+"West Midlands Open University, Ibadan","Ibadan, Oyo",Private,Oyo
+"Al-Muhibbah Open University, Abuja","Abuja, FCT",Private,FCT
+"El-Amin University, Minna","Minna, Niger",Private,Niger
+"College of Petroleum and Energy Studies, Kaduna","Kaduna, Kaduna",Private,Kaduna
+"Jewel University, Gombe","Gombe, Gombe",Private,Gombe
+"Prime University, Kuje","Kuje, FCT",Private,FCT
+"Nigerian University of Technology and Management, Apapa","Apapa, Lagos",Private,Lagos
+"Al-Bayan University, Ankpa","Ankpa, Kogi",Private,Kogi
+"Lighthouse University, Evbobanosa","Evbobanosa, Edo",Private,Edo
+"African University of Economics, Abuja","Abuja, FCT",Private,FCT
+"New City University, Ayetoro","Ayetoro, Ogun",Private,Ogun
+"University of Fortune, Igbotako","Igbotako, Ondo",Private,Ondo
+"Eranova University, Abuja","Abuja, FCT",Private,FCT
+"Minaret University, Ikirun","Ikirun, Osun",Private,Osun
+"Abdulrasaq Abubakar Toyin University, Ganmo","Ganmo, Kwara",Private,Kwara
+"Southern Atlantic University, Uyo","Uyo, Akwa Ibom",Private,Akwa Ibom
+"Lens University, Ilemona","Ilemona, Kwara",Private,Kwara
+"Monarch University, Iyesi-Ota","Iyesi-Ota, Ogun",Private,Ogun
+"Tonine Iredia University of Communication, Benin City","Benin City, Edo",Private,Edo
+"Isaac Balami University of Aeronautics and Management, Lagos","Lagos, Lagos",Private,Lagos
+"Kevin Eze University, Mgbowo","Mgbowo, Enugu",Private,Enugu
+"Tazkiyah University, Kaduna","Kaduna, Kaduna",Private,Kaduna
+"Leadership University, Abuja","Abuja, FCT",Private,FCT
+"Jimoh Babalola University, Ilorin","Ilorin, Kwara",Private,Kwara
+"Bridget University, Okirika-Nweke","Okirika-Nweke, Imo",Private,Imo
+"Greenland University, Jalingo","Jalingo, Taraba",Private,Taraba
+"JEFAP University, Suleja","Suleja, Niger",Private,Niger
+"Azione Verde University, Amaigbo","Amaigbo, Imo",Private,Imo
+"Unique Open University, Ojo","Ojo, Lagos",Private,Lagos
+"American Open University, Abeokuta","Abeokuta, Ogun",Private,Ogun
+"Millenium Crest University, Ikare Akoko","Ikare Akoko, Ondo",Private,Ondo
+"Abdulfattah Durojaiye University, Abeokuta","Abeokuta, Ogun",Private,Ogun
+"Euston University, Abakaliki","Abakaliki, Ebonyi",Private,Ebonyi
+"Adeche Momoh University, Igarra","Igarra, Edo",Private,Edo
+"Sani Bello University, Kontagora","Kontagora, Niger",Private,Niger
+"Godday Erewa University, Sapele","Sapele, Delta",Private,Delta
+"Owolabi University, Oke Ila Orangun","Oke Ila Orangun, Osun",Private,Osun
+"Regnum Medical University, Anthony","Anthony, Lagos",Private,Lagos
+City University Abuja,"Abuja, FCT",Private,FCT
+"Transatlantic University of Medicine and Health Sciences, Umuchukwu","Umuchukwu, Anambra",Private,Anambra
+"Maria Assumpta University, Owerri","Owerri, Imo",Private,Imo
+"High Flyers University, Ikere-Ekiti","Ikere-Ekiti, Ekiti",Private,Ekiti
+"Ummah University of Nigeria, Abuja","Abuja, FCT",Private,FCT
+"Pearl University, Calabar","Calabar, Cross River",Private,Cross River
+Omega University Kaduna,"Kaduna, Kaduna",Private,Kaduna
+Federal Polytechnic Ilaro,"Ilaro, Ogun",Federal,Ogun
+Lagos State Polytechnic (LASPOTECH),"Ikorodu, Lagos",State,Lagos

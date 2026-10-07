@@ -96,7 +96,7 @@ Make every Nigerian student feel connected before arrival, supported while there
 - Reason:
   1. Runs locally on Windows + Git Bash with only Node 20 — zero-config, file-based, fits current `backend/server.js` stub and single-dev setup where Postgres is not installed.
   2. Sufficient for MVP hypothesis in §14 (registration, discovery, connections, posts, basic Fido) — low concurrent writes, <10k users.
-  3. Prisma makes migration trivial — same models, change provider to `postgresql`, run migrate + seed UNILAG/UI/OAU/FUTA.
+  3. Prisma makes migration trivial — same models, change provider to `postgresql`, run migrate + seed (canonical NUC names, see backend/seed/institutions-all.csv).
   4. Defers cost/ops (hosting, backups, pgvector) until Phase 2 when verified hub + RAG + concurrent messaging need it.
 - Trade-off accepted: no row-level concurrent write scale, no native vector/full-text search. Mitigated by keeping `hub_pages` small and Fido rule-based in Phase 1.
 - When to revisit: >1k concurrent users, need hosted auth/jobs, or Fido RAG over large verified corpus — switch provider to PostgreSQL, move `backend/uploads/` to S3/MinIO.

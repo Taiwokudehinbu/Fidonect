@@ -68,7 +68,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="orb-wrap"><div class="orb"><span id="orbWord">Connect.</span></div></div>
 <p class="tagline">Know. Prepare. Belong. — meet future classmates, mentors and campus guides before you resume. Your campus journey starts with confidence.</p>
 <div class="cta-row"><a href="#auth" class="btn btn-gold" style="text-decoration:none">Join free</a><a href="#schools" class="btn btn-light" style="text-decoration:none">Explore schools</a></div>
-<div class="stats"><div class="stat"><b>2,400+</b><span>students connecting</span></div><div class="stat"><b>50</b><span>institutions listed</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
+<div class="stats"><div class="stat"><b>2,400+</b><span>students connecting</span></div><div class="stat"><b id="statSchools">50</b><span>institutions listed</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
 </div>
 
 <div class="card" id="auth">
@@ -96,7 +96,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="card">
 <h2>Find your school</h2>
 <div class="search-row">
-<input id="schoolSearch" class="input" placeholder="Search institution e.g. UNILAG…" />
+<input id="schoolSearch" class="input" placeholder="Search institution e.g. Lagos…" />
 <button id="findBtn" class="btn">Find Students</button>
 </div>
 <p id="resultMsg" class="muted"></p>
@@ -141,15 +141,15 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <script>
 var schools = [
-{name:"University of Lagos (UNILAG)", loc:"Akoka, Lagos", students:1240, ownership:"Federal"},
-{name:"University of Ibadan (UI)", loc:"Ibadan, Oyo", students:860, ownership:"Federal"},
-{name:"Federal University of Technology, Akure (FUTA)", loc:"Akure, Ondo", students:890, ownership:"Federal"}
+{name:"University of Lagos", loc:"Akoka, Lagos", students:1240, ownership:"Federal"},
+{name:"University of Ibadan", loc:"Ibadan, Oyo", students:860, ownership:"Federal"},
+{name:"Federal University of Technology, Akure", loc:"Akure, Ondo", students:890, ownership:"Federal"}
 ];
 var students = [
-{name:"Adaeze O.", dept:"Biology", school:"University of Lagos (UNILAG)", session:"2026/2027"},
-{name:"Tunde B.", dept:"Biology", school:"University of Lagos (UNILAG)", session:"2026/2027"},
-{name:"Mariam S.", dept:"Computer Science", school:"University of Ibadan (UI)", session:"2026/2027"},
-{name:"Fatima A.", dept:"Microbiology", school:"Federal University of Technology, Akure (FUTA)", session:"2026/2027"}
+{name:"Adaeze O.", dept:"Biology", school:"University of Lagos", session:"2026/2027"},
+{name:"Tunde B.", dept:"Biology", school:"University of Lagos", session:"2026/2027"},
+{name:"Mariam S.", dept:"Computer Science", school:"University of Ibadan", session:"2026/2027"},
+{name:"Fatima A.", dept:"Microbiology", school:"Federal University of Technology, Akure", session:"2026/2027"}
 ];
 var liveSchools=null; // live rows from Supabase when reachable; mocks otherwise
 var currentCat="";
@@ -164,7 +164,7 @@ renderSchools(document.getElementById("schoolSearch").value);
 };
 async function loadSchools(){
 try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
-if(r.ok&&rows.length){liveSchools=normSchools(rows);return;}}catch(e){}
+if(r.ok&&rows.length){liveSchools=normSchools(rows);var st=document.getElementById("statSchools");if(st)st.textContent=rows.length;return;}}catch(e){}
 liveSchools=null;
 }
 function renderSchools(filter){
@@ -230,7 +230,7 @@ function setSess(s){if(s)localStorage.setItem("fidonect_session",JSON.stringify(
 async function loadSchoolOptions(){
 try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
 if(r.ok&&rows.length)document.getElementById("authSchool").innerHTML='<option value="">Select school…</option>'+rows.map(function(s){return '<option>'+s.name+'</option>';}).join("");
-else document.getElementById("authSchool").innerHTML='<option value="">Select school…</option><option>University of Lagos (UNILAG)</option><option>University of Ibadan (UI)</option><option>Federal University of Technology, Akure (FUTA)</option>';
+else document.getElementById("authSchool").innerHTML='<option value="">Select school…</option><option>University of Lagos</option><option>University of Ibadan</option><option>Federal University of Technology, Akure</option>';
 }catch(e){/* offline: leave default */}
 }
 async function fetchProfile(token){
