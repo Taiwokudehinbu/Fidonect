@@ -277,7 +277,66 @@ app.post("/api/communities/:school/posts", async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
-app.post("/api/fido/ask", (req, res) => res.json({ source: "AI guidance", answer: "Stub: wire LLM + institutional knowledge base with source attribution (Official/Community/AI)." }));
+// ---- Phase 5: Basic Fido (rule-based; PRD §§5, 25 labels; no AI provider yet) ----
+const FIDO_ALIASES = { unilag: "University of Lagos", ui: "University of Ibadan", oau: "Obafemi Awolowo University", unn: "University of Nigeria", abu: "Ahmadu Bello University", uniben: "University of Benin", unilorin: "University of Ilorin", unical: "University of Calabar", uniport: "University of Port-Harcourt", buk: "Bayero University", futa: "Federal University of Technology, Akure", futminna: "Federal University of Technology Minna", futo: "Federal University of Technology Owerri", unizik: "Nnamdi Azikiwe University", uniuyo: "University of Uyo", unijos: "University of Jos", unimaid: "University of Maiduguri", noun: "National Open University of Nigeria", lasu: "Lagos State University", oou: "Olabisi Onabanjo University", covenant: "Covenant University", abuad: "Afe Babalola University", babcock: "Babcock University", laspotech: "Lagos State Polytechnic", yabatech: "Yaba College of Technology", mapoly: "Moshood Abiola University of Science and Technology" };
+let schoolCache = [], schoolCacheAt = 0;
+async function findSchool(text) {
+  const q = text.toLowerCase();
+  for (const [alias, frag] of Object.entries(FIDO_ALIASES)) {
+    if (q.includes(alias)) {
+      if (supabase) {
+        const { data } = await supabase.from("institutions").select("id,name,location,ownership,state").ilike("name", "%" + frag + "%").limit(1);
+        if (data && data.length) return data[0];
+      }
+      return { name: frag };
+    }
+  }
+  if (supabase && (Date.now() - schoolCacheAt > 10 * 60 * 1000 || !schoolCache.length)) {
+    const { data } = await supabase.from("institutions").select("name,location,ownership,state");
+    if (data) { schoolCache = data; schoolCacheAt = Date.now(); }
+  }
+  const words = q.split(/[^a-z]+/).filter(w => w.length >= 5);
+  return schoolCache.find(s => words.some(w => s.name.toLowerCase().includes(w))) || null;
+}
+async function findHub(institutionId) {
+  if (!supabase || !institutionId) return null;
+  const { data } = await supabase.from("hub_pages").select("overview,clearance,fees,accommodation,source").eq("institution_id", institutionId).single();
+  return data || null;
+}
+app.post("/api/fido/ask", async (req, res) => {
+  const question = req.body && req.body.question;
+  if (typeof question !== "string" || question.trim().length < 3 || question.length > 500) return bad(res, "question must be 3–500 characters");
+  const q = question.toLowerCase();
+  const school = await findSchool(q).catch(() => null);
+  const sName = school ? school.name : null;
+  const hub = await findHub(school && school.id).catch(() => null);
+  const official = (text) => ({ answer: text, source: "Official", school: sName, verify: true });
+  const community = (text) => ({ answer: text, source: "Community", school: sName, verify: true });
+  const ai = (text) => ({ answer: text, source: "AI guidance", school: sName, verify: true });
+  const where = sName ? " at " + sName : "";
+  if (/clearance|document|screening|registr/.test(q)) {
+    if (hub && hub.clearance) return res.json(official("For clearance" + where + ": " + hub.clearance + " Always confirm on your school portal — requirements vary by department."));
+    return res.json(ai("For clearance" + where + ", typically prepare: JAMB admission letter, O-level result(s), birth certificate/age declaration, LGA identification letter, passport photographs, and departmental screening forms." + (sName ? " Ask in the " + sName + " community for department-specific experience." : "") + " Confirm everything on the official school portal."));
+  }
+  if (/accommod|hostel|housing|lodge/.test(q)) {
+    if (hub && hub.accommodation) return res.json(official("Accommodation" + where + ": " + hub.accommodation));
+    return res.json(community("Community tip" + where + ": school hostels fill fast — apply immediately after clearance and budget for private hostels nearby as backup. Ask connected students where they stay."));
+  }
+  if (/fee|school charges|payment|tuition/.test(q)) {
+    if (hub && hub.fees) return res.json(official("Fees" + where + ": " + hub.fees));
+    return res.json(ai("Fees vary by institution, faculty, and session" + where + ". Check the official school portal for the current schedule and never pay into personal accounts — report payment scams."));
+  }
+  if (/admission|jamb|post-utme|postutme|cut.?off|merit list/.test(q)) {
+    return res.json(ai("For admission" + where + ": track JAMB CAPS, the school portal, and departmental cut-off marks. Only trust admission offers shown on JAMB CAPS or the official portal — anyone asking for money to 'secure' admission is running a scam."));
+  }
+  if (/resum|prepare|first semester|freshers|fresher|new student/.test(q)) {
+    return res.json(ai("To prepare" + where + ": (1) documents + photocopies, (2) accommodation plan, (3) departmental reading list, (4) basic campus essentials, (5) connect with 2–3 classmates and one mentor here before resumption."));
+  }
+  if (/study|exam|gp|grade|reading|tutorial/.test(q)) {
+    return res.json(ai("Study smart" + where + ": get the course outline early, join department study threads, ask mentors for past questions, and protect your study time in the first semester — it sets your GPA foundation."));
+  }
+  return res.json(ai("I can help with resumption prep, clearance documents, accommodation, fees, admission, and study tips" + where + ". Try: 'What documents do I need for clearance?'"));
+});
 app.get("/api/mentors", (req, res) => res.json(db.mentors));
 app.post("/api/reports", async (req, res) => {
   const auth = await authedUser(req).catch(() => null);

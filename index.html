@@ -37,6 +37,10 @@ nav a:hover{text-decoration:underline}
 .pill-fed{background:#0a1f33;color:#fff;border-radius:999px;padding:2px 10px;font-size:12px}
 .pill-state{background:#e6f6f3;color:#0b5e54;border-radius:999px;padding:2px 10px;font-size:12px}
 .pill-priv{background:#ede9fe;color:#5b21b6;border-radius:999px;padding:2px 10px;font-size:12px}
+.tag{border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}
+.tag-official{background:#dbeafe;color:#1e40af}
+.tag-community{background:#fef3c7;color:#92400e}
+.tag-ai{background:#f3e8ff;color:#6b21a8}
 @media(prefers-reduced-motion:reduce){.orb::before{animation:none}.card:hover{transform:none}}
 .muted{color:#637083}
 .card{background:#fff;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 4px 16px rgba(15,42,67,.08);transition:transform .15s,box-shadow .15s}
@@ -125,6 +129,13 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div id="reqIncoming"></div>
 <div id="reqOutgoing"></div>
 <div id="reqAccepted"></div>
+</div>
+
+<div class="card" id="fido">
+<h2>Ask Fido</h2>
+<p class="muted">Your campus assistant. Answers are labeled <span class="tag tag-official">Official</span> <span class="tag tag-community">Community</span> <span class="tag tag-ai">AI guidance</span> — always verify fees, deadlines, and admission facts with official sources.</p>
+<div class="search-row"><input id="fidoQ" class="input" placeholder='Ask e.g. "What documents for UNILAG clearance?"' /><button id="fidoBtn" class="btn">Ask</button></div>
+<div id="fidoAns" style="margin-top:10px"></div>
 </div>
 
 <div class="card" id="live">
@@ -227,6 +238,18 @@ document.getElementById("studentGrid").innerHTML=list.map(function(s,i){
 return '<div class="person"><h4>'+s.name+'</h4><div>'+s.dept+' — '+s.school+'</div><div class="muted">'+s.session+'</div><p><button class="btn ghost" onclick="this.textContent=\'✓ Connected\'">Connect</button></p></div>';
 }).join("")||'<p class="muted">No students match.</p>';
 }
+async function askFido(){
+var q=document.getElementById("fidoQ").value.trim(),box=document.getElementById("fidoAns");
+if(!q){box.innerHTML='<p class="muted">Type a question first.</p>';return;}
+box.innerHTML='<p class="muted">Fido is thinking…</p>';
+try{var r=await fetch(apiBase()+"/api/fido/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+var cls=j.source==="Official"?"tag-official":j.source==="Community"?"tag-community":"tag-ai";
+box.innerHTML='<div class="person"><p><span class="tag '+cls+'">'+esc(j.source)+'</span> '+(j.school?'<span class="muted small">'+esc(j.school)+'</span>':"")+'</p><p>'+esc(j.answer)+'</p><p class="muted small">Verify important facts with official school sources.</p></div>';
+}catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
+}
+document.getElementById("fidoBtn").onclick=askFido;
+document.getElementById("fidoQ").onkeydown=function(e){if(e.key==="Enter")askFido();};
 document.getElementById("findBtn").onclick=async function(){
 document.getElementById("schoolDetail").innerHTML="";
 await loadSchools();
