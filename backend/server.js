@@ -32,23 +32,25 @@ app.get("/api/institutions/test", async (req, res) => {
 app.get("/api/institutions", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
   const own = req.query.ownership;
+  const kind = req.query.kind;
   if (own !== undefined && !["Federal", "State", "Private"].includes(own)) return bad(res, "ownership must be Federal, State, or Private");
-  const cols = "id,name,location,ownership,state";
+  if (kind !== undefined && !["University", "Polytechnic", "College of Education"].includes(kind)) return bad(res, "kind must be University, Polytechnic, or College of Education");
   const run = (select) => {
     let q = supabase.from("institutions").select(select).order("name");
     if (own && select.includes("ownership")) q = q.eq("ownership", own);
+    if (kind && select.includes("kind")) q = q.eq("kind", kind);
     return q;
   };
-  let { data, error } = await run(cols);
-  if (error && /column/i.test(error.message)) {
-    // Pre-upgrade schema (no ownership/state columns yet): basic list only.
-    // Category is unknown pre-upgrade, so filtered views honestly return empty.
-    const r2 = await run("id,name,location");
-    if (r2.error) return res.status(500).json({ error: r2.error.message });
-    return res.json(own ? [] : (r2.data || []));
-  }
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  const full = await run("id,name,location,ownership,state,kind");
+  if (!full.error) return res.json(full.data);
+  if (!/column/i.test(full.error.message)) return res.status(500).json({ error: full.error.message });
+  if (kind) return res.json([]); // kind unknown pre-upgrade: honestly empty
+  const mid = await run("id,name,location,ownership,state");
+  if (!mid.error) return res.json(mid.data);
+  if (!/column/i.test(mid.error.message)) return res.status(500).json({ error: mid.error.message });
+  const base = await run("id,name,location");
+  if (base.error) return res.status(500).json({ error: base.error.message });
+  return res.json(own ? [] : (base.data || []));
 });
 
 app.get("/api/institutions/:id/tree", async (req, res) => {

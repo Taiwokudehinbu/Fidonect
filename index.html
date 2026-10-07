@@ -107,6 +107,9 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="cat-row" id="catRow">
 <button class="cat active" data-cat="">All</button><button class="cat" data-cat="Federal">Federal</button><button class="cat" data-cat="State">State</button><button class="cat" data-cat="Private">Private</button>
 </div>
+<div class="cat-row" id="kindRow">
+<button class="cat active" data-kind="">All types</button><button class="cat" data-kind="University">University</button><button class="cat" data-kind="Polytechnic">Polytechnic</button><button class="cat" data-kind="College of Education">College of Education</button>
+</div>
 <div class="grid" id="schoolGrid"></div>
 <div id="schoolDetail"></div>
 </div>
@@ -141,9 +144,9 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <script>
 var schools = [
-{name:"University of Lagos", loc:"Akoka, Lagos", students:1240, ownership:"Federal"},
-{name:"University of Ibadan", loc:"Ibadan, Oyo", students:860, ownership:"Federal"},
-{name:"Federal University of Technology, Akure", loc:"Akure, Ondo", students:890, ownership:"Federal"}
+{name:"University of Lagos", loc:"Akoka, Lagos", students:1240, ownership:"Federal", kind:"University"},
+{name:"University of Ibadan", loc:"Ibadan, Oyo", students:860, ownership:"Federal", kind:"University"},
+{name:"Federal University of Technology, Akure", loc:"Akure, Ondo", students:890, ownership:"Federal", kind:"University"}
 ];
 var students = [
 {name:"Adaeze O.", dept:"Biology", school:"University of Lagos", session:"2026/2027"},
@@ -153,7 +156,7 @@ var students = [
 ];
 var liveSchools=null; // live rows from Supabase when reachable; mocks otherwise
 var currentCat="";
-function normSchools(list){return list.map(function(s){return {id:s.id,name:s.name,loc:s.location||s.loc,ownership:s.ownership||"",state:s.state||"",live:!!s.id};});}
+function normSchools(list){return list.map(function(s){return {id:s.id,name:s.name,loc:s.location||s.loc,ownership:s.ownership||"",state:s.state||"",kind:s.kind||"",live:!!s.id};});}
 function ownPill(o){if(o==="Federal")return ' <span class="pill-fed">Federal</span>';if(o==="State")return ' <span class="pill-state">State</span>';if(o==="Private")return ' <span class="pill-priv">Private</span>';return '';}
 document.getElementById("catRow").onclick=function(e){
 if(!e.target.dataset||e.target.dataset.cat===undefined)return;
@@ -161,6 +164,14 @@ currentCat=e.target.dataset.cat;
 var btns=document.getElementById("catRow").querySelectorAll(".cat");
 for(var i=0;i<btns.length;i++)btns[i].classList.toggle("active",btns[i]===e.target);
 renderSchools(document.getElementById("schoolSearch").value);
+};
+var currentKind="";
+document.getElementById("kindRow").onclick=async function(e){
+if(!e.target.dataset||e.target.dataset.kind===undefined)return;
+currentKind=e.target.dataset.kind;
+var btns=document.getElementById("kindRow").querySelectorAll(".cat");
+for(var i=0;i<btns.length;i++)btns[i].classList.toggle("active",btns[i]===e.target);
+await loadSchools();renderSchools(document.getElementById("schoolSearch").value);
 };
 async function loadSchools(){
 try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
@@ -170,10 +181,10 @@ liveSchools=null;
 function renderSchools(filter){
 var q=(filter||"").toLowerCase();
 var base=liveSchools||normSchools(schools);
-var list=base.filter(function(s){return (!q || s.name.toLowerCase().indexOf(q)>-1) && (!currentCat || s.ownership===currentCat);});
+var list=base.filter(function(s){return (!q || s.name.toLowerCase().indexOf(q)>-1) && (!currentCat || s.ownership===currentCat) && (!currentKind || s.kind===currentKind);});
 document.getElementById("schoolCount").textContent=list.length+" shown";
 document.getElementById("schoolGrid").innerHTML=list.map(function(s){
-return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+ownPill(s.ownership)+'</p><p><button class="btn ghost" onclick="showTree('+(s.live?s.id:'null')+')">View departments</button></p></div>';
+return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+ownPill(s.ownership)+(s.kind?' <span class="pill">'+s.kind+'</span>':"")+'</p><p><button class="btn ghost" onclick="showTree('+(s.live?s.id:'null')+')">View departments</button></p></div>';
 }).join("")||'<p class="muted">No schools match.</p>';
 return list.length;
 }
@@ -204,7 +215,8 @@ var q=document.getElementById("schoolSearch").value;
 var n=renderSchools(q); var sn=await refreshStudents(q);
 var live=liveSchools?" (live)":" (mock data)";
 var cat=currentCat?(" — "+currentCat):"";
-document.getElementById("resultMsg").textContent=n+" school(s)"+cat+" found for \""+ (q||"all schools") +"\""+live+".";
+var knd=currentKind?(" — "+currentKind):"";
+document.getElementById("resultMsg").textContent=n+" school(s)"+cat+knd+" found for \""+ (q||"all schools") +"\""+live+".";
 };
 document.getElementById("schoolSearch").onkeydown=function(e){if(e.key==="Enter")document.getElementById("findBtn").click();};
 document.getElementById("loadLive").onclick=async function(){
