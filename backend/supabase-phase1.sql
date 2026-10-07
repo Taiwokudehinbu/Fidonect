@@ -16,6 +16,7 @@ create table if not exists profiles (
   interests text,
   visibility text not null default 'connections' check (visibility in ('public','connections','private')),
   consent_at timestamptz,
+  photo_url text,
   created_at timestamptz not null default now()
 );
 
