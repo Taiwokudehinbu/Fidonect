@@ -1,0 +1,31 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ng.fidonect.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'ng.fidonect.app'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0-debug'
+    }
+
+    buildTypes {
+        debug {
+            // Signed automatically with the SDK debug key — testing only.
+            applicationIdSuffix ''
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

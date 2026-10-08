@@ -5,5 +5,10 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 .env
 backend/.env
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
 .DS_Store
 Thumbs.db
