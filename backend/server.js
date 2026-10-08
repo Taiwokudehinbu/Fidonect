@@ -8,6 +8,8 @@ const multer = require("multer");
 const supabase = require("./supabaseClient");
 const app = express();
 app.use(cors()); app.use(express.json({ limit: "100kb" }));
+// PWA assets (manifest, service worker, icons) — this folder only, never secrets.
+app.use(express.static(path.join(__dirname, "public")));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 // Cheap-slice input validation: valid requests behave exactly as before;
