@@ -110,6 +110,13 @@ async function authedUser(req) {
   const { data: { user } } = await me.auth.getUser();
   return user ? { me, user } : null;
 }
+function adminEmails() { return (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean); }
+async function requireAdmin(req, res) {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) { res.status(401).json({ error: "Missing or invalid Authorization Bearer token" }); return null; }
+  if (!adminEmails().includes((auth.user.email || "").toLowerCase())) { res.status(403).json({ error: "Admin only" }); return null; }
+  return auth;
+}
 
 app.post("/api/auth/signup", async (req, res) => {
   const { name, email, password, type, school, visibility, consent } = req.body || {};
@@ -173,7 +180,7 @@ app.get("/api/profile", async (req, res) => {
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
   const { data, error } = await auth.me.from("profiles").select("*").eq("id", auth.user.id).single();
   if (error) return res.status(404).json({ error: "Profile not found" });
-  res.json(data);
+  res.json({ ...data, authMeta: { emailConfirmed: !!auth.user.email_confirmed_at, lastSignInAt: auth.user.last_sign_in_at || null } });
 });
 
 app.put("/api/profile", async (req, res) => {
@@ -376,6 +383,40 @@ app.post("/api/reports", async (req, res) => {
   }).select("id,created_at").single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true, id: data.id });
+});
+
+app.get("/api/admin/me", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  res.json({ isAdmin: adminEmails().includes((auth.user.email || "").toLowerCase()), email: auth.user.email });
+});
+
+app.get("/api/admin/stats", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  async function count(table) {
+    try {
+      const r = await auth.me.from(table).select("id", { count: "exact", head: true });
+      if (r.error) return { status: "pending", detail: String(r.error.message || r.error).slice(0, 120) };
+      return { status: "ok", count: r.count };
+    } catch (e) { return { status: "pending", detail: String((e && e.message) || e).slice(0, 120) }; }
+  }
+  const [users, posts, institutions] = await Promise.all([count("profiles"), count("posts"), count("institutions")]);
+  let recentUsers = [];
+  if (users.status === "ok") {
+    const r = await auth.me.from("profiles").select("name,email,school,visibility,created_at").order("created_at", { ascending: false }).limit(20);
+    if (!r.error) recentUsers = r.data || [];
+  }
+  let recentPosts = [];
+  if (posts.status === "ok") {
+    const r = await auth.me.from("posts").select("author_name,school,text,created_at").order("created_at", { ascending: false }).limit(20);
+    if (!r.error) recentPosts = r.data || [];
+  }
+  res.json({
+    users, posts, institutions, recentUsers, recentPosts,
+    reports: { status: "dashboard", detail: "Review reports in Supabase dashboard > Table Editor > reports." },
+    generatedAt: new Date().toISOString()
+  });
 });
 
 const PORT = process.env.PORT || 3000;
