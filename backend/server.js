@@ -8,6 +8,12 @@ const multer = require("multer");
 const supabase = require("./supabaseClient");
 const app = express();
 app.use(cors()); app.use(express.json({ limit: "100kb" }));
+app.set("trust proxy", 1); // correct protocol/host behind Render's proxy
+function appUrl(req) {
+  const env = (process.env.APP_URL || "").replace(/\/$/, "");
+  if (env) return env;
+  return req.protocol + "://" + req.get("host");
+}
 // PWA assets (manifest, service worker, icons) — this folder only, never secrets.
 app.use(express.static(path.join(__dirname, "public")));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
@@ -155,6 +161,34 @@ app.post("/api/auth/resend", async (req, res) => {
   const { error } = await supabase.auth.resend({ type: "signup", email });
   if (error) return res.status(400).json({ error: error.message });
   res.json({ ok: true, message: "Confirmation email re-sent if the account exists." });
+});
+
+app.post("/api/auth/forgot", async (req, res) => {
+  const { email } = req.body || {};
+  if (!isEmail(email)) return bad(res, "email is invalid");
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: appUrl(req) + "/" });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true, message: "If that email is registered, a reset link is on its way." });
+});
+
+app.post("/api/auth/recover", async (req, res) => {
+  const { code } = req.body || {};
+  if (typeof code !== "string" || !code) return bad(res, "code is required");
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ user: data.user, session: data.session });
+});
+
+app.put("/api/auth/password", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { password } = req.body || {};
+  if (typeof password !== "string" || password.length < 6) return bad(res, "password must be at least 6 characters");
+  const { data, error } = await auth.me.auth.updateUser({ password });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true, user: data.user });
 });
 
 app.post("/api/profile/complete", async (req, res) => {

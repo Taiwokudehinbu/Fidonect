@@ -88,20 +88,28 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <input id="authPass" class="input" placeholder="Password (min 6 chars)" type="password" />
 <div class="search-row">
 <select id="authType" class="input"><option value="prospective">Prospective student</option><option value="existing">Existing student</option><option value="alumni">Alumni</option></select>
-<select id="authSchool" class="input"><option value="">Select school…</option></select>
+<input id="authSchool" class="input" list="schoolList" placeholder="Type your school — suggestions appear" />
+<datalist id="schoolList"></datalist>
 <select id="authVis" class="input"><option value="connections">Visible to: connections</option><option value="public">Visible to: everyone</option><option value="private">Visible to: only me</option></select>
 </div>
 <p style="font-size:13px"><label><input type="checkbox" id="authConsent" style="width:auto" /> I agree to Fidonect storing my profile for student matching (PRD §23).</label></p>
-<div class="search-row"><button id="signupBtn" class="btn">Create account</button><button id="loginBtn" class="btn ghost">Log in</button><button id="resendBtn" class="btn ghost">Resend confirmation</button></div>
+<div class="search-row"><button id="signupBtn" class="btn">Create account</button><button id="loginBtn" class="btn ghost">Log in</button><button id="resendBtn" class="btn ghost">Resend confirmation</button><button id="forgotBtn" class="btn ghost">Forgot password?</button></div>
 <p id="authMsg" class="muted">Not logged in. Session stays in this browser only.</p>
 <p class="muted small">New here? Create an account, click the confirmation link in your email (it brings you back here), then log in and complete your profile.</p>
+</div>
+<div id="resetBox" style="display:none">
+<p><b>Set a new password.</b></p>
+<input id="newPass1" type="password" class="input" placeholder="New password (min 6 chars)" />
+<input id="newPass2" type="password" class="input" placeholder="Repeat new password" />
+<div class="search-row"><button id="resetSave" class="btn">Save password</button></div>
+<p id="resetMsg" class="muted"></p>
 </div>
 <div id="completeBox" style="display:none">
 <p><b>One step left — complete your profile.</b></p>
 <input id="cmpName" class="input" placeholder="Full name" />
 <div class="search-row">
 <select id="cmpType" class="input"><option value="prospective">Prospective student</option><option value="existing">Existing student</option><option value="alumni">Alumni</option></select>
-<select id="cmpSchool" class="input"><option value="">Select school…</option></select>
+<input id="cmpSchool" class="input" list="schoolList" placeholder="Type your school…" />
 <select id="cmpVis" class="input"><option value="connections">Visible to: connections</option><option value="public">Visible to: everyone</option><option value="private">Visible to: only me</option></select>
 </div>
 <p style="font-size:13px"><label><input type="checkbox" id="cmpConsent" style="width:auto" /> I agree to Fidonect storing my profile for student matching (PRD §23).</label></p>
@@ -134,6 +142,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <button class="cat active" data-kind="">All types</button><button class="cat" data-kind="University">University</button><button class="cat" data-kind="Polytechnic">Polytechnic</button><button class="cat" data-kind="College of Education">College of Education</button>
 </div>
 <div class="grid" id="schoolGrid"></div>
+<div class="search-row" style="margin-top:8px;align-items:center"><button id="prevPage" class="btn ghost">← Prev</button><span id="pageLabel" class="muted"></span><button id="nextPage" class="btn ghost">Next →</button></div>
 <div id="schoolDetail"></div>
 </div>
 
@@ -220,7 +229,7 @@ if(!e.target.dataset||e.target.dataset.cat===undefined)return;
 currentCat=e.target.dataset.cat;
 var btns=document.getElementById("catRow").querySelectorAll(".cat");
 for(var i=0;i<btns.length;i++)btns[i].classList.toggle("active",btns[i]===e.target);
-renderSchools(document.getElementById("schoolSearch").value);
+schoolPage=1;renderSchools(document.getElementById("schoolSearch").value);
 };
 var currentKind="";
 document.getElementById("kindRow").onclick=async function(e){
@@ -228,21 +237,28 @@ if(!e.target.dataset||e.target.dataset.kind===undefined)return;
 currentKind=e.target.dataset.kind;
 var btns=document.getElementById("kindRow").querySelectorAll(".cat");
 for(var i=0;i<btns.length;i++)btns[i].classList.toggle("active",btns[i]===e.target);
-await loadSchools();renderSchools(document.getElementById("schoolSearch").value);
+schoolPage=1;await loadSchools();renderSchools(document.getElementById("schoolSearch").value);
 };
 async function loadSchools(){
 try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
 if(r.ok&&rows.length){liveSchools=normSchools(rows);var st=document.getElementById("statSchools");if(st)st.textContent=rows.length;return;}}catch(e){}
 liveSchools=null;
 }
+var schoolPage=1;var PAGE_SIZE=12;
 function renderSchools(filter){
 var q=(filter||"").toLowerCase();
 var base=liveSchools||normSchools(schools);
 var list=base.filter(function(s){return (!q || s.name.toLowerCase().indexOf(q)>-1) && (!currentCat || s.ownership===currentCat) && (!currentKind || s.kind===currentKind);});
+var totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
+if(schoolPage>totalPages)schoolPage=totalPages;
+var page=list.slice((schoolPage-1)*PAGE_SIZE,schoolPage*PAGE_SIZE);
 document.getElementById("schoolCount").textContent=list.length+" shown";
-document.getElementById("schoolGrid").innerHTML=list.map(function(s){
+document.getElementById("schoolGrid").innerHTML=page.map(function(s){
 return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+ownPill(s.ownership)+(s.kind?' <span class="pill">'+s.kind+'</span>':"")+'</p><p><button class="btn ghost" onclick="showTree('+(s.live?s.id:'null')+')">View departments</button></p></div>';
 }).join("")||'<p class="muted">No schools match.</p>';
+document.getElementById("pageLabel").textContent=list.length?("Page "+schoolPage+" of "+totalPages):"";
+document.getElementById("prevPage").disabled=schoolPage<=1;
+document.getElementById("nextPage").disabled=schoolPage>=totalPages;
 return list.length;
 }
 async function showTree(id){
@@ -277,9 +293,12 @@ box.innerHTML='<div class="person"><p><span class="tag '+cls+'">'+esc(j.source)+
 }
 document.getElementById("fidoBtn").onclick=askFido;
 document.getElementById("fidoQ").onkeydown=function(e){if(e.key==="Enter")askFido();};
+document.getElementById("prevPage").onclick=function(){if(schoolPage>1){schoolPage--;renderSchools(document.getElementById("schoolSearch").value);}};
+document.getElementById("nextPage").onclick=function(){schoolPage++;renderSchools(document.getElementById("schoolSearch").value);};
 document.getElementById("findBtn").onclick=async function(){
 document.getElementById("schoolDetail").innerHTML="";
 await loadSchools();
+schoolPage=1;
 var q=document.getElementById("schoolSearch").value;
 var n=renderSchools(q); var sn=await refreshStudents(q);
 var live=liveSchools?" (live)":" (mock data)";
@@ -310,9 +329,9 @@ function sess(){try{return JSON.parse(localStorage.getItem("fidonect_session")||
 function setSess(s){if(s)localStorage.setItem("fidonect_session",JSON.stringify(s));else localStorage.removeItem("fidonect_session");renderAuth();}
 async function loadSchoolOptions(){
 try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
-if(r.ok&&rows.length)document.getElementById("authSchool").innerHTML='<option value="">Select school…</option>'+rows.map(function(s){return '<option>'+s.name+'</option>';}).join("");
-else document.getElementById("authSchool").innerHTML='<option value="">Select school…</option><option>University of Lagos</option><option>University of Ibadan</option><option>Federal University of Technology, Akure</option>';
-}catch(e){/* offline: leave default */}
+if(r.ok&&rows.length)document.getElementById("schoolList").innerHTML=rows.map(function(s){return '<option value="'+esc(s.name)+'">';}).join("");
+else document.getElementById("schoolList").innerHTML='<option value="University of Lagos"><option value="University of Ibadan"><option value="Federal University of Technology, Akure">';
+}catch(e){/* offline: free text still works */}
 }
 async function fetchProfile(token){
 var r=await fetch(apiBase()+"/api/profile",{headers:{Authorization:"Bearer "+token}});
@@ -325,7 +344,6 @@ var p=await fetchProfile(s.access_token);
 if(!p.ok){
 if(p.status===404){form.style.display="none";view.style.display="none";
 var cb=document.getElementById("completeBox");cb.style.display="";
-document.getElementById("cmpSchool").innerHTML=document.getElementById("authSchool").innerHTML;
 document.getElementById("cmpMsg").textContent="Email confirmed — finish your profile to continue.";return;}
 setSess(null);document.getElementById("authMsg").textContent="Session expired — logged out.";return;}
 document.getElementById("completeBox").style.display="none";
@@ -393,6 +411,32 @@ try{var r=await fetch(apiBase()+"/api/auth/resend",{method:"POST",headers:{"Cont
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 m.textContent=j.message;}catch(e){m.textContent="Failed: "+e.message;}
 };
+document.getElementById("forgotBtn").onclick=async function(){
+var m=document.getElementById("authMsg");var email=document.getElementById("authEmail").value;
+if(!email){m.textContent="Type your registered email first, then Forgot password.";return;}
+m.textContent="Sending reset link…";
+try{var r=await fetch(apiBase()+"/api/auth/forgot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+m.textContent=j.message;}catch(e){m.textContent="Failed: "+e.message;}
+};
+document.getElementById("resetSave").onclick=async function(){
+var m=document.getElementById("resetMsg");
+var a=document.getElementById("newPass1").value,b=document.getElementById("newPass2").value;
+var s=sess();if(!s){m.textContent="Recovery session missing — request a fresh link.";return;}
+if(a.length<6){m.textContent="Password must be at least 6 characters.";return;}
+if(a!==b){m.textContent="Passwords do not match.";return;}
+m.textContent="Saving…";
+try{var r=await fetch(apiBase()+"/api/auth/password",{method:"PUT",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({password:a})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+m.textContent="Password updated — you are logged in.";document.getElementById("resetBox").style.display="none";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
+};
+(function(){
+var code=null;
+try{code=new URLSearchParams(location.search).get("code");}catch(e){}
+if(!code)return;
+document.getElementById("resetBox").style.display="none";
+fetch(apiBase()+"/api/auth/recover",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:code})}).then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||"");setSess(j.session);document.getElementById("authForm").style.display="none";document.getElementById("resetBox").style.display="";document.getElementById("resetMsg").textContent="Link verified — set a new password below.";try{window.history.replaceState({},"","/");}catch(e){}}).catch(function(e){document.getElementById("resetBox").style.display="";document.getElementById("resetMsg").textContent="Link invalid or expired: "+e.message+" — use Forgot password for a fresh link.";});
+})();
 document.getElementById("logoutBtn").onclick=function(){setSess(null);document.getElementById("authMsg").textContent="Logged out.";};
 // ---- Phase 3: Connections UI (live when logged in, mocks otherwise) ----
 var connState={};
