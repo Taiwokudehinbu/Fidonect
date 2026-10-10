@@ -384,6 +384,37 @@ app.post("/api/fido/ask", async (req, res) => {
   const community = (text) => ({ answer: text, source: "Community", school: sName, verify: true });
   const ai = (text) => ({ answer: text, source: "AI guidance", school: sName, verify: true });
   const where = sName ? " at " + sName : "";
+  // Directory intelligence: answer from the live NUC/NBTE/NCCE dataset (Official source).
+  if (supabase && /list|show|display|how many|number of|count|which/.test(q) && /school|institution|universit|polytechnic|college/.test(q)) {
+    const STATES = ["Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno","Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","FCT","Abuja","Gombe","Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara"];
+    const kindQ = /polytechnic|\bpoly\b/.test(q) ? "Polytechnic" : (/college of education|\bcoe\b/.test(q) ? "College of Education" : (/universit/.test(q) ? "University" : null));
+    const ownQ = /\bfederal\b/.test(q) ? "Federal" : (/\bprivate\b/.test(q) ? "Private" : (/\bstate\b/.test(q) ? "State" : null));
+    let stHit = STATES.find(st => q.includes(st.toLowerCase()));
+    if (stHit === "Abuja") stHit = "FCT";
+    try {
+      if (kindQ || ownQ || stHit) {
+        let query = supabase.from("institutions").select("name,location,ownership,state,kind", { count: "exact" }).order("name").limit(25);
+        if (kindQ) query = query.eq("kind", kindQ);
+        if (ownQ) query = query.eq("ownership", ownQ);
+        if (stHit) query = query.eq("state", stHit);
+        const { data, error, count } = await query;
+        if (!error && data) {
+          const label = [ownQ, stHit, kindQ ? kindQ + "s" : ""].filter(Boolean).join(" ");
+          const names = data.map(r => r.name).join("; ");
+          return res.json({ answer: (count || data.length) + " matching " + (label || "schools") + " (showing " + data.length + "): " + names + ". Open any school in the directory below for departments and campus info.", source: "Official", school: null, verify: true });
+        }
+      } else {
+        const { data, error } = await supabase.from("institutions").select("kind", { count: "exact" });
+        if (!error) {
+          const all = await supabase.from("institutions").select("kind").limit(1000);
+          const n = { University: 0, Polytechnic: 0, "College of Education": 0 };
+          (all.data || []).forEach(r => { if (n[r.kind] !== undefined) n[r.kind]++; });
+          const total = n.University + n.Polytechnic + n["College of Education"];
+          return res.json({ answer: "Fidonect lists " + total + " institutions: " + n.University + " universities, " + n.Polytechnic + " polytechnics, " + n["College of Education"] + " colleges of education — Federal, State, and Private. Try: 'list federal universities in Lagos' or 'how many polytechnics'.", source: "Official", school: null, verify: true });
+        }
+      }
+    } catch (e) { /* fall through to topic rules */ }
+  }
   if (/clearance|document|screening|registr/.test(q)) {
     if (hub && hub.clearance) return res.json(official("For clearance" + where + ": " + hub.clearance + " Always confirm on your school portal — requirements vary by department."));
     return res.json(ai("For clearance" + where + ", typically prepare: JAMB admission letter, O-level result(s), birth certificate/age declaration, LGA identification letter, passport photographs, and departmental screening forms." + (sName ? " Ask in the " + sName + " community for department-specific experience." : "") + " Confirm everything on the official school portal."));
