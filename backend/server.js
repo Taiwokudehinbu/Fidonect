@@ -450,21 +450,6 @@ app.post("/api/reports", async (req, res) => {
   res.json({ ok: true, id: data.id });
 });
 
-// TEMPORARY diagnostic (remove after env fix verified): shows which Supabase
-// project/keys the running backend uses and what it can read. No secrets exposed.
-app.get("/api/diag", async (req, res) => {
-  const out = { urlHost: null, keyPrefix: null, instCount: null, instError: null };
-  try { out.urlHost = new URL(process.env.SUPABASE_URL || "").host; }
-  catch (e) { out.instError = "bad SUPABASE_URL"; }
-  out.keyPrefix = (process.env.SUPABASE_ANON_KEY || "").slice(0, 20);
-  if (supabase && !out.instError) {
-    const r = await supabase.from("institutions").select("id", { count: "exact", head: true });
-    if (r.error) out.instError = r.error.message.slice(0, 140);
-    else out.instCount = r.count;
-  }
-  res.json(out);
-});
-
 app.get("/api/admin/me", async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
