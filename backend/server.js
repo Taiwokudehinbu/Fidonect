@@ -31,6 +31,14 @@ app.get(["/", "/index.html"], (req, res) => res.sendFile(path.join(__dirname, ".
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 
 app.get("/health", (req, res) => res.json({ ok: true, service: "fidonect-api", phase: "mvp-stub" }));
+app.get("/api/status", async (req, res) => {
+  const out = { ok: true, time: new Date().toISOString(), institutions: null };
+  if (supabase) {
+    const r = await supabase.from("institutions").select("id", { count: "exact", head: true });
+    if (!r.error) out.institutions = r.count;
+  }
+  res.json(out);
+});
 app.get("/api/institutions/test", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in backend/.env" });
   const { data, error } = await supabase.from("institutions").select("id,name,location").limit(10);
