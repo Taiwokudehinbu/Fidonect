@@ -4,6 +4,7 @@ services:
   - type: web
     name: fidonect-api
     runtime: node
+    autoDeploy: true
     buildCommand: npm --prefix backend install
     startCommand: npm --prefix backend start
     healthCheckPath: /health
@@ -11,4 +12,6 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: ADMIN_EMAILS
         sync: false
