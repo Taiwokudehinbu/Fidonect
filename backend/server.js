@@ -27,6 +27,8 @@ function isEmail(v) { return typeof v === "string" && v.length <= 254 && /^[^\s@
 // Serve the homepage from the same service (repo-root index.html).
 // Only this file is exposed — backend/.env and other files are never served.
 app.get(["/", "/index.html"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+// Dedicated admin login page (public chrome; all data behind requireAdmin).
+app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 

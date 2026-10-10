@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Fidonect Admin — Sign in</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#0a1f33;color:#17202a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.box{background:#fff;border-radius:16px;padding:24px;max-width:720px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.35)}
+.brand{font-weight:800;font-size:20px;display:flex;align-items:center;margin-bottom:4px}
+.logo{display:inline-flex;width:30px;height:30px;border-radius:8px;background:#2dd4bf;color:#062a26;align-items:center;justify-content:center;margin-right:8px;font-weight:800}
+.muted{color:#637083}.small{font-size:12px}
+.input{width:100%;padding:12px;margin:6px 0;border:1px solid #d7dee8;border-radius:10px;font:inherit}
+.btn{cursor:pointer;border-radius:999px;border:1px solid #0a1f33;padding:12px 22px;background:#0a1f33;color:#fff;font-weight:700}
+.btn.ghost{background:#fff;color:#0a1f33}
+.btn:focus-visible{outline:3px solid #2dd4bf;outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:12px 0}
+.stat{background:#f6f7fb;border-radius:12px;padding:12px;text-align:center}
+.stat b{font-size:22px;display:block}
+.person{background:#f6f7fb;border-radius:10px;padding:10px;margin:8px 0}
+.deny{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:12px}
+</style>
+</head>
+<body>
+<div class="box">
+<div class="brand"><span class="logo">F</span> Fidonect Admin</div>
+<p class="muted small">Restricted area. Sign in with an administrator account. Nothing here is visible without one.</p>
+
+<div id="loginBox">
+<input id="aEmail" class="input" type="email" placeholder="Admin email" autocomplete="username" />
+<input id="aPass" class="input" type="password" placeholder="Password" autocomplete="current-password" />
+<button id="aLogin" class="btn">Sign in</button>
+<p id="aMsg" class="muted"></p>
+</div>
+
+<div id="dashBox" style="display:none">
+<p><b id="aWho"></b> <button id="aLogout" class="btn ghost">Sign out</button></p>
+<div class="grid" id="aStats"></div>
+<div id="aUsers"></div>
+<div id="aPosts"></div>
+<p class="muted small" id="aNote"></p>
+</div>
+</div>
+
+<script>
+var API = location.origin;
+function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function token(){ try { var s = JSON.parse(localStorage.getItem("fidonect_admin_session") || "null"); return s && s.access_token; } catch (e) { return null; } }
+function showLogin(msg) {
+  document.getElementById("loginBox").style.display = "";
+  document.getElementById("dashBox").style.display = "none";
+  if (msg) document.getElementById("aMsg").textContent = msg;
+}
+async function loadDash(tok) {
+  var me = await (await fetch(API + "/api/admin/me", { headers: { Authorization: "Bearer " + tok } })).json();
+  if (!me.isAdmin) {
+    localStorage.removeItem("fidonect_admin_session");
+    document.getElementById("dashBox").style.display = "none";
+    document.getElementById("loginBox").style.display = "";
+    document.getElementById("aMsg").innerHTML = "";
+    var d = document.createElement("div");
+    d.className = "deny";
+    d.textContent = "Access denied: this account is not an administrator.";
+    document.getElementById("aMsg").appendChild(d);
+    return;
+  }
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("dashBox").style.display = "";
+  document.getElementById("aWho").textContent = me.email;
+  var r = await fetch(API + "/api/admin/stats", { headers: { Authorization: "Bearer " + tok } });
+  var j = await r.json();
+  if (!r.ok) { document.getElementById("aNote").textContent = "Failed: " + (j.error || r.status); return; }
+  function card(t, v) { return '<div class="stat"><b>' + v + '</b><span class="muted small">' + t + '</span></div>'; }
+  function n(x) { return x.status === "ok" ? x.count : "pending"; }
+  document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions));
+  document.getElementById("aUsers").innerHTML = "<h3>Recent users</h3>" + ((j.recentUsers || []).map(function (u) {
+    return "<div class=\"person\"><b>" + esc(u.name) + "</b> <span class=\"muted small\">" + esc(u.email) + " — " + esc(u.school || "no school") + "</span></div>";
+  }).join("") || '<p class="muted">No user data yet.</p>');
+  document.getElementById("aPosts").innerHTML = "<h3>Recent posts</h3>" + ((j.recentPosts || []).map(function (p) {
+    return "<div class=\"person\"><b>" + esc(p.author_name) + "</b> <span class=\"muted small\">" + esc(p.school) + "</span><p>" + esc(p.text) + "</p></div>";
+  }).join("") || '<p class="muted">No posts yet.</p>');
+  document.getElementById("aNote").textContent = "Reports: review in Supabase dashboard > Table Editor > reports. Updated " + new Date(j.generatedAt).toLocaleString() + ".";
+}
+document.getElementById("aLogin").onclick = async function () {
+  var m = document.getElementById("aMsg"); m.textContent = "Signing in…";
+  try {
+    var r = await fetch(API + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: document.getElementById("aEmail").value, password: document.getElementById("aPass").value }) });
+    var j = await r.json();
+    if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+    localStorage.setItem("fidonect_admin_session", JSON.stringify(j.session));
+    m.textContent = "";
+    loadDash(j.session.access_token);
+  } catch (e) { m.textContent = "Failed: " + e.message; }
+};
+document.getElementById("aLogout").onclick = function () {
+  localStorage.removeItem("fidonect_admin_session");
+  showLogin("Signed out.");
+};
+// Minimal escaping for admin-rendered user content.
+document.getElementById("aStats").innerHTML = "";
+(function () {
+  var t = token();
+  if (t) loadDash(t);
+})();
+</script>
+</body>
+</html>
