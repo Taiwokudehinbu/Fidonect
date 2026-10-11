@@ -384,6 +384,36 @@ async function findHub(institutionId) {
   const { data } = await supabase.from("hub_pages").select("overview,clearance,fees,accommodation,source").eq("institution_id", institutionId).single();
   return data || null;
 }
+async function findCourses(text) {
+  // Live lookup in department records (covers only some schools so far — never invent).
+  if (!supabase) return [];
+  const stop = new Set(["where","study","studies","offer","offers","offered","offering","which","schools","school","course","courses","department","departments","programme","programmes","available","there","their","admission","learn","best","good","with","that","this","from","about","does","what","have","has","want","like"]);
+  const keys = [...new Set(text.toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 4 && !stop.has(w)))].slice(0, 3);
+  const out = [];
+  for (const k of keys) {
+    const r = await supabase.from("departments").select("id,name,faculty_id").ilike("name", "%" + k + "%").limit(8).catch(() => ({ data: [] }));
+    const depts = (r && r.data) || [];
+    if (depts.length) {
+      const facIds = [...new Set(depts.map(d => d.faculty_id))];
+      const fr = await supabase.from("faculties").select("id,name,institution_id").in("id", facIds).catch(() => ({ data: [] }));
+      const facs = (fr && fr.data) || [];
+      const byId = {};
+      facs.forEach(f => { byId[f.id] = f; });
+      const instIds = [...new Set(facs.map(f => f.institution_id))];
+      let instById = {};
+      if (instIds.length) {
+        const ir = await supabase.from("institutions").select("id,name").in("id", instIds).catch(() => ({ data: [] }));
+        ((ir && ir.data) || []).forEach(i => { instById[i.id] = i.name; });
+      }
+      depts.slice(0, 8).forEach(d => {
+        const f = byId[d.faculty_id] || {};
+        out.push(d.name + (f.name ? " (" + f.name + (instById[f.institution_id] ? ", " + instById[f.institution_id] : "") + ")" : ""));
+      });
+    }
+    if (out.length >= 6) break;
+  }
+  return [...new Set(out)].slice(0, 6);
+}
 app.post("/api/fido/ask", async (req, res) => {
   const question = req.body && req.body.question;
   if (typeof question !== "string" || question.trim().length < 3 || question.length > 500) return bad(res, "question must be 3–500 characters");
@@ -396,7 +426,8 @@ app.post("/api/fido/ask", async (req, res) => {
   const ai = (text) => ({ answer: text, source: "AI guidance", school: sName, verify: true });
   const where = sName ? " at " + sName : "";
   // Directory intelligence: answer from the live NUC/NBTE/NCCE dataset (Official source).
-  if (supabase && /list|show|display|how many|number of|count|which/.test(q) && /school|institution|universit|polytechnic|college/.test(q)) {
+  // Skipped for course/department questions — those go to the live course lookup below.
+  if (supabase && /list|show|display|how many|number of|count|which/.test(q) && /school|institution|universit|polytechnic|college/.test(q) && !/course|programme|department|study|offer/.test(q)) {
     const STATES = ["Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno","Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","FCT","Abuja","Gombe","Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara"];
     const kindQ = /polytechnic|\bpoly\b/.test(q) ? "Polytechnic" : (/college of education|\bcoe\b/.test(q) ? "College of Education" : (/universit/.test(q) ? "University" : null));
     const ownQ = /\bfederal\b/.test(q) ? "Federal" : (/\bprivate\b/.test(q) ? "Private" : (/\bstate\b/.test(q) ? "State" : null));
@@ -426,28 +457,53 @@ app.post("/api/fido/ask", async (req, res) => {
       }
     } catch (e) { /* fall through to topic rules */ }
   }
-  if (/clearance|document|screening|registr/.test(q)) {
-    if (hub && hub.clearance) return res.json(official("For clearance" + where + ": " + hub.clearance + " Always confirm on your school portal — requirements vary by department."));
-    return res.json(ai("For clearance" + where + ", typically prepare: JAMB admission letter, O-level result(s), birth certificate/age declaration, LGA identification letter, passport photographs, and departmental screening forms." + (sName ? " Ask in the " + sName + " community for department-specific experience." : "") + " Confirm everything on the official school portal."));
+  if (/^(hi|hey|hello|good (morning|afternoon|evening)|thanks|thank you|bye|goodbye)\b/.test(q) || /who are you|what can you do|help me/.test(q)) {
+    return res.json(ai("Hello! I'm Fido, your campus guide. I can walk you through admission steps, clearance documents, fees, accommodation, course registration, finding courses, and resumption prep" + where + ". Try: 'I just got admitted — what next?'"));
+  }
+  if (/admitted|after admission|just got|newly admitted|next step/.test(q)) {
+    return res.json(ai("Congrats on your admission" + where + "! Typical next steps: (1) accept the offer on JAMB CAPS and print your JAMB admission letter; (2) watch your school portal for the admission and screening list; (3) gather clearance documents — O-level results, birth certificate, LGA letter, passport photos; (4) pay acceptance and school fees only through official portal channels; (5) sort accommodation early; (6) complete course registration within the window; (7) attend orientation and matriculation." + (sName ? " Ask in the " + sName + " community — students there have done this recently." : " Tell me your school and I'll share its campus info.")));
+  }
+  if (/caps/.test(q) || (/jamb/.test(q) && !/cut.?off|post-utme|postutme/.test(q))) {
+    return res.json(ai("On JAMB CAPS" + where + ": (1) log in and check your admission status often; (2) click Accept once offered — ignoring it can forfeit the slot; (3) print your admission letter from the portal; (4) confirm your O-level results are uploaded on the JAMB portal. Only trust offers shown on CAPS or the official school portal — anyone asking for money to 'secure' admission is running a scam."));
+  }
+  if (/regist|enrol|course form/.test(q)) {
+    return res.json(ai("For course registration" + where + ": (1) pay your acceptance and school fees first — most portals block registration until payment; (2) log in to the student portal inside the registration window; (3) select the semester's courses using your departmental handbook; (4) submit and print your registration forms; (5) confirm with your level adviser. Late registration attracts extra charges, so don't wait."));
+  }
+  if (/where.*(study|offer|do)|does .*offer|can i study|course|programme|department|available/.test(q)) {
+    const hits = await findCourses(q).catch(() => null);
+    if (hits && hits.length) return res.json(official("From our department records: " + hits.join("; ") + ". These records currently cover only some schools — confirm availability and entry requirements on the school portal or JAMB brochure."));
+    if (sName) return res.json(ai("I don't hold department-level records for " + sName + " yet — our directory covers institution-level info for 588 schools, with department details for only some so far. Check " + sName + "'s portal or the JAMB brochure for that course, and ask in the community — a student there may know."));
+    return res.json(ai("Tell me the course and the school — e.g. 'Does UNILAG offer Computer Science?' — and I'll check our records. Note department data covers only some schools so far; for the full picture, check the school portal or JAMB brochure."));
+  }
+  if (/clearance|screening/.test(q)) {
+    if (hub && hub.clearance) return res.json(official("For clearance" + where + ": " + hub.clearance + " Go in this order: confirm your name on the admission list, present originals plus photocopies, then keep every receipt. Always confirm on your school portal — requirements vary by department."));
+    return res.json(ai("For clearance" + where + ", go in this order: (1) confirm your name on the admission or screening list; (2) gather originals plus 3–4 photocopies of each — JAMB admission letter, O-level result(s), birth certificate or age declaration, LGA identification letter, passport photos; (3) present them at the screening venue; (4) keep every receipt." + (sName ? " Ask in the " + sName + " community for department-specific experience." : " Tell me your school for its specific requirements.")));
+  }
+  if (/document|what .*(need|require|bring)|checklist/.test(q)) {
+    if (hub && hub.clearance) return res.json(official("Documents" + where + ": " + hub.clearance + " Carry originals plus photocopies, and confirm the exact list on your school portal."));
+    return res.json(ai("Most schools ask for: JAMB admission letter and result slip, O-level result(s), birth certificate or age declaration, LGA or state identification letter, 8–12 passport photographs, acceptance fee receipt, and departmental screening forms. Carry originals plus 3–4 photocopies of each in a file jacket. Exact lists vary — confirm on your school portal before travelling."));
   }
   if (/accommod|hostel|housing|lodge/.test(q)) {
-    if (hub && hub.accommodation) return res.json(official("Accommodation" + where + ": " + hub.accommodation));
-    return res.json(community("Community tip" + where + ": school hostels fill fast — apply immediately after clearance and budget for private hostels nearby as backup. Ask connected students where they stay."));
+    if (hub && hub.accommodation) return res.json(official("Accommodation" + where + ": " + hub.accommodation + " Apply the moment clearance opens — school hostels fill fast."));
+    return res.json(community("Accommodation plan" + where + ": (1) apply for the school hostel immediately after clearance; (2) line up a private hostel nearby as backup; (3) before paying, inspect security, water, light, and distance to campus; (4) never pay into personal accounts or before seeing the room. Ask connected students where they stay."));
   }
   if (/fee|school charges|payment|tuition/.test(q)) {
-    if (hub && hub.fees) return res.json(official("Fees" + where + ": " + hub.fees));
-    return res.json(ai("Fees vary by institution, faculty, and session" + where + ". Check the official school portal for the current schedule and never pay into personal accounts — report payment scams."));
+    if (hub && hub.fees) return res.json(official("Fees" + where + ": " + hub.fees + " Pay only through channels named on the official portal and keep every receipt."));
+    return res.json(ai("I don't hold verified fee figures for every school" + (sName ? " — including " + sName + " — " : "") + " so tell me your school and I'll share what we hold. Generally: check the official school portal for the current schedule (it changes per session and faculty), pay only through official channels, keep receipts, and never pay into personal accounts — report payment scams."));
   }
-  if (/admission|jamb|post-utme|postutme|cut.?off|merit list/.test(q)) {
-    return res.json(ai("For admission" + where + ": track JAMB CAPS, the school portal, and departmental cut-off marks. Only trust admission offers shown on JAMB CAPS or the official portal — anyone asking for money to 'secure' admission is running a scam."));
+  if (/admission|jamb|post-utme|postutme|cut.?off|merit list|supplementary|supplemental/.test(q)) {
+    return res.json(ai("For admission" + where + ": (1) track JAMB CAPS and accept your offer there; (2) watch the school portal for merit, supplementary, or VC lists; (3) note departmental cut-off marks change every year, so treat last year's figures as a guide only; (4) print your JAMB admission letter early. Only trust offers on CAPS or the official portal — anyone asking for money to 'secure' admission is running a scam."));
   }
-  if (/resum|prepare|first semester|freshers|fresher|new student/.test(q)) {
-    return res.json(ai("To prepare" + where + ": (1) documents + photocopies, (2) accommodation plan, (3) departmental reading list, (4) basic campus essentials, (5) connect with 2–3 classmates and one mentor here before resumption."));
+  if (/resum|prepare|first semester|freshers|fresher|new student|packing|pack/.test(q)) {
+    return res.json(ai("Resumption prep" + where + ": documents — originals plus photocopies in a file jacket; accommodation — confirmed before you travel; academics — departmental reading list and basic stationery; living — bedding, cooking basics, toiletries, and a lockable box; people — connect with 2–3 classmates and one mentor here before you arrive. Travel light on day one and buy bulky items near campus." + (sName ? "" : " Tell me your school for campus-specific tips.")));
   }
-  if (/study|exam|gp|grade|reading|tutorial/.test(q)) {
-    return res.json(ai("Study smart" + where + ": get the course outline early, join department study threads, ask mentors for past questions, and protect your study time in the first semester — it sets your GPA foundation."));
+  if (/orientation|matric|matriculation/.test(q)) {
+    return res.json(ai("Orientation and matriculation" + where + ": expect campus tours, faculty and department introductions, library and portal training, and the matriculation oath that formally admits you. Go with writing materials and your admission documents — and use the week to meet classmates and find a mentor. It's the easiest week to make friends you'll keep all through school."));
   }
-  return res.json(ai("I can help with resumption prep, clearance documents, accommodation, fees, admission, and study tips" + where + ". Try: 'What documents do I need for clearance?'"));
+  if (/study|exam|gp|grade|reading|tutorial|past question/.test(q)) {
+    return res.json(ai("Study smart" + where + ": (1) get each course outline in week one; (2) build a weekly timetable and protect study hours; (3) join department study threads and ask mentors for past questions; (4) revise weekly instead of cramming; (5) guard your first-semester GPA — it sets your foundation. Which course is giving you trouble? I can share how to approach it."));
+  }
+  return res.json(ai("I can guide you step by step on: next steps after admission, JAMB CAPS, clearance documents, course registration, fees, accommodation, finding courses, orientation, resumption prep, and study tips" + where + ". Try: 'I just got admitted — what next?' or 'What documents do I need for clearance?'"));
 });
 app.get("/api/mentors", (req, res) => res.json(db.mentors));
 app.post("/api/reports", async (req, res) => {
