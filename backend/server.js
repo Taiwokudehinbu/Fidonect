@@ -56,7 +56,8 @@ app.get("/api/institutions", async (req, res) => {
   if (own !== undefined && !["Federal", "State", "Private"].includes(own)) return bad(res, "ownership must be Federal, State, or Private");
   if (kind !== undefined && !["University", "Polytechnic", "College of Education"].includes(kind)) return bad(res, "kind must be University, Polytechnic, or College of Education");
   const run = (select) => {
-    let q = supabase.from("institutions").select(select).order("name");
+    // Explicit limit: never let PostgREST fall back to a smaller default page (588 rows live).
+    let q = supabase.from("institutions").select(select).order("name").limit(1000);
     if (own && select.includes("ownership")) q = q.eq("ownership", own);
     if (kind && select.includes("kind")) q = q.eq("kind", kind);
     return q;
@@ -469,14 +470,16 @@ app.get("/api/admin/me", async (req, res) => {
 app.get("/api/admin/stats", async (req, res) => {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
-  async function count(table) {
+  async function count(table, client) {
     try {
-      const r = await auth.me.from(table).select("id", { count: "exact", head: true });
+      const r = await (client || auth.me).from(table).select("id", { count: "exact", head: true });
       if (r.error) return { status: "pending", detail: String(r.error.message || r.error).slice(0, 120) };
       return { status: "ok", count: r.count };
     } catch (e) { return { status: "pending", detail: String((e && e.message) || e).slice(0, 120) }; }
   }
-  const [users, posts, institutions] = await Promise.all([count("profiles"), count("posts"), count("institutions")]);
+  // Institutions are public data whose read policy covers the anon role only;
+  // count them with the anon client so the admin card matches /api/status.
+  const [users, posts, institutions] = await Promise.all([count("profiles"), count("posts"), count("institutions", supabase)]);
   let recentUsers = [];
   if (users.status === "ok") {
     const r = await auth.me.from("profiles").select("name,email,school,visibility,created_at").order("created_at", { ascending: false }).limit(20);
