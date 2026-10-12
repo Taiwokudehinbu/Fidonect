@@ -257,12 +257,31 @@ if(schoolPage>totalPages)schoolPage=totalPages;
 var page=list.slice((schoolPage-1)*PAGE_SIZE,schoolPage*PAGE_SIZE);
 document.getElementById("schoolCount").textContent=list.length+" shown";
 document.getElementById("schoolGrid").innerHTML=page.map(function(s){
-return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+ownPill(s.ownership)+(s.kind?' <span class="pill">'+s.kind+'</span>':"")+'</p><p><button class="btn ghost" onclick="showTree('+(s.live?s.id:'null')+')">View departments</button></p></div>';
+return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+ownPill(s.ownership)+(s.kind?' <span class="pill">'+s.kind+'</span>':"")+'</p><p>'+(s.live?'<a class="btn ghost" style="text-decoration:none" href="/schools/'+s.id+'">Open school page</a>':'<button class="btn ghost" onclick="showTree(null)">View departments</button>')+'</p></div>';
 }).join("")||'<p class="muted">No schools match.</p>';
 document.getElementById("pageLabel").textContent=list.length?("Page "+schoolPage+" of "+totalPages):"";
 document.getElementById("prevPage").disabled=schoolPage<=1;
 document.getElementById("nextPage").disabled=schoolPage>=totalPages;
 return list.length;
+}
+// Reusable school profile renderer: one builder powers both the inline
+// directory detail and the dedicated /schools/:id page. Add a school later
+// by adding its rows — no new page code needed.
+function schoolProfileHTML(t, page){
+page=!!page;
+var html=page?'<p><a href="/#schools">← Back to all schools</a></p>':"";
+html+='<div class="card"><h2>'+esc(t.name)+'</h2><p class="muted">'+esc(t.location||"")+((t.state&&t.location.indexOf(t.state)<0)?", "+esc(t.state):"")+(t.ownership?" • "+esc(t.ownership):"")+(t.kind?" • "+esc(t.kind):"")+'</p>';
+html+='<h3>Overview</h3><p>'+esc((t.hub&&t.hub.overview)||"Community-driven page for this institution. Official details are added as they are verified.")+'</p>'+(t.hub?'<p><span class="pill">'+esc(t.hub.source)+'</span></p>':"");
+html+='<h3>Admission information</h3><p>Track JAMB CAPS, accept your offer there, and watch the school portal for merit and supplementary lists. Only trust offers on CAPS or the official portal.</p>';
+html+='<h3>Resumption information</h3><p>Confirm accommodation before travelling, carry originals plus photocopies in a file jacket, and attend orientation week — it is the easiest week to meet classmates and find a mentor.</p>';
+html+='<h3>Clearance requirements</h3><p>'+esc((t.hub&&t.hub.clearance)||"Confirm your name on the admission list, then present originals plus photocopies at the screening venue. Confirm the exact list on the school portal.")+'</p>';
+html+='<h3>Required documents</h3><p>JAMB admission letter and result slip, O-level result(s), birth certificate or age declaration, LGA identification letter, 8–12 passport photographs, acceptance fee receipt, and departmental screening forms. Carry originals plus 3–4 photocopies of each.</p>';
+html+='<h3>School fees</h3><p>'+esc((t.hub&&t.hub.fees)||"Check the official school portal for the current schedule — fees change per session and faculty.")+' <span class="muted">Pay only through official channels; never pay into personal accounts.</span>'+(t.hub?"":' <span class="muted">Have verified figures? Ask in the community.</span>')+'</p>';
+html+='<h3>Accommodation</h3><p>'+esc((t.hub&&t.hub.accommodation)||"Apply for the school hostel immediately after clearance and line up a private hostel nearby as backup. Inspect security, water, light, and distance before paying.")+'</p>';
+html+='<h3>Faculties &amp; departments</h3>'+(t.faculties.map(function(f){return '<p><b>'+esc(f.name)+'</b><br/>'+f.departments.map(function(d){return esc(d.name)+' ('+d.programmes.map(function(p){return esc(p.name);}).join(", ")+')';}).join("<br/>")+'</p>';}).join("")||'<p class="muted">Department details coming soon for this school.</p>');
+html+='<div id="commWrap"><h3>Student community</h3><p class="muted small">Stay safe: never share passwords, bank details, ID documents, or your exact home address.</p><div id="postList"></div><div class="search-row" id="postBox" style="display:none"><input id="postInput" class="input" placeholder="Share guidance or ask a question…" /><button class="btn" onclick="sendPost()">Post</button></div><p class="muted" id="postLogin">Log in above to join the discussion.</p></div>';
+html+='<div><h3>Ask Fido about '+esc(t.name)+'</h3><div class="search-row"><input id="schoolFidoQ" class="input" placeholder="Ask e.g. clearance, fees, accommodation…" /><button class="btn" onclick="askFidoSchool()">Ask</button></div><div id="schoolFidoAns" style="margin-top:10px"></div></div>';
+html+='</div>';return html;
 }
 async function showTree(id){
 var box=document.getElementById("schoolDetail");
@@ -270,12 +289,36 @@ if(id===null){box.innerHTML='<p class="muted">Offline mock — start the backend
 box.innerHTML='<p class="muted">Loading departments…</p>';
 try{var r=await fetch(apiBase()+"/api/institutions/"+id+"/tree");var t=await r.json();
 if(!r.ok)throw new Error(t.error||("HTTP "+r.status));
-var html='<div class="card"><h3>'+t.name+'</h3><p class="muted">'+(t.location||"")+((t.state&&t.location.indexOf(t.state)<0)?", "+t.state:"")+(t.ownership?" • "+t.ownership:"")+'</p>';
-html+=t.faculties.map(function(f){return '<p><b>'+f.name+'</b><br/>'+f.departments.map(function(d){return d.name+' ('+d.programmes.map(function(p){return p.name;}).join(", ")+')';}).join("<br/>")+'</p>';}).join("")||'<p class="muted">No faculties yet.</p>';
-if(t.hub)html+='<p><b>Campus info</b> <span class="pill">'+t.hub.source+'</span><br/>'+t.hub.overview+'<br/><span class="muted">Clearance: '+t.hub.clearance+'<br/>Fees: '+t.hub.fees+'<br/>Housing: '+t.hub.accommodation+'</span></p>';
-html+='<div id="commWrap"><h3>Community</h3><p class="muted small">Stay safe: never share passwords, bank details, ID documents, or your exact home address.</p><div id="postList"></div><div class="search-row" id="postBox" style="display:none"><input id="postInput" class="input" /><button class="btn" onclick="sendPost()">Post</button></div><p class="muted" id="postLogin">Log in above to join the discussion.</p></div>';
-html+='</div>';box.innerHTML=html;currentSchool=t.name;loadPosts();
-}catch(e){box.innerHTML='<p class="muted">Failed: '+e.message+'</p>';}
+box.innerHTML=schoolProfileHTML(t,false);currentSchool=t.name;loadPosts();
+}catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
+}
+async function askFidoSchool(){
+var inp=document.getElementById("schoolFidoQ"),box=document.getElementById("schoolFidoAns");
+if(!inp||!box)return;
+var q=inp.value.trim();
+if(!q){box.innerHTML='<p class="muted">Type a question first.</p>';return;}
+box.innerHTML='<p class="muted">Fido is thinking…</p>';
+try{var r=await fetch(apiBase()+"/api/fido/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,context:{school:currentSchool}})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+var cls=j.source==="Official"?"tag-official":j.source==="Community"?"tag-community":"tag-ai";
+box.innerHTML='<div class="person"><p><span class="tag '+cls+'">'+esc(j.source)+'</span> '+(j.school?'<span class="muted small">'+esc(j.school)+'</span>':"")+'</p><p>'+esc(j.answer)+'</p><p class="muted small">Verify important facts with official school sources.</p></div>';
+}catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
+}
+// Dedicated school page router: /schools/:id renders the full profile and
+// hides the browse grid so the page stays focused. / and /#schools unchanged.
+async function showSchoolPage(id){
+var browse=["catRow","kindRow","schoolGrid","prevPage","nextPage","pageLabel"];
+await loadSchools();renderSchools("");
+var box=document.getElementById("schoolDetail");
+if(!/^\d+$/.test(id)){box.innerHTML='<p><a href="/#schools">← Back to all schools</a></p><p class="muted">School not found.</p>';return;}
+box.innerHTML='<p class="muted">Loading school…</p>';
+try{var r=await fetch(apiBase()+"/api/institutions/"+id+"/tree");var t=await r.json();
+if(!r.ok)throw new Error(t.error||("HTTP "+r.status));
+document.title=esc(t.name)+" — Fidonect";
+for(var i=0;i<browse.length;i++){var el=document.getElementById(browse[i]);if(el)el.style.display="none";}
+box.innerHTML=schoolProfileHTML(t,true);currentSchool=t.name;loadPosts();
+box.scrollIntoView();
+}catch(e){box.innerHTML='<p><a href="/#schools">← Back to all schools</a></p><p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
 function renderStudents(filter){
 var q=(filter||"").toLowerCase();
@@ -528,6 +571,7 @@ document.getElementById("adminPosts").innerHTML="<h3>Recent posts</h3>"+((j.rece
 st.textContent="Updated "+new Date(j.generatedAt).toLocaleString()+". "+j.reports.detail;
 }catch(e){st.textContent="Failed: "+e.message;}
 }
+async function loadRequests(){
 var s=sess(),card=document.getElementById("requests");
 if(!s){card.style.display="none";return;}
 try{var r=await fetch(apiBase()+"/api/connections/mine",{headers:{Authorization:"Bearer "+s.access_token}});
@@ -547,7 +591,9 @@ loadSchoolOptions();renderAuth();
 (function(){var words=["Connect.","Know.","Prepare.","Belong."];var i=0;var el=document.getElementById("orbWord");if(!el)return;
 if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
 setInterval(function(){el.classList.add("fade");setTimeout(function(){i=(i+1)%words.length;el.textContent=words[i];el.classList.remove("fade");},400);},2200);})();
-(async function(){await loadSchools();renderSchools("");await refreshStudents("");})();
+(async function(){var m=null;try{m=location.pathname.match(/^\/schools\/([^\/]+)\/?$/);}catch(e){}
+if(m){await loadSchools();renderSchools("");await refreshStudents("");showSchoolPage(m[1]);}
+else{await loadSchools();renderSchools("");await refreshStudents("");}})();
 </script>
 </body>
 </html>

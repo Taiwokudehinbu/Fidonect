@@ -29,6 +29,8 @@ function isEmail(v) { return typeof v === "string" && v.length <= 254 && /^[^\s@
 app.get(["/", "/index.html"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
 // Dedicated admin login page (public chrome; all data behind requireAdmin).
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
+// Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
+app.get(["/schools", "/schools/:id"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 
