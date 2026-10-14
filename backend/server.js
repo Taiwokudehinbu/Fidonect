@@ -32,7 +32,8 @@ app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "adm
 // Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
 app.get(["/schools", "/schools/:id"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
 // Feature pages (client-side router in index.html; same shell, no new backend logic).
-app.get(["/institutions", "/connections", "/ai-honesty", "/about"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+app.get(["/institutions", "/connections", "/ai-honesty", "/about", "/messages"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+app.get("/chat/:id", (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 
@@ -329,6 +330,145 @@ app.post("/api/connections/:id/respond", async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   if (!data || !data.length) return res.status(404).json({ error: "Pending request not found" });
   res.json(data[0]);
+});
+
+// ---- Phase 6: Private 1-to-1 messaging (connection-gated; Supabase tables, never local files) ----
+const msgRate = {}; // light per-user send throttle (best-effort; restarts clear it)
+function msgAllowed(uid) {
+  const now = Date.now(), windowMs = 60 * 1000, max = 30;
+  const hits = (msgRate[uid] || []).filter(t => now - t < windowMs);
+  if (hits.length >= max) return false;
+  hits.push(now); msgRate[uid] = hits;
+  return true;
+}
+async function acceptedConnection(client, uid, otherId) {
+  const { data, error } = await client.from("connections").select("requester_id,addressee_id")
+    .eq("status", "accepted").or("requester_id.eq." + uid + ",addressee_id.eq." + uid).limit(200);
+  if (error || !data) return false;
+  return data.some(c => (c.requester_id === uid && c.addressee_id === otherId) ||
+    (c.addressee_id === uid && c.requester_id === otherId));
+}
+async function myConversationIds(client, uid) {
+  const { data, error } = await client.from("participants").select("conversation_id").eq("user_id", uid).limit(200);
+  if (error || !data) return null;
+  return data.map(p => p.conversation_id);
+}
+async function findSharedConversation(client, uid, otherId) {
+  const ids = await myConversationIds(client, uid);
+  if (ids === null) return { error: "lookup failed" };
+  if (!ids.length) return { id: null };
+  const { data, error } = await client.from("participants").select("conversation_id")
+    .in("conversation_id", ids).eq("user_id", otherId).limit(1);
+  if (error) return { error: error.message };
+  return { id: data && data.length ? data[0].conversation_id : null };
+}
+async function threadOther(client, uid, convoId) {
+  const { data, error } = await client.from("participants").select("user_id").eq("conversation_id", convoId);
+  if (error || !data) return null;
+  const other = (data.map(p => p.user_id).filter(id => id !== uid))[0] || null;
+  if (!other) return null;
+  const { data: prof } = await client.from("profiles").select("id,name,photo_url,school").eq("id", other).single();
+  return prof || { id: other, name: "Student" };
+}
+async function requireThread(req, res) {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) { res.status(401).json({ error: "Missing or invalid Authorization Bearer token" }); return null; }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { bad(res, "id must be a positive integer"); return null; }
+  const { data: mine, error } = await auth.me.from("participants").select("conversation_id")
+    .eq("conversation_id", id).eq("user_id", auth.user.id).limit(1);
+  if (error) { res.status(500).json({ error: error.message }); return null; }
+  if (!mine || !mine.length) { res.status(404).json({ error: "Conversation not found" }); return null; }
+  return { me: auth.me, uid: auth.user.id, id };
+}
+
+app.post("/api/conversations/open", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const otherId = req.body && req.body.otherId;
+  if (typeof otherId !== "string" || !otherId) return bad(res, "otherId is required");
+  if (otherId === auth.user.id) return bad(res, "cannot message yourself");
+  if (!supabase && !auth.me) return res.status(500).json({ error: "Supabase not configured" });
+  const ok = await acceptedConnection(auth.me, auth.user.id, otherId);
+  if (!ok) return res.status(403).json({ error: "You're not connected with this user." });
+  const found = await findSharedConversation(auth.me, auth.user.id, otherId);
+  if (found.error) return res.status(500).json({ error: found.error });
+  let convoId = found.id;
+  if (!convoId) {
+    const { data: conv, error: cErr } = await auth.me.from("conversations").insert({}).select().single();
+    if (cErr) return res.status(500).json({ error: cErr.message });
+    const { error: pErr } = await auth.me.from("participants")
+      .insert([{ conversation_id: conv.id, user_id: auth.user.id }, { conversation_id: conv.id, user_id: otherId }]);
+    if (pErr) return res.status(500).json({ error: pErr.message });
+    convoId = conv.id;
+  }
+  const other = await threadOther(auth.me, auth.user.id, convoId);
+  res.json({ id: convoId, other });
+});
+
+app.get("/api/conversations", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const ids = await myConversationIds(auth.me, auth.user.id);
+  if (ids === null) return res.status(500).json({ error: "lookup failed" });
+  const out = [];
+  for (const cid of ids.slice(0, 50)) {
+    const other = await threadOther(auth.me, auth.user.id, cid);
+    if (!other) continue;
+    const { data: last } = await auth.me.from("messages").select("id,text,created_at,sender_id")
+      .eq("conversation_id", cid).order("created_at", { ascending: false }).limit(1);
+    const { count } = await auth.me.from("messages").select("id", { count: "exact", head: true })
+      .eq("conversation_id", cid).neq("sender_id", auth.user.id).is("read_at", null);
+    const lm = (last && last[0]) || null;
+    out.push({ id: cid, other, lastMessage: lm ? { text: lm.text, created_at: lm.created_at, mine: lm.sender_id === auth.user.id } : null, unread: count || 0 });
+  }
+  out.sort((a, b) => {
+    const ta = a.lastMessage ? a.lastMessage.created_at : "", tb = b.lastMessage ? b.lastMessage.created_at : "";
+    return ta < tb ? 1 : ta > tb ? -1 : 0;
+  });
+  res.json({ conversations: out, totalUnread: out.reduce((n, c) => n + c.unread, 0) });
+});
+
+app.get("/api/conversations/:id/messages", async (req, res) => {
+  const t = await requireThread(req, res);
+  if (!t) return;
+  let limit = parseInt(req.query.limit, 10);
+  if (!Number.isInteger(limit) || limit <= 0) limit = 50;
+  if (limit > 100) limit = 100;
+  const before = Number(req.query.before);
+  let q = t.me.from("messages").select("id,sender_id,text,created_at,read_at").eq("conversation_id", t.id);
+  if (Number.isInteger(before) && before > 0) q = q.lt("id", before);
+  q = q.order("id", { ascending: false }).limit(limit);
+  const { data, error } = await q;
+  if (error) return res.status(500).json({ error: error.message });
+  const other = await threadOther(t.me, t.uid, t.id);
+  res.json({ other, messages: (data || []).reverse().map(m => ({ ...m, mine: m.sender_id === t.uid })) });
+});
+
+app.post("/api/conversations/:id/messages", async (req, res) => {
+  const t = await requireThread(req, res);
+  if (!t) return;
+  const text = req.body && req.body.text;
+  if (typeof text !== "string" || !text.trim() || text.length > 2000) return bad(res, "text must be 1–2000 characters");
+  const other = await threadOther(t.me, t.uid, t.id);
+  if (!other) return res.status(404).json({ error: "Conversation not found" });
+  const ok = await acceptedConnection(t.me, t.uid, other.id);
+  if (!ok) return res.status(403).json({ error: "You're not connected with this user." });
+  if (!msgAllowed(t.uid)) return res.status(429).json({ error: "Slow down — try again in a minute." });
+  const { data, error } = await t.me.from("messages")
+    .insert({ conversation_id: t.id, sender_id: t.uid, text: text.trim() }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await t.me.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", t.id);
+  res.json({ ...data, mine: true });
+});
+
+app.post("/api/conversations/:id/read", async (req, res) => {
+  const t = await requireThread(req, res);
+  if (!t) return;
+  const { error, count } = await t.me.from("messages").update({ read_at: new Date().toISOString() }, { count: "exact" })
+    .eq("conversation_id", t.id).neq("sender_id", t.uid).is("read_at", null);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true, marked: count || 0 });
 });
 app.post("/api/users", (req, res) => {
   if (!req.body || !isText(req.body.name, 100)) return bad(res, "name is required (text, max 100 chars)");

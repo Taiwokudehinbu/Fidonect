@@ -63,6 +63,11 @@ h2{border-left:4px solid #f59e0b;padding-left:10px}
 .person h4{margin:4px 0}
 .pill{background:#e6f6f3;color:#0b5e54;border-radius:999px;padding:2px 10px;font-size:12px}
 .school{border-left:4px solid #2dd4bf}
+.badge{display:inline-block;background:#ef4444;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
+#threadBox{background:#fff;border-radius:12px;padding:12px;min-height:220px;max-height:55vh;overflow:auto;margin:10px 0}
+.bub{margin:8px 0;padding:8px 12px;border-radius:12px;background:#eef2f7;max-width:85%;overflow-wrap:break-word}
+.bub.me{margin-left:auto;background:#dcfce7;text-align:right}
+.conv-link{display:block;color:inherit;text-decoration:none}
 .menu-btn{display:none;background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer}
 .feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px}
 .feat{display:block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);border-radius:12px;padding:14px;color:#fff;text-decoration:none;text-align:left}
@@ -78,7 +83,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <header class="topbar">
 <div class="brand"><a href="/" style="color:#fff;text-decoration:none"><span class="logo">F</span> Fidonect</a></div>
 <button id="menuBtn" class="menu-btn" aria-label="Open menu">☰</button>
-<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
+<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
 </header>
 
 <div class="wrap" id="home">
@@ -172,6 +177,21 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div id="reqIncoming"></div>
 <div id="reqOutgoing"></div>
 <div id="reqAccepted"></div>
+</div>
+
+<div id="messages" data-page="messages">
+<h2>Messages <span id="convCount" class="pill"></span></h2>
+<div id="convList"></div>
+</div>
+
+<div id="chat" data-page="chat">
+<p><a href="/messages">← Back to messages</a></p>
+<div class="card" id="chatBody">
+<p><span id="chatAvatar"></span> <b id="chatName">…</b></p>
+<div id="threadBox"></div>
+<div class="search-row"><input id="chatInput" class="input" maxlength="2000" placeholder="Write a message…" /><button class="btn" onclick="sendChat()">Send</button></div>
+<p id="chatMsg" class="muted"></p>
+</div>
 </div>
 
 <div class="card" id="aihonesty" data-page="ai">
@@ -530,11 +550,11 @@ var q=(filter||"").toLowerCase();
 var list=rows.filter(function(p){return !q||(p.name+(p.dept||"")+(p.school||"")).toLowerCase().indexOf(q)>-1;});
 document.getElementById("studentGrid").innerHTML=list.map(function(p){
 var st=connState[p.id];
-var btn=st==="connected"?'<button class="btn ghost" disabled>✓ Connected</button>':st==="pending"?'<button class="btn ghost" disabled>Request sent</button>':st==="incoming"?'<button class="btn ghost" onclick="document.getElementById(\'requests\').scrollIntoView()">Incoming — review below</button>':'<button class="btn ghost" onclick="sendRequest(\''+p.id+'\')">Connect</button>';
+var btn=st==="connected"?'<button class="btn ghost" disabled>✓ Connected</button> <button class="btn ghost" onclick="openChatWith(\''+p.id+'\')">Message</button>':st==="pending"?'<button class="btn ghost" disabled>Request sent</button>':st==="incoming"?'<button class="btn ghost" onclick="document.getElementById(\'requests\').scrollIntoView()">Incoming — review below</button>':'<button class="btn ghost" onclick="sendRequest(\''+p.id+'\')">Connect</button>';
 return '<div class="person"><h4>'+p.name+'</h4><div>'+(p.dept||"")+' — '+(p.school||"")+'</div><div class="muted">'+(p.session||"")+'</div><p>'+btn+'</p></div>';
 }).join("")||'<p class="muted">No students yet — invite a classmate to register.</p>';
 loadRequests();return list.length;
-}catch(e){return renderStudents(filter);}
+}catch(e){document.getElementById("studentGrid").innerHTML='<p class="muted">Couldn\'t load registered students ('+esc(e.message)+'). Check your connection and refresh — or log in again on the Home page.</p>';return 0;}
 }
 var currentSchool="";
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
@@ -613,7 +633,7 @@ card.style.display="";
 if(routeFromPath()!=="connections")card.style.display="none";
 document.getElementById("reqIncoming").innerHTML="<h3>Incoming ("+inc.length+")</h3>"+(inc.map(function(c){var n=c.other?c.other.name:c.requester_id;return '<p>'+n+' <button class="btn ghost" onclick="respondReq('+c.id+',\'accept\')">Accept</button> <button class="btn ghost" onclick="respondReq('+c.id+',\'decline\')">Decline</button></p>';}).join("")||'<p class="muted">None.</p>');
 document.getElementById("reqOutgoing").innerHTML="<h3>Sent ("+out.length+")</h3>"+(out.map(function(c){var n=c.other?c.other.name:c.addressee_id;return '<p class="muted">'+n+' — awaiting reply</p>';}).join("")||'<p class="muted">None.</p>');
-document.getElementById("reqAccepted").innerHTML="<h3>Connected ("+acc.length+")</h3>"+(acc.map(function(c){var n=c.other?(c.other.name+" — "+(c.other.school||"")):"?";return '<p>'+n+'</p>';}).join("")||'<p class="muted">None yet.</p>');
+document.getElementById("reqAccepted").innerHTML="<h3>Connected ("+acc.length+")</h3>"+(acc.map(function(c){var oid=c.requester_id===me?c.addressee_id:c.requester_id;var n=c.other?(c.other.name+" — "+(c.other.school||"")):"?";return '<p>'+n+' <button class="btn ghost" onclick="openChatWith(\''+oid+'\')">Message</button></p>';}).join("")||'<p class="muted">None yet.</p>');
 }catch(e){card.style.display="none";}
 }
 loadSchoolOptions();renderAuth();
@@ -621,32 +641,137 @@ loadSchoolOptions();renderAuth();
 (function(){var words=["Connect.","Know.","Prepare.","Belong."];var i=0;var el=document.getElementById("orbWord");if(!el)return;
 if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
 setInterval(function(){el.classList.add("fade");setTimeout(function(){i=(i+1)%words.length;el.textContent=words[i];el.classList.remove("fade");},400);},2200);})();
-// Page router: one shell, five routes. Sections carry data-page="home institutions
-// connections ai about" (space-separated); full page loads keep this stateless.
+// ---- Private 1-to-1 messaging (connection-gated; Supabase tables, never local files) ----
+var openChatId=null;
+function avatarHTML(p,size){size=size||40;if(p&&p.photo_url)return '<img src="'+p.photo_url+'" alt="" style="width:'+size+'px;height:'+size+'px;border-radius:50%;object-fit:cover;vertical-align:middle" />';var ch=(p&&p.name?p.name.trim().charAt(0):"?").toUpperCase();return '<span style="display:inline-flex;width:'+size+'px;height:'+size+'px;border-radius:50%;background:#0a1f33;color:#fff;align-items:center;justify-content:center;font-weight:800;vertical-align:middle">'+esc(ch)+'</span>';}
+async function openChatWith(uid){
+var s=sess();if(!s){location.href="/connections";return;}
+try{var r=await fetch(apiBase()+"/api/conversations/open",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({otherId:uid})});
+var j=await r.json();
+if(r.status===403){alert("You're not connected with this user.");return;}
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+location.href="/chat/"+j.id;
+}catch(e){alert("Failed: "+e.message);}
+}
+async function updateMsgBadge(){
+var b=document.getElementById("msgBadge");if(!b)return;
+var s=sess();if(!s){b.style.display="none";return;}
+try{var r=await fetch(apiBase()+"/api/conversations",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw 0;
+var n=j.totalUnread||0;b.textContent=n>99?"99+":n;b.style.display=n?"":"none";
+}catch(e){}
+}
+async function loadConversations(){
+var s=sess(),box=document.getElementById("convList");if(!box)return;
+if(!s){box.innerHTML='<p class="muted">Log in on the Home page to see your messages.</p>';return;}
+box.innerHTML='<p class="muted">Loading…</p>';
+try{var r=await fetch(apiBase()+"/api/conversations",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+var n=j.totalUnread||0,b=document.getElementById("msgBadge");
+if(b){b.textContent=n>99?"99+":n;b.style.display=n?"":"none";}
+document.getElementById("convCount").textContent=j.conversations.length?j.conversations.length+" chats":"";
+box.innerHTML=j.conversations.map(function(c){
+var u=c.unread?'<span class="badge">'+(c.unread>99?"99+":c.unread)+'</span>':"";
+var snip=c.lastMessage?esc(c.lastMessage.text):"No messages yet.";
+var when=c.lastMessage?esc(new Date(c.lastMessage.created_at).toLocaleString()):"";
+return '<a class="conv-link" href="/chat/'+c.id+'"><div class="person">'+avatarHTML(c.other,44)+' <b>'+esc(c.other.name)+'</b> '+u+'<div class="muted small">'+when+'</div><div>'+snip+'</div></div></a>';
+}).join("")||'<p class="muted">No conversations yet.</p><p class="muted">Start a conversation with one of your connections.</p>';
+}catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
+}
+function renderThread(msgs){
+var box=document.getElementById("threadBox");if(!box)return;
+var pinned=box.scrollHeight-box.scrollTop-box.clientHeight<80;
+box.innerHTML=msgs.map(function(m){
+return '<div class="bub'+(m.mine?" me":"")+'"><div>'+esc(m.text)+'</div><div class="muted small">'+esc(new Date(m.created_at).toLocaleString())+'</div></div>';
+}).join("")||'<p class="muted">No messages yet — say hello.</p>';
+if(pinned)box.scrollTop=box.scrollHeight;
+}
+async function markChatRead(){
+var s=sess();if(!s||!openChatId)return;
+try{await fetch(apiBase()+"/api/conversations/"+openChatId+"/read",{method:"POST",headers:{Authorization:"Bearer "+s.access_token}});}catch(e){}
+updateMsgBadge();
+}
+async function reloadThread(){
+var s=sess();if(!s||!openChatId)return;
+try{var r=await fetch(apiBase()+"/api/conversations/"+openChatId+"/messages?limit=50",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)return;
+var fresh=j.messages.some(function(m){return !m.mine&&!m.read_at;});
+renderThread(j.messages);
+if(fresh)markChatRead();
+}catch(e){}
+}
+async function openChat(id){
+var s=sess();
+if(!s){document.getElementById("chatBody").innerHTML='<p class="muted">Log in on the Home page to read messages.</p>';return;}
+openChatId=id;
+var box=document.getElementById("threadBox");box.innerHTML='<p class="muted">Loading…</p>';
+try{var r=await fetch(apiBase()+"/api/conversations/"+id+"/messages?limit=50",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();
+if(r.status===403||r.status===404){document.getElementById("chatBody").innerHTML='<p><a href="/messages">← Back to messages</a></p><p class="muted">You\'re not connected with this user.</p>';return;}
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+document.getElementById("chatName").textContent=j.other.name;
+document.getElementById("chatAvatar").innerHTML=avatarHTML(j.other,44);
+renderThread(j.messages);
+box.scrollTop=box.scrollHeight;
+markChatRead();
+}catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
+}
+async function sendChat(){
+var s=sess();if(!s||!openChatId)return;
+var inp=document.getElementById("chatInput"),m=document.getElementById("chatMsg");
+var v=inp.value.trim();
+if(!v){m.textContent="Write something first.";return;}
+if(v.length>2000){m.textContent="Keep it under 2000 characters.";return;}
+m.textContent="Sending…";
+try{var r=await fetch(apiBase()+"/api/conversations/"+openChatId+"/messages",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({text:v})});
+var j=await r.json();
+if(r.status===403){m.textContent="You're not connected with this user.";return;}
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+inp.value="";m.textContent="";reloadThread();
+}catch(e){m.textContent="Failed: "+e.message;}
+}
+async function msgTick(){
+var s=sess();if(!s||document.hidden)return;
+var rt=routeFromPath();
+if(rt==="chat"&&openChatId)await reloadThread();
+else if(rt==="messages")await loadConversations();
+else await updateMsgBadge();
+}
+// Page router: one shell, seven routes. Sections carry data-page="home institutions
+// connections messages chat ai about" (space-separated); full page loads keep this stateless.
 // Future pages (Map, Events, Communities…): add a server route, a section with
 // data-page="newpage", a nav link, and one line in routeFromPath/PAGE_TITLES.
-var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
+var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
 function routeFromPath(){
-var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|ai-honesty|about)/);}catch(e){}
+var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|messages|chat|ai-honesty|about)/);}catch(e){}
 if(!m)return "home";
 var seg=m[1];
 if(seg==="schools"||seg==="institutions")return "institutions";
 if(seg==="students"||seg==="connections")return "connections";
+if(seg==="messages")return "messages";
+if(seg==="chat")return "chat";
 if(seg==="ai-honesty")return "ai";
 return "about";
 }
 function routeTo(page){
 document.body.setAttribute("data-route",page);
+var s=sess();
 var els=document.querySelectorAll("[data-page]");
-for(var i=0;i<els.length;i++){var p=(els[i].getAttribute("data-page")||"").split(" ");els[i].style.display=(p.indexOf(page)>-1)?"":"none";}
+for(var i=0;i<els.length;i++){var p=(els[i].getAttribute("data-page")||"").split(" ");if(els[i].id==="requests"&&!s){els[i].style.display="none";continue;}els[i].style.display=(p.indexOf(page)>-1)?"":"none";}
 if(PAGE_TITLES[page])document.title=PAGE_TITLES[page];
 }
 (async function(){
 document.getElementById("menuBtn").onclick=function(){document.getElementById("mainNav").classList.toggle("open");};
+document.getElementById("chatInput").onkeydown=function(e){if(e.key==="Enter")sendChat();};
 await loadSchools();renderSchools("");await refreshStudents("");
 var m=null;try{m=location.pathname.match(/^\/schools\/([^\/]+)\/?$/);}catch(e){}
+var cm=null;try{cm=location.pathname.match(/^\/chat\/([^\/]+)\/?$/);}catch(e){}
 routeTo(routeFromPath());
 if(m)showSchoolPage(m[1]);
+else if(cm)openChat(cm[1]);
+else if(routeFromPath()==="messages")loadConversations();
+updateMsgBadge();
+setInterval(msgTick,10000);
 })();
 </script>
 </body>
