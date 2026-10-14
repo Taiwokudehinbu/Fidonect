@@ -31,6 +31,8 @@ app.get(["/", "/index.html"], (req, res) => res.sendFile(path.join(__dirname, ".
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 // Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
 app.get(["/schools", "/schools/:id"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+// Feature pages (client-side router in index.html; same shell, no new backend logic).
+app.get(["/institutions", "/connections", "/ai-honesty", "/about"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 

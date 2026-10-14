@@ -63,26 +63,40 @@ h2{border-left:4px solid #f59e0b;padding-left:10px}
 .person h4{margin:4px 0}
 .pill{background:#e6f6f3;color:#0b5e54;border-radius:999px;padding:2px 10px;font-size:12px}
 .school{border-left:4px solid #2dd4bf}
+.menu-btn{display:none;background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px}
+.feat{display:block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);border-radius:12px;padding:14px;color:#fff;text-decoration:none;text-align:left}
+.feat b{display:block;font-size:16px}
+.feat span{font-size:12px;color:#cbd5e1}
+.feat:hover{background:rgba(255,255,255,.22)}
 footer{text-align:center;padding:20px;color:#637083;font-size:13px}
+@media(max-width:700px){.hero h1{font-size:28px}.menu-btn{display:inline-block}#mainNav{display:none;width:100%;flex-direction:column}#mainNav.open{display:flex}#mainNav a{padding:8px 0}}
 @media(max-width:600px){.hero h1{font-size:28px}nav{width:100%}}
 </style>
 </head>
 <body>
 <header class="topbar">
-<div class="brand"><span class="logo">F</span> Fidonect</div>
-<nav><a href="#home">Home</a><a href="#schools">Institutions</a><a href="#students">Connections</a><a href="#how">How it works</a><a href="#about">About</a><a href="#safety">Safety</a><a href="#admin" id="navAdmin" style="display:none">Admin</a></nav>
+<div class="brand"><a href="/" style="color:#fff;text-decoration:none"><span class="logo">F</span> Fidonect</a></div>
+<button id="menuBtn" class="menu-btn" aria-label="Open menu">☰</button>
+<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
 </header>
 
 <div class="wrap" id="home">
-<div class="hero">
+<div class="hero" data-page="home">
 <div class="orb-wrap"><div class="orb"><span id="orbWord">Connect.</span></div></div>
 <p class="tagline">Know. Prepare. Belong. — meet future classmates, mentors and campus guides before you resume. Your campus journey starts with confidence.</p>
 <img class="hero-img" src="/hero.jpg" alt="Nigerian students connecting on Fidonect" loading="lazy" />
-<div class="cta-row"><a href="#auth" class="btn btn-gold" style="text-decoration:none">Join free</a><a href="#schools" class="btn btn-light" style="text-decoration:none">Explore schools</a></div>
+<div class="cta-row"><a href="#auth" class="btn btn-gold" style="text-decoration:none">Join free</a><a href="/institutions" class="btn btn-light" style="text-decoration:none">Explore schools</a></div>
+<div class="feat-grid">
+<a class="feat" href="/institutions"><b>Institutions</b><span>588 schools — search, filter, open any school page</span></a>
+<a class="feat" href="/connections"><b>Connections</b><span>Find classmates, connect, message your circle</span></a>
+<a class="feat" href="/ai-honesty"><b>Ask Fido</b><span>Campus guidance with honest Official / Community / AI labels</span></a>
+<a class="feat" href="/about"><b>About</b><span>What Fidonect is, who it serves, and how it works</span></a>
+</div>
 <div class="stats"><div class="stat"><b>2,400+</b><span>students connecting</span></div><div class="stat"><b id="statSchools">–</b><span>institutions listed</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
 </div>
 
-<div class="card" id="auth">
+<div class="card" id="auth" data-page="home connections">
 <h2>Join Fidonect (MVP test)</h2>
 <div id="authForm">
 <input id="authName" class="input" placeholder="Full name" />
@@ -126,7 +140,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 </div>
 
-<div class="card">
+<div class="card" data-page="institutions">
 <h2>Find your school</h2>
 <div class="search-row">
 <input id="schoolSearch" class="input" placeholder="Search institution e.g. Lagos…" />
@@ -135,7 +149,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p id="resultMsg" class="muted"></p>
 </div>
 
-<div id="schools">
+<div id="schools" data-page="institutions">
 <h2>Institutions <span id="schoolCount" class="pill"></span></h2>
 <div class="cat-row" id="catRow">
 <button class="cat active" data-cat="">All</button><button class="cat" data-cat="Federal">Federal</button><button class="cat" data-cat="State">State</button><button class="cat" data-cat="Private">Private</button>
@@ -148,26 +162,35 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div id="schoolDetail"></div>
 </div>
 
-<div id="students">
+<div id="students" data-page="connections">
 <h2>Sample student connections (mock data)</h2>
 <div class="grid" id="studentGrid"></div>
 </div>
 
-<div class="card" id="requests" style="display:none">
+<div class="card" id="requests" data-page="connections" style="display:none">
 <h2>Connection requests</h2>
 <div id="reqIncoming"></div>
 <div id="reqOutgoing"></div>
 <div id="reqAccepted"></div>
 </div>
 
-<div class="card" id="fido">
+<div class="card" id="aihonesty" data-page="ai">
+<h2>AI Honesty</h2>
+<p>Fido, your campus assistant, tells you <b>what kind of answer</b> you are reading — so you always know what to trust and what to double-check.</p>
+<p><span class="tag tag-official">Official</span> — verified institutional information from our records (school directory, campus info pages). Treat as reliable, still confirm critical dates on the school portal.</p>
+<p><span class="tag tag-community">Community</span> — experience shared by fellow students. Useful and practical, but personal — experiences differ.</p>
+<p><span class="tag tag-ai">AI guidance</span> — general step-by-step guidance generated to help you prepare. Sensible and safe, but not school-specific fact.</p>
+<p><b>Our promises:</b> Fido never decides admissions, scholarships, grades, or jobs; never presents guidance as an official school decision; never asks for passwords, bank details, or ID documents; and always encourages verifying fees, deadlines, and admission facts with official school sources. Unsafe replies can be reported like any other content.</p>
+</div>
+
+<div class="card" id="fido" data-page="ai">
 <h2>Ask Fido</h2>
 <p class="muted">Your campus assistant. Answers are labeled <span class="tag tag-official">Official</span> <span class="tag tag-community">Community</span> <span class="tag tag-ai">AI guidance</span> — always verify fees, deadlines, and admission facts with official sources.</p>
 <div class="search-row"><input id="fidoQ" class="input" placeholder='Ask e.g. "What documents for UNILAG clearance?"' /><button id="fidoBtn" class="btn">Ask</button></div>
 <div id="fidoAns" style="margin-top:10px"></div>
 </div>
 
-<div class="card" id="live">
+<div class="card" id="live" data-page="institutions">
 <h2>Live test — Supabase</h2>
 <p class="muted">Reads <code>institutions</code> via your backend. Mock data above is untouched.</p>
 <div class="search-row"><button id="loadLive" class="btn">Load institutions</button></div>
@@ -175,7 +198,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="grid" id="liveGrid"></div>
 </div>
 
-<div class="card" id="how">
+<div class="card" id="how" data-page="about">
 <h2>How it works</h2>
 <p><b>1. Create your account</b> — register with your name, email, and school path. Your profile visibility is yours to control.</p>
 <p><b>2. Find your school</b> — search 588 institutions across Federal, State, and Private ownership. Open any school to see its faculties, departments, programmes, and campus info.</p>
@@ -183,7 +206,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p><b>4. Join the community</b> — ask questions, share guidance, and meet mentors in your school community. Unsafe behavior can be reported on any post.</p>
 </div>
 
-<div class="card" id="about">
+<div class="card" id="about" data-page="about">
 <h2>About Fidonect</h2>
 <p><b>Mission:</b> make every Nigerian student feel connected before arrival, supported while there, and connected to opportunities after graduation.</p>
 <p><b>Who it serves:</b> prospective students (UTME/DE, newly admitted, awaiting resumption), existing students and mentors, plus alumni — across universities, polytechnics, and colleges of education.</p>
@@ -191,7 +214,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p><b>Free core, always:</b> registration, discovery, connection, and community participation stay free. Trust, safety, and usefulness come before monetization.</p>
 </div>
 
-<div class="card" id="safety">
+<div class="card" id="safety" data-page="about">
 <h2>Safety &amp; privacy</h2>
 <p><b>Your safety:</b> block and report users or content that bothers you; harassment, scams, and spam are reviewed by moderators. Never share passwords, bank details, ID documents, or your exact home address.</p>
 <p><b>Your privacy:</b> you control profile visibility (everyone, connections, or only you). Phone numbers and exact addresses are never public by default. We collect only what matching needs, and never sell personal information.</p>
@@ -208,7 +231,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p class="muted small">Reports are reviewed in Supabase dashboard > Table Editor > reports. Never grant admin by code alone — access comes from the server's admin list.</p>
 </div>
 
-<footer>Fidonect • <a href="#how">How it works</a> • <a href="#about">About</a> • <a href="#safety">Safety &amp; privacy</a> • <a href="/admin">Admin</a><br/>Connect. Know. Prepare. Belong.</footer>
+<footer>Fidonect • <a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>Connect. Know. Prepare. Belong.</footer>
 
 <script>
 var schools = [
@@ -281,7 +304,7 @@ html+='<h3>Required documents</h3><p>JAMB admission letter and result slip, O-le
 html+='<h3>School fees</h3><p>'+esc((t.hub&&t.hub.fees)||"Check the official school portal for the current schedule — fees change per session and faculty.")+' <span class="muted">Pay only through official channels; never pay into personal accounts.</span>'+(t.hub?"":' <span class="muted">Have verified figures? Ask in the community.</span>')+'</p>';
 html+='<h3>Accommodation</h3><p>'+esc((t.hub&&t.hub.accommodation)||"Apply for the school hostel immediately after clearance and line up a private hostel nearby as backup. Inspect security, water, light, and distance before paying.")+'</p>';
 html+='<h3>Faculties &amp; departments</h3>'+(t.faculties.map(function(f){return '<p><b>'+esc(f.name)+'</b><br/>'+f.departments.map(function(d){return esc(d.name)+' ('+d.programmes.map(function(p){return esc(p.name);}).join(", ")+')';}).join("<br/>")+'</p>';}).join("")||'<p class="muted">Department details coming soon for this school.</p>');
-html+='<div id="commWrap"><h3>Student community</h3><p class="muted small">Stay safe: never share passwords, bank details, ID documents, or your exact home address.</p><div id="postList"></div><div class="search-row" id="postBox" style="display:none"><input id="postInput" class="input" placeholder="Share guidance or ask a question…" /><button class="btn" onclick="sendPost()">Post</button></div><p class="muted" id="postLogin">Log in above to join the discussion.</p></div>';
+html+='<div id="commWrap"><h3>Student community</h3><p class="muted small">Stay safe: never share passwords, bank details, ID documents, or your exact home address.</p><div id="postList"></div><div class="search-row" id="postBox" style="display:none"><input id="postInput" class="input" placeholder="Share guidance or ask a question…" /><button class="btn" onclick="sendPost()">Post</button></div><p class="muted" id="postLogin">Log in on the Home or Connections page to join the discussion.</p></div>';
 html+='<div><h3>Ask Fido about '+esc(t.name)+'</h3><div class="search-row"><input id="schoolFidoQ" class="input" placeholder="Ask e.g. clearance, fees, accommodation…" /><button class="btn" onclick="askFidoSchool()">Ask</button></div><div id="schoolFidoAns" style="margin-top:10px"></div></div>';
 html+='</div>';return html;
 }
@@ -583,6 +606,7 @@ var inc=conns.filter(function(c){return c.addressee_id===me&&c.status==="pending
 var out=conns.filter(function(c){return c.requester_id===me&&c.status==="pending";});
 var acc=conns.filter(function(c){return c.status==="accepted";});
 card.style.display="";
+if(routeFromPath()!=="connections")card.style.display="none";
 document.getElementById("reqIncoming").innerHTML="<h3>Incoming ("+inc.length+")</h3>"+(inc.map(function(c){var n=c.other?c.other.name:c.requester_id;return '<p>'+n+' <button class="btn ghost" onclick="respondReq('+c.id+',\'accept\')">Accept</button> <button class="btn ghost" onclick="respondReq('+c.id+',\'decline\')">Decline</button></p>';}).join("")||'<p class="muted">None.</p>');
 document.getElementById("reqOutgoing").innerHTML="<h3>Sent ("+out.length+")</h3>"+(out.map(function(c){var n=c.other?c.other.name:c.addressee_id;return '<p class="muted">'+n+' — awaiting reply</p>';}).join("")||'<p class="muted">None.</p>');
 document.getElementById("reqAccepted").innerHTML="<h3>Connected ("+acc.length+")</h3>"+(acc.map(function(c){var n=c.other?(c.other.name+" — "+(c.other.school||"")):"?";return '<p>'+n+'</p>';}).join("")||'<p class="muted">None yet.</p>');
@@ -593,9 +617,33 @@ loadSchoolOptions();renderAuth();
 (function(){var words=["Connect.","Know.","Prepare.","Belong."];var i=0;var el=document.getElementById("orbWord");if(!el)return;
 if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
 setInterval(function(){el.classList.add("fade");setTimeout(function(){i=(i+1)%words.length;el.textContent=words[i];el.classList.remove("fade");},400);},2200);})();
-(async function(){var m=null;try{m=location.pathname.match(/^\/schools\/([^\/]+)\/?$/);}catch(e){}
-if(m){await loadSchools();renderSchools("");await refreshStudents("");showSchoolPage(m[1]);}
-else{await loadSchools();renderSchools("");await refreshStudents("");}})();
+// Page router: one shell, five routes. Sections carry data-page="home institutions
+// connections ai about" (space-separated); full page loads keep this stateless.
+// Future pages (Map, Events, Communities…): add a server route, a section with
+// data-page="newpage", a nav link, and one line in routeFromPath/PAGE_TITLES.
+var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
+function routeFromPath(){
+var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|ai-honesty|about)/);}catch(e){}
+if(!m)return "home";
+var seg=m[1];
+if(seg==="schools"||seg==="institutions")return "institutions";
+if(seg==="students"||seg==="connections")return "connections";
+if(seg==="ai-honesty")return "ai";
+return "about";
+}
+function routeTo(page){
+document.body.setAttribute("data-route",page);
+var els=document.querySelectorAll("[data-page]");
+for(var i=0;i<els.length;i++){var p=(els[i].getAttribute("data-page")||"").split(" ");els[i].style.display=(p.indexOf(page)>-1)?"":"none";}
+if(PAGE_TITLES[page])document.title=PAGE_TITLES[page];
+}
+(async function(){
+document.getElementById("menuBtn").onclick=function(){document.getElementById("mainNav").classList.toggle("open");};
+await loadSchools();renderSchools("");await refreshStudents("");
+var m=null;try{m=location.pathname.match(/^\/schools\/([^\/]+)\/?$/);}catch(e){}
+routeTo(routeFromPath());
+if(m)showSchoolPage(m[1]);
+})();
 </script>
 </body>
 </html>
