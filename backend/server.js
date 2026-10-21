@@ -395,12 +395,14 @@ app.post("/api/conversations/open", async (req, res) => {
   if (found.error) return res.status(500).json({ error: found.error });
   let convoId = found.id;
   if (!convoId) {
-    const { data: conv, error: cErr } = await auth.me.from("conversations").insert({}).select().single();
-    if (cErr) return res.status(500).json({ error: cErr.message });
-    const { error: pErr } = await auth.me.from("participants")
-      .insert([{ conversation_id: conv.id, user_id: auth.user.id }, { conversation_id: conv.id, user_id: otherId }]);
-    if (pErr) return res.status(500).json({ error: pErr.message });
-    convoId = conv.id;
+    // Thread creation is atomic in the database: INSERT ... RETURNING (what
+    // .insert().select() sends) must also pass the SELECT policy, which a
+    // brand-new conversation with no participants cannot (42501). The
+    // open_conversation() definer function writes both rows in one step and
+    // re-checks the accepted connection itself.
+    const { data: cid, error: rpcErr } = await auth.me.rpc("open_conversation", { other: otherId });
+    if (rpcErr) return res.status(500).json({ error: rpcErr.message });
+    convoId = cid;
   }
   const other = await threadOther(auth.me, auth.user.id, convoId);
   res.json({ id: convoId, other });
