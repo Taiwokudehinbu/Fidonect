@@ -645,6 +645,12 @@ async function findCourses(text) {
   return [...new Set(out)].slice(0, 6);
 }
 app.post("/api/fido/ask", async (req, res) => {
+  // PRD §25: Responsible AI principles. This endpoint must always:
+  // - Label answers as Official / Community / AI guidance
+  // - Never present AI output as institutional decision
+  // - Encourage verification against official sources
+  // - Include school context when available (so follow-ups stay school-aware)
+  // - Hard limits: AI must NEVER decide admissions, scholarships, ability, employment, or financial eligibility
   const question = req.body && req.body.question;
   if (typeof question !== "string" || question.trim().length < 3 || question.length > 500) return bad(res, "question must be 3–500 characters");
   const q = question.toLowerCase();
@@ -662,7 +668,11 @@ app.post("/api/fido/ask", async (req, res) => {
   const hub = await findHub(school && school.id).catch(() => null);
   const official = (text) => ({ answer: text, source: "Official", school: sName, verify: true, context: { school: sName } });
   const community = (text) => ({ answer: text, source: "Community", school: sName, verify: true, context: { school: sName } });
-  const ai = (text) => ({ answer: text, source: "AI guidance", school: sName, verify: true, context: { school: sName } });
+  const ai = (text) => { 
+    // AI guidance: label clearly, always reference official sources where possible,
+    // never present as institutional decision, encourage user verification.
+    return ({ answer: text, source: "AI guidance", school: sName, verify: true, context: { school: sName } });
+  };
   const where = sName ? " at " + sName : "";
   // Directory intelligence: answer from the live NUC/NBTE/NCCE dataset (Official source).
   // Skipped for course/department questions — those go to the live course lookup below.
