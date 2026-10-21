@@ -126,15 +126,44 @@ function authedClient(req) {
     global: { headers: { Authorization: "Bearer " + token } }
   });
 }
+// Read identity straight from the bearer token instead of calling the auth
+// server on every request (one less network hop in the hot path). Safe because
+// PostgREST still verifies the JWT signature on the very next query — a forged
+// token cannot read or write anything, and an expired one is rejected here
+// (exp) or there (PGRST301 -> 401 via dbErr).
+function bearerUser(req) {
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!token || !process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) return null;
+  try {
+    const p = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+    if (!p || typeof p.sub !== "string" || !p.sub) return null;
+    if (p.exp && p.exp * 1000 <= Date.now()) return null;
+    return { id: p.sub, email: p.email || null };
+  } catch (e) { return null; }
+}
 async function authedUser(req) {
+  const user = bearerUser(req);
+  const me = authedClient(req);
+  if (!user || !me) return null;
+  return { me, user };
+}
+// Full verification (network call to the auth server) — only where the email
+// claim alone is not enough, e.g. admin checks.
+async function verifiedUser(req) {
   const me = authedClient(req);
   if (!me) return null;
   const { data: { user } } = await me.auth.getUser();
   return user ? { me, user } : null;
 }
+// Map PostgREST auth failures (forged/expired token surfacing on the first
+// signature-verified query) to 401 instead of a generic 500.
+function dbErr(res, error) {
+  const auth = !!(error && (error.status === 401 || /^PGRST30/.test(error.code || "") || /\bjwt\b/i.test(error.message || "")));
+  res.status(auth ? 401 : 500).json({ error: (error && error.message) || "Database error" });
+}
 function adminEmails() { return (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean); }
 async function requireAdmin(req, res) {
-  const auth = await authedUser(req).catch(() => null);
+  const auth = await verifiedUser(req).catch(() => null);
   if (!auth) { res.status(401).json({ error: "Missing or invalid Authorization Bearer token" }); return null; }
   if (!adminEmails().includes((auth.user.email || "").toLowerCase())) { res.status(403).json({ error: "Admin only" }); return null; }
   return auth;
@@ -375,11 +404,15 @@ async function requireThread(req, res) {
   if (!auth) { res.status(401).json({ error: "Missing or invalid Authorization Bearer token" }); return null; }
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) { bad(res, "id must be a positive integer"); return null; }
-  const { data: mine, error } = await auth.me.from("participants").select("conversation_id")
-    .eq("conversation_id", id).eq("user_id", auth.user.id).limit(1);
-  if (error) { res.status(500).json({ error: error.message }); return null; }
-  if (!mine || !mine.length) { res.status(404).json({ error: "Conversation not found" }); return null; }
-  return { me: auth.me, uid: auth.user.id, id };
+  // One query answers both "am I in this thread?" (RLS hides threads I'm not
+  // in, so no rows = not found) and "who is the other side?" for the response.
+  const { data: rows, error } = await auth.me.from("participants").select("user_id")
+    .eq("conversation_id", id);
+  if (error) { dbErr(res, error); return null; }
+  const uids = (rows || []).map(p => p.user_id);
+  if (!uids.includes(auth.user.id)) { res.status(404).json({ error: "Conversation not found" }); return null; }
+  const otherId = uids.filter(u => u !== auth.user.id)[0] || null;
+  return { me: auth.me, uid: auth.user.id, id, otherId };
 }
 
 app.post("/api/conversations/open", async (req, res) => {
@@ -389,9 +422,12 @@ app.post("/api/conversations/open", async (req, res) => {
   if (typeof otherId !== "string" || !otherId) return bad(res, "otherId is required");
   if (otherId === auth.user.id) return bad(res, "cannot message yourself");
   if (!supabase && !auth.me) return res.status(500).json({ error: "Supabase not configured" });
-  const ok = await acceptedConnection(auth.me, auth.user.id, otherId);
+  // independent reads — run them together instead of one after the other
+  const [ok, found] = await Promise.all([
+    acceptedConnection(auth.me, auth.user.id, otherId),
+    findSharedConversation(auth.me, auth.user.id, otherId),
+  ]);
   if (!ok) return res.status(403).json({ error: "You're not connected with this user." });
-  const found = await findSharedConversation(auth.me, auth.user.id, otherId);
   if (found.error) return res.status(500).json({ error: found.error });
   let convoId = found.id;
   if (!convoId) {
@@ -413,16 +449,46 @@ app.get("/api/conversations", async (req, res) => {
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
   const ids = await myConversationIds(auth.me, auth.user.id);
   if (ids === null) return res.status(500).json({ error: "lookup failed" });
+  const cids = ids.slice(0, 50);
+  if (!cids.length) return res.json({ conversations: [], totalUnread: 0 });
+
+  // Batch what used to be 4 serial queries per conversation: one participants
+  // fetch, one profiles fetch, one unread fetch — and the per-thread last
+  // message (PostgREST has no group-by) in parallel rather than in a loop.
+  const { data: parts, error: pErr } = await auth.me.from("participants")
+    .select("conversation_id,user_id").in("conversation_id", cids);
+  if (pErr) return dbErr(res, pErr);
+  const otherByConvo = {};
+  (parts || []).forEach(p => {
+    if (p.user_id !== auth.user.id && !(p.conversation_id in otherByConvo)) otherByConvo[p.conversation_id] = p.user_id;
+  });
+  const otherIds = [...new Set(Object.values(otherByConvo))];
+  const profQ = otherIds.length
+    ? auth.me.from("profiles").select("id,name,photo_url,school").in("id", otherIds)
+    : Promise.resolve({ data: [], error: null });
+  const [pr, un, lasts] = await Promise.all([
+    profQ,
+    auth.me.from("messages").select("conversation_id")
+      .in("conversation_id", cids).neq("sender_id", auth.user.id).is("read_at", null),
+    Promise.all(cids.map(cid => auth.me.from("messages").select("id,text,created_at,sender_id")
+      .eq("conversation_id", cid).order("created_at", { ascending: false }).limit(1))),
+  ]);
+  if (pr.error) return dbErr(res, pr.error);
+  if (un.error) return dbErr(res, un.error);
+  const lastErr = lasts.find(l => l.error);
+  if (lastErr) return dbErr(res, lastErr.error);
+  const profById = {};
+  (pr.data || []).forEach(p => { profById[p.id] = p; });
+  const unread = {};
+  (un.data || []).forEach(m => { unread[m.conversation_id] = (unread[m.conversation_id] || 0) + 1; });
   const out = [];
-  for (const cid of ids.slice(0, 50)) {
-    const other = await threadOther(auth.me, auth.user.id, cid);
-    if (!other) continue;
-    const { data: last } = await auth.me.from("messages").select("id,text,created_at,sender_id")
-      .eq("conversation_id", cid).order("created_at", { ascending: false }).limit(1);
-    const { count } = await auth.me.from("messages").select("id", { count: "exact", head: true })
-      .eq("conversation_id", cid).neq("sender_id", auth.user.id).is("read_at", null);
-    const lm = (last && last[0]) || null;
-    out.push({ id: cid, other, lastMessage: lm ? { text: lm.text, created_at: lm.created_at, mine: lm.sender_id === auth.user.id } : null, unread: count || 0 });
+  for (let i = 0; i < cids.length; i++) {
+    const cid = cids[i];
+    const oid = otherByConvo[cid];
+    if (!oid) continue;
+    const other = profById[oid] || { id: oid, name: "Student" };
+    const lm = (lasts[i].data && lasts[i].data[0]) || null;
+    out.push({ id: cid, other, lastMessage: lm ? { text: lm.text, created_at: lm.created_at, mine: lm.sender_id === auth.user.id } : null, unread: unread[cid] || 0 });
   }
   out.sort((a, b) => {
     const ta = a.lastMessage ? a.lastMessage.created_at : "", tb = b.lastMessage ? b.lastMessage.created_at : "";
@@ -441,26 +507,42 @@ app.get("/api/conversations/:id/messages", async (req, res) => {
   let q = t.me.from("messages").select("id,sender_id,text,created_at,read_at").eq("conversation_id", t.id);
   if (Number.isInteger(before) && before > 0) q = q.lt("id", before);
   q = q.order("id", { ascending: false }).limit(limit);
-  const { data, error } = await q;
-  if (error) return res.status(500).json({ error: error.message });
-  const other = await threadOther(t.me, t.uid, t.id);
-  res.json({ other, messages: (data || []).reverse().map(m => ({ ...m, mine: m.sender_id === t.uid })) });
+  // The other participant's profile and the messages are independent —
+  // fetch them together (requireThread already gave us the other id).
+  const profQ = t.otherId
+    ? t.me.from("profiles").select("id,name,photo_url,school").eq("id", t.otherId).single()
+    : Promise.resolve({ data: null, error: null });
+  const [mr, pr] = await Promise.all([q, profQ]);
+  if (mr.error) return dbErr(res, mr.error);
+  const other = pr.data || (t.otherId ? { id: t.otherId, name: "Student" } : null);
+  res.json({ other, messages: (mr.data || []).reverse().map(m => ({ ...m, mine: m.sender_id === t.uid })) });
 });
 
 app.post("/api/conversations/:id/messages", async (req, res) => {
-  const t = await requireThread(req, res);
-  if (!t) return;
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return bad(res, "id must be a positive integer");
   const text = req.body && req.body.text;
   if (typeof text !== "string" || !text.trim() || text.length > 2000) return bad(res, "text must be 1–2000 characters");
-  const other = await threadOther(t.me, t.uid, t.id);
-  if (!other) return res.status(404).json({ error: "Conversation not found" });
-  const ok = await acceptedConnection(t.me, t.uid, other.id);
-  if (!ok) return res.status(403).json({ error: "You're not connected with this user." });
-  if (!msgAllowed(t.uid)) return res.status(429).json({ error: "Slow down — try again in a minute." });
-  const { data, error } = await t.me.from("messages")
-    .insert({ conversation_id: t.id, sender_id: t.uid, text: text.trim() }).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await t.me.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", t.id);
+  if (!msgAllowed(auth.user.id)) return res.status(429).json({ error: "Slow down — try again in a minute." });
+  // The whole gate rides on RLS inside the insert itself, so a send is one
+  // database round trip: not a member -> 42501 (send own thread messages),
+  // no such thread -> FK 23503 on conversation_id — both mapped to 404.
+  // Membership could only ever be granted over an accepted connection, and
+  // connections are immutable in v1 (no revoke endpoint), so nothing is lost
+  // by not re-checking them here.
+  const { data, error } = await auth.me.from("messages")
+    .insert({ conversation_id: id, sender_id: auth.user.id, text: text.trim() }).select().single();
+  if (error) {
+    const code = String(error.code || "");
+    if (code === "42501") return res.status(404).json({ error: "Conversation not found" });
+    if (code === "23503" && /conversation_id/.test(error.message || "")) return res.status(404).json({ error: "Conversation not found" });
+    return dbErr(res, error);
+  }
+  // last_message_at only feeds list ordering — don't hold the response for it
+  Promise.resolve(auth.me.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", id))
+    .catch(() => {});
   res.json({ ...data, mine: true });
 });
 
@@ -469,7 +551,7 @@ app.post("/api/conversations/:id/read", async (req, res) => {
   if (!t) return;
   const { error, count } = await t.me.from("messages").update({ read_at: new Date().toISOString() }, { count: "exact" })
     .eq("conversation_id", t.id).neq("sender_id", t.uid).is("read_at", null);
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return dbErr(res, error);
   res.json({ ok: true, marked: count || 0 });
 });
 app.post("/api/users", (req, res) => {

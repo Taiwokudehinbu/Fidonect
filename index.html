@@ -661,10 +661,10 @@ var j=await r.json();if(!r.ok)throw 0;
 var n=j.totalUnread||0;b.textContent=n>99?"99+":n;b.style.display=n?"":"none";
 }catch(e){}
 }
-async function loadConversations(){
+async function loadConversations(quiet){
 var s=sess(),box=document.getElementById("convList");if(!box)return;
 if(!s){box.innerHTML='<p class="muted">Log in on the Home page to see your messages.</p>';return;}
-box.innerHTML='<p class="muted">Loading…</p>';
+if(!quiet)box.innerHTML='<p class="muted">Loading…</p>'; // quiet = background refresh, no flash
 try{var r=await fetch(apiBase()+"/api/conversations",{headers:{Authorization:"Bearer "+s.access_token}});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 var n=j.totalUnread||0,b=document.getElementById("msgBadge");
@@ -678,8 +678,10 @@ return '<a class="conv-link" href="/chat/'+c.id+'"><div class="person">'+avatarH
 }).join("")||'<p class="muted">No conversations yet.</p><p class="muted">Start a conversation with one of your connections.</p>';
 }catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
+var threadMsgs=[];
 function renderThread(msgs){
 var box=document.getElementById("threadBox");if(!box)return;
+threadMsgs=msgs||[];
 var pinned=box.scrollHeight-box.scrollTop-box.clientHeight<80;
 box.innerHTML=msgs.map(function(m){
 return '<div class="bub'+(m.mine?" me":"")+'"><div>'+esc(m.text)+'</div><div class="muted small">'+esc(new Date(m.created_at).toLocaleString())+'</div></div>';
@@ -722,20 +724,30 @@ var inp=document.getElementById("chatInput"),m=document.getElementById("chatMsg"
 var v=inp.value.trim();
 if(!v){m.textContent="Write something first.";return;}
 if(v.length>2000){m.textContent="Keep it under 2000 characters.";return;}
-m.textContent="Sending…";
+// Optimistic send: render the bubble and clear the box instantly, then sync
+// with the server — on failure reloadThread() rolls the bubble back.
+var box=document.getElementById("threadBox");
+renderThread(threadMsgs.concat([{id:"tmp-"+Date.now(),text:v,created_at:new Date().toISOString(),mine:true}]));
+box.scrollTop=box.scrollHeight;
+inp.value="";m.textContent="Sending…";
 try{var r=await fetch(apiBase()+"/api/conversations/"+openChatId+"/messages",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({text:v})});
 var j=await r.json();
-if(r.status===403){m.textContent="You're not connected with this user.";return;}
+if(r.status===403){m.textContent="You're not connected with this user.";reloadThread();return;}
 if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
-inp.value="";m.textContent="";reloadThread();
-}catch(e){m.textContent="Failed: "+e.message;}
+m.textContent="";reloadThread();
+}catch(e){m.textContent="Failed: "+e.message;reloadThread();}
 }
+var msgTickBusy=false,lastConvPoll=0,lastBadgePoll=0;
 async function msgTick(){
-var s=sess();if(!s||document.hidden)return;
-var rt=routeFromPath();
+var s=sess();if(!s||document.hidden||msgTickBusy)return; // no stacked requests
+msgTickBusy=true;
+try{
+var rt=routeFromPath(),now=Date.now();
+// Open chat refreshes every tick (~2s); the list every 3s; the badge every 8s.
 if(rt==="chat"&&openChatId)await reloadThread();
-else if(rt==="messages")await loadConversations();
-else await updateMsgBadge();
+else if(rt==="messages"){if(now-lastConvPoll>=3000){lastConvPoll=now;await loadConversations(true);}}
+else{if(now-lastBadgePoll>=8000){lastBadgePoll=now;await updateMsgBadge();}}
+}finally{msgTickBusy=false;}
 }
 // Page router: one shell, seven routes. Sections carry data-page="home institutions
 // connections messages chat ai about" (space-separated); full page loads keep this stateless.
@@ -771,7 +783,11 @@ if(m)showSchoolPage(m[1]);
 else if(cm)openChat(cm[1]);
 else if(routeFromPath()==="messages")loadConversations();
 updateMsgBadge();
-setInterval(msgTick,10000);
+// Chat: ~2s while a thread is open, messages list: 3s, badge: 8s. msgTick
+// throttles per route, skips while the tab is hidden, and re-fetches right
+// away when the tab becomes visible again.
+setInterval(msgTick,2000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)msgTick();});
 })();
 </script>
 </body>

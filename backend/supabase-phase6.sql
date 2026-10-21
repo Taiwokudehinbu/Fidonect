@@ -152,4 +152,5 @@ create policy "mark others read" on messages
 -- 9 (OPTIONAL, future realtime only — skip for v1 polling): expose new rows to Realtime.
 -- alter publication supabase_realtime add table messages;
 -- Realtime also needs: supabase-js in the frontend + login session + a postgres_changes
--- channel on messages. v1 uses 8-second polling instead — no new keys or dependencies.
+-- channel on messages. v1 polls instead (open chat ~2s, list 3s, badge 8s) —
+-- no new keys or dependencies; the batched/fast endpoints keep that cheap.
