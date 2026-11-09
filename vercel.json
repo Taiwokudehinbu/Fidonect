@@ -8,6 +8,20 @@
       "maxDuration": 30
     }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "fidonect-taiwokudehinbu.vercel.app" }],
+      "destination": "https://fidonect.vercel.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "fidonect-git-main-taiwokudehinbu.vercel.app" }],
+      "destination": "https://fidonect.vercel.app/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ]
