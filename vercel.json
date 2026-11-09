@@ -10,6 +10,18 @@
   },
   "redirects": [
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "fidonect-taiwokudehinbu.vercel.app" }],
+      "destination": "https://fidonect.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "fidonect-git-main-taiwokudehinbu.vercel.app" }],
+      "destination": "https://fidonect.vercel.app/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "fidonect-taiwokudehinbu.vercel.app" }],
       "destination": "https://fidonect.vercel.app/:path*",
