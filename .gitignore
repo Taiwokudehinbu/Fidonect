@@ -1,5 +1,7 @@
 node_modules/
 backend/node_modules/
+backups/
+.vercel/
 backend/fidonect.db
 backend/uploads/*
 !backend/uploads/.gitkeep

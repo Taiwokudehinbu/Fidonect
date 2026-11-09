@@ -24,6 +24,9 @@ See `backend/server.js`. This is a minimal Express API stub for
 auth/profile/discovery/community/fido/mentors/messages/hub/admin
 to be expanded in Phase 2.
 
+**Deploying on Vercel:** see `VERCEL-DEPLOY.md` (env vars, import steps, verification).
+Render (`render.yaml`) remains supported and unchanged.
+
 ## Roadmap
 - Phase 1 (MVP): this repo — connection + communities + basic Fido AI
 - Phase 2: mentorship verification + verified institutional info + improved AI (RAG)

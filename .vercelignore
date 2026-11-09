@@ -1,0 +1,19 @@
+# Keep the Vercel upload small. The deployed app only needs:
+# api/, backend/server.js, backend/supabaseClient.js, backend/public/, index.html.
+android/
+dist/
+backups/
+FIDONECT.docx
+PRD.md
+design.html
+app.js
+styles.css
+build-apk.bat
+backend/node_modules/
+backend/fidonect.db
+backend/uploads/
+backend/seed/
+backend/prisma/
+backend/.env
+.env
+.vercel/

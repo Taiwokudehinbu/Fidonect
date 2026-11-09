@@ -821,4 +821,9 @@ app.get("/api/admin/stats", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Fidonect API stub on :${PORT}`));
+// Render/local run a long-lived process; Vercel imports this module as a
+// serverless handler and must not call listen().
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`Fidonect API stub on :${PORT}`));
+}
+module.exports = app;

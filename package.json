@@ -1,0 +1,19 @@
+{
+  "name": "fidonect",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fidonect — Vercel deployment entry (the app itself lives in backend/)",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "cors": "^2.8.5",
+    "dotenv": "^18.0.5",
+    "express": "^4.19.2",
+    "multer": "^2.4.0"
+  }
+}
