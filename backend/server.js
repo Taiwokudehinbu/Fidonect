@@ -4,19 +4,44 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const multer = require("multer");
 const supabase = require("./supabaseClient");
 const app = express();
 app.use(cors()); app.use(express.json({ limit: "100kb" }));
 app.set("trust proxy", 1); // correct protocol/host behind Render's proxy
+app.disable("x-powered-by");
 function appUrl(req) {
   const env = (process.env.APP_URL || "").replace(/\/$/, "");
   if (env) return env;
   return req.protocol + "://" + req.get("host");
 }
 // PWA assets (manifest, service worker, icons) — this folder only, never secrets.
-app.use(express.static(path.join(__dirname, "public")));
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+// Long-cache images/icons, but always revalidate the service worker and HTML.
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders(res, filePath) {
+    if (/sw\.js$/i.test(filePath)) res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    else if (/\.(?:png|jpe?g|webp|svg|ico|woff2?)$/i.test(filePath)) res.setHeader("Cache-Control", "public, max-age=604800");
+    else res.setHeader("Cache-Control", "public, max-age=300");
+  }
+}));
+// User-specific API responses must never be cached by the browser or CDN.
+app.use((req, res, next) => {
+  if (req.headers.authorization) res.setHeader("Cache-Control", "no-store");
+  next();
+});
+let photoUploadMiddleware = null;
+function photoUpload(req, res, next) {
+  if (!photoUploadMiddleware) {
+    const multer = require("multer");
+    photoUploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }).single("photo");
+  }
+  photoUploadMiddleware(req, res, next);
+}
+const CACHE_MS = 5 * 60 * 1000;
+const PUBLIC_CACHE = "public, max-age=120, s-maxage=600, stale-while-revalidate=86400";
+const STATUS_CACHE = "public, max-age=30, s-maxage=60, stale-while-revalidate=300";
+const instCache = new Map();
+const statusCache = { at: 0, body: null };
+const treeCache = new Map();
 
 // Cheap-slice input validation: valid requests behave exactly as before;
 // malformed bodies get 400 instead of polluting the stores.
@@ -26,24 +51,38 @@ function isEmail(v) { return typeof v === "string" && v.length <= 254 && /^[^\s@
 
 // Serve the homepage from the same service (repo-root index.html).
 // Only this file is exposed — backend/.env and other files are never served.
-app.get(["/", "/index.html"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+function sendHome(req, res) {
+  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=60, stale-while-revalidate=300");
+  res.sendFile(path.join(__dirname, "..", "index.html"));
+}
+app.get(["/", "/index.html"], sendHome);
 // Dedicated admin login page (public chrome; all data behind requireAdmin).
-app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
+app.get("/admin", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
 // Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
-app.get(["/schools", "/schools/:id"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+app.get(["/schools", "/schools/:id"], sendHome);
 // Feature pages (client-side router in index.html; same shell, no new backend logic).
-app.get(["/institutions", "/connections", "/ai-honesty", "/about", "/messages"], (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
-app.get("/chat/:id", (req, res) => res.sendFile(path.join(__dirname, "..", "index.html")));
+app.get(["/institutions", "/connections", "/ai-honesty", "/about", "/messages"], sendHome);
+app.get("/chat/:id", sendHome);
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
 
 app.get("/health", (req, res) => res.json({ ok: true, service: "fidonect-api", phase: "mvp-stub" }));
 app.get("/api/status", async (req, res) => {
+  const now = Date.now();
+  if (statusCache.body && now - statusCache.at < CACHE_MS) {
+    res.setHeader("Cache-Control", STATUS_CACHE);
+    return res.json(statusCache.body);
+  }
   const out = { ok: true, time: new Date().toISOString(), institutions: null };
   if (supabase) {
     const r = await supabase.from("institutions").select("id", { count: "exact", head: true });
     if (!r.error) out.institutions = r.count;
   }
+  statusCache.at = now; statusCache.body = out;
+  res.setHeader("Cache-Control", STATUS_CACHE);
   res.json(out);
 });
 app.get("/api/institutions/test", async (req, res) => {
@@ -60,6 +99,17 @@ app.get("/api/institutions", async (req, res) => {
   const kind = req.query.kind;
   if (own !== undefined && !["Federal", "State", "Private"].includes(own)) return bad(res, "ownership must be Federal, State, or Private");
   if (kind !== undefined && !["University", "Polytechnic", "College of Education"].includes(kind)) return bad(res, "kind must be University, Polytechnic, or College of Education");
+  const cacheKey = (own || "") + "|" + (kind || "");
+  const cached = instCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_MS) {
+    res.setHeader("Cache-Control", PUBLIC_CACHE);
+    return res.json(cached.data);
+  }
+  const send = (data) => {
+    instCache.set(cacheKey, { at: Date.now(), data });
+    res.setHeader("Cache-Control", PUBLIC_CACHE);
+    return res.json(data);
+  };
   const run = (select) => {
     // Explicit limit: never let PostgREST fall back to a smaller default page (588 rows live).
     let q = supabase.from("institutions").select(select).order("name").limit(1000);
@@ -68,21 +118,26 @@ app.get("/api/institutions", async (req, res) => {
     return q;
   };
   const full = await run("id,name,location,ownership,state,kind");
-  if (!full.error) return res.json(full.data);
+  if (!full.error) return send(full.data);
   if (!/column/i.test(full.error.message)) return res.status(500).json({ error: full.error.message });
-  if (kind) return res.json([]); // kind unknown pre-upgrade: honestly empty
+  if (kind) return send([]); // kind unknown pre-upgrade: honestly empty
   const mid = await run("id,name,location,ownership,state");
-  if (!mid.error) return res.json(mid.data);
+  if (!mid.error) return send(mid.data);
   if (!/column/i.test(mid.error.message)) return res.status(500).json({ error: mid.error.message });
   const base = await run("id,name,location");
   if (base.error) return res.status(500).json({ error: base.error.message });
-  return res.json(own ? [] : (base.data || []));
+  return send(own ? [] : (base.data || []));
 });
 
 app.get("/api/institutions/:id/tree", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return bad(res, "id must be a positive integer");
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const cached = treeCache.get(id);
+  if (cached && Date.now() - cached.at < CACHE_MS) {
+    res.setHeader("Cache-Control", PUBLIC_CACHE);
+    return res.json(cached.data);
+  }
   const { data: inst, error: iErr } = await (async () => {
     const full = await supabase.from("institutions").select("id,name,location,ownership,state").eq("id", id).single();
     if (full.error && /column/i.test(full.error.message)) {
@@ -91,7 +146,12 @@ app.get("/api/institutions/:id/tree", async (req, res) => {
     return full;
   })();
   if (iErr || !inst) return res.status(404).json({ error: "Institution not found" });
-  const { data: facs, error: fErr } = await supabase.from("faculties").select("id,name").eq("institution_id", id).order("name");
+  // Faculties and hub are independent; run them together.
+  const [facRes, hubRes] = await Promise.all([
+    supabase.from("faculties").select("id,name").eq("institution_id", id).order("name"),
+    supabase.from("hub_pages").select("overview,clearance,fees,accommodation,source").eq("institution_id", id).single()
+  ]);
+  const facs = facRes.data, fErr = facRes.error, hub = hubRes.data;
   if (fErr) return res.status(500).json({ error: fErr.message });
   const facIds = (facs || []).map(f => f.id);
   let depts = [];
@@ -107,14 +167,17 @@ app.get("/api/institutions/:id/tree", async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     progs = data || [];
   }
-  const { data: hub } = await supabase.from("hub_pages").select("overview,clearance,fees,accommodation,source").eq("institution_id", id).single();
   const tree = (facs || []).map(f => ({
     ...f,
     departments: depts.filter(d => d.faculty_id === f.id).map(d => ({
       ...d, programmes: progs.filter(p => p.department_id === d.id)
     }))
   }));
-  res.json({ ...inst, faculties: tree, hub: hub || null });
+  const body = { ...inst, faculties: tree, hub: hub || null };
+  treeCache.set(id, { at: Date.now(), data: body });
+  if (treeCache.size > 200) treeCache.delete(treeCache.keys().next().value);
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json(body);
 });
 
 // ---- Phase 1: Auth + profiles (Supabase Auth; RLS enforced in the database) ----
@@ -286,7 +349,7 @@ app.put("/api/profile", async (req, res) => {
   res.json(data);
 });
 
-app.post("/api/profile/photo", upload.single("photo"), async (req, res) => {
+app.post("/api/profile/photo", photoUpload, async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
   if (!req.file) return bad(res, "photo file is required");

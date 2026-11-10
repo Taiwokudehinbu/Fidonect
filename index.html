@@ -141,7 +141,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p><img id="mePhoto" alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;display:none;vertical-align:middle" /> <b id="meName"></b> <span id="meVis" class="pill"></span> <span id="meVerified" class="pill"></span></p>
 <p class="muted" id="meDetail"></p>
 <div class="search-row"><select id="visEdit" class="input"><option value="public">Visible to: everyone</option><option value="connections">Visible to: connections</option><option value="private">Visible to: only me</option></select><button id="visSave" class="btn ghost">Save</button><button id="logoutBtn" class="btn ghost">Log out</button></div>
-<div class="search-row"><label class="btn ghost" style="display:inline-block;cursor:pointer">Choose photo<input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" /></label><button id="photoBtn" class="btn ghost">Upload photo</button></div><p class="muted small" id="photoName"></p>
+<div class="search-row"><button id="photoBtn" type="button" class="btn ghost">Upload photo</button><input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" /></div><p class="muted small" id="photoName"></p>
 </div>
 </div>
 
@@ -288,10 +288,17 @@ var btns=document.getElementById("kindRow").querySelectorAll(".cat");
 for(var i=0;i<btns.length;i++)btns[i].classList.toggle("active",btns[i]===e.target);
 schoolPage=1;await loadSchools();renderSchools(document.getElementById("schoolSearch").value);
 };
+var institutionsPromise=null;
+function getInstitutions(){
+if(!institutionsPromise){
+institutionsPromise=fetch(apiBase()+"/api/institutions").then(function(r){return r.json().then(function(rows){if(!r.ok)throw new Error((rows&&rows.error)||("HTTP "+r.status));if(!Array.isArray(rows))throw new Error("Bad institutions response");return rows;});}).catch(function(e){institutionsPromise=null;throw e;});
+}
+return institutionsPromise;
+}
 async function loadSchools(){
 for(let attempt=1;attempt<=2;attempt++){
-try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
-if(r.ok&&rows.length){liveSchools=normSchools(rows);var st=document.getElementById("statSchools");if(st)st.textContent=rows.length;return;}}catch(e){}
+try{var rows=await getInstitutions();
+if(rows.length){liveSchools=normSchools(rows);var st=document.getElementById("statSchools");if(st)st.textContent=rows.length;return;}}catch(e){}
 if(attempt===1){document.getElementById("resultMsg").textContent="Waking backend, retrying…";await new Promise(function(res){setTimeout(res,4000);});}
 }
 liveSchools=null;
@@ -423,8 +430,8 @@ function apiBase(){return (new URLSearchParams(location.search).get("api")||wind
 function sess(){try{return JSON.parse(localStorage.getItem("fidonect_session")||"null");}catch(e){return null;}}
 function setSess(s){if(s)localStorage.setItem("fidonect_session",JSON.stringify(s));else localStorage.removeItem("fidonect_session");renderAuth();}
 async function loadSchoolOptions(){
-try{var r=await fetch(apiBase()+"/api/institutions");var rows=await r.json();
-if(r.ok&&rows.length)document.getElementById("schoolList").innerHTML=rows.map(function(s){return '<option value="'+esc(s.name)+'">';}).join("");
+try{var rows=await getInstitutions();
+if(rows.length)document.getElementById("schoolList").innerHTML=rows.map(function(s){return '<option value="'+esc(s.name)+'">';}).join("");
 else document.getElementById("schoolList").innerHTML='<option value="University of Lagos"><option value="University of Ibadan"><option value="Federal University of Technology, Akure">';
 }catch(e){/* offline: free text still works */}
 }
@@ -451,7 +458,7 @@ var photo=document.getElementById("mePhoto");
 if(p.body.photo_url){photo.src=p.body.photo_url;photo.style.display="";}else{photo.style.display="none";}
 var verified=p.body.authMeta&&p.body.authMeta.emailConfirmed;
 document.getElementById("meVerified").textContent=verified?"✓ Verified email":"Unverified email";
-if(typeof refreshStudents==="function"){refreshStudents("");loadRequests();}
+if(typeof refreshStudents==="function"){refreshStudents("");}
 checkAdmin();
 }
 document.getElementById("signupBtn").onclick=async function(){
@@ -479,18 +486,20 @@ try{var r=await fetch(apiBase()+"/api/profile",{method:"PUT",headers:{"Content-T
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
 };
-document.getElementById("photoFile").onchange=function(){var f=this.files[0];document.getElementById("photoName").textContent=f?("Selected: "+f.name):"";};
-document.getElementById("photoBtn").onclick=async function(){
+var photoFile=document.getElementById("photoFile"),photoBtn=document.getElementById("photoBtn");
+async function uploadPhoto(f){
 var s=sess();if(!s)return;
-var f=document.getElementById("photoFile").files[0];
 var m=document.getElementById("authMsg");
-if(!f){m.textContent="Choose a JPG/PNG/WebP photo first.";return;}
 m.textContent="Uploading photo…";
+photoBtn.disabled=true;
 try{var fd=new FormData();fd.append("photo",f);
 var r=await fetch(apiBase()+"/api/profile/photo",{method:"POST",headers:{Authorization:"Bearer "+s.access_token},body:fd});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));if(!j.photo_url)throw new Error("Photo uploaded but not saved to your profile. Please try again.");
-m.textContent="Photo updated.";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
-};
+m.textContent="Photo updated.";document.getElementById("photoName").textContent="";photoFile.value="";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
+finally{photoBtn.disabled=false;photoFile.value="";}
+}
+photoBtn.onclick=function(){photoFile.click();};
+photoFile.onchange=function(){var f=this.files[0];if(!f)return;document.getElementById("photoName").textContent="Selected: "+f.name;uploadPhoto(f);};
 document.getElementById("cmpBtn").onclick=async function(){
 var s=sess();if(!s)return;
 var m=document.getElementById("cmpMsg");
@@ -540,10 +549,12 @@ async function refreshStudents(filter){
 var s=sess();
 if(!s){document.getElementById("requests").style.display="none";return renderStudents(filter);}
 try{
-var r=await fetch(apiBase()+"/api/students",{headers:{Authorization:"Bearer "+s.access_token}});
-var rows=await r.json();if(!r.ok)throw new Error(rows.error||("HTTP "+r.status));
-var m=await fetch(apiBase()+"/api/connections/mine",{headers:{Authorization:"Bearer "+s.access_token}});
-var conns=await m.json();if(!m.ok)throw new Error(conns.error||"");
+var h={Authorization:"Bearer "+s.access_token};
+var pair=await Promise.all([
+fetch(apiBase()+"/api/students",{headers:h}).then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));return j;}),
+fetch(apiBase()+"/api/connections/mine",{headers:h}).then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));return j;})
+]);
+var rows=pair[0],conns=pair[1];
 connState={};var me=s.user.id;
 conns.forEach(function(c){var oid=c.requester_id===me?c.addressee_id:c.requester_id;connState[oid]=c.status==="accepted"?"connected":(c.requester_id===me?"pending":"incoming");});
 var q=(filter||"").toLowerCase();
@@ -553,7 +564,7 @@ var st=connState[p.id];
 var btn=st==="connected"?'<button class="btn ghost" disabled>✓ Connected</button> <button class="btn ghost" onclick="openChatWith(\''+p.id+'\')">Message</button>':st==="pending"?'<button class="btn ghost" disabled>Request sent</button>':st==="incoming"?'<button class="btn ghost" onclick="document.getElementById(\'requests\').scrollIntoView()">Incoming — review below</button>':'<button class="btn ghost" onclick="sendRequest(\''+p.id+'\')">Connect</button>';
 return '<div class="person"><div style="display:flex;align-items:center;gap:12px">'+avatarHTML(p,56)+'<div><h4 style="margin:0">'+esc(p.name)+'</h4><div>'+esc(p.dept||"")+' — '+esc(p.school||"")+'</div><div class="muted">'+esc(p.session||"")+'</div></div></div><p>'+btn+'</p></div>';
 }).join("")||'<p class="muted">No students yet — invite a classmate to register.</p>';
-loadRequests();return list.length;
+loadRequests(conns);return list.length;
 }catch(e){document.getElementById("studentGrid").innerHTML='<p class="muted">Couldn\'t load registered students ('+esc(e.message)+'). Check your connection and refresh — or log in again on the Home page.</p>';return 0;}
 }
 var currentSchool="";
@@ -595,7 +606,7 @@ async function respondReq(id,action){
 var s=sess();if(!s)return;
 try{var r=await fetch(apiBase()+"/api/connections/"+id+"/respond",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({action:action})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
-loadRequests();refreshStudents(document.getElementById("schoolSearch").value);
+refreshStudents(document.getElementById("schoolSearch").value);
 }catch(e){alert("Failed: "+e.message);}
 }
 async function checkAdmin(){
@@ -620,11 +631,11 @@ document.getElementById("adminPosts").innerHTML="<h3>Recent posts</h3>"+((j.rece
 st.textContent="Updated "+new Date(j.generatedAt).toLocaleString()+". "+j.reports.detail;
 }catch(e){st.textContent="Failed: "+e.message;}
 }
-async function loadRequests(){
+async function loadRequests(preloaded){
 var s=sess(),card=document.getElementById("requests");
 if(!s){card.style.display="none";return;}
-try{var r=await fetch(apiBase()+"/api/connections/mine",{headers:{Authorization:"Bearer "+s.access_token}});
-var conns=await r.json();if(!r.ok)throw new Error();
+try{var conns=preloaded;
+if(!conns){var r=await fetch(apiBase()+"/api/connections/mine",{headers:{Authorization:"Bearer "+s.access_token}});conns=await r.json();if(!r.ok)throw new Error();}
 var me=s.user.id;
 var inc=conns.filter(function(c){return c.addressee_id===me&&c.status==="pending";});
 var out=conns.filter(function(c){return c.requester_id===me&&c.status==="pending";});
@@ -775,7 +786,7 @@ if(PAGE_TITLES[page])document.title=PAGE_TITLES[page];
 (async function(){
 document.getElementById("menuBtn").onclick=function(){document.getElementById("mainNav").classList.toggle("open");};
 document.getElementById("chatInput").onkeydown=function(e){if(e.key==="Enter")sendChat();};
-await loadSchools();renderSchools("");await refreshStudents("");
+await loadSchools();renderSchools("");
 var m=null;try{m=location.pathname.match(/^\/schools\/([^\/]+)\/?$/);}catch(e){}
 var cm=null;try{cm=location.pathname.match(/^\/chat\/([^\/]+)\/?$/);}catch(e){}
 routeTo(routeFromPath());
