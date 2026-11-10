@@ -311,7 +311,7 @@ app.get("/api/students", async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
   const { data, error } = await auth.me.from("profiles")
-    .select("id,name,user_type,school,dept,session").neq("visibility", "private").neq("id", auth.user.id).limit(50);
+    .select("id,name,user_type,school,dept,session,photo_url").neq("visibility", "private").neq("id", auth.user.id).limit(50);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -340,7 +340,7 @@ app.get("/api/connections/mine", async (req, res) => {
   const ids = [...new Set((data || []).flatMap(c => [c.requester_id, c.addressee_id]).filter(id => id !== auth.user.id))];
   let names = {};
   if (ids.length) {
-    const { data: profs } = await auth.me.from("profiles").select("id,name,school").in("id", ids);
+    const { data: profs } = await auth.me.from("profiles").select("id,name,school,photo_url").in("id", ids);
     (profs || []).forEach(p => { names[p.id] = p; });
   }
   res.json((data || []).map(c => ({ ...c, other: names[c.requester_id === auth.user.id ? c.addressee_id : c.requester_id] || null })));
