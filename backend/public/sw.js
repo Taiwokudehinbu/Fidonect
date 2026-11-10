@@ -1,5 +1,5 @@
 /* Fidonect service worker: offline-capable app shell, fresh API data. */
-const CACHE = "fidonect-v11"; // bump to force clients off stale cached pages
+const CACHE = "fidonect-v12"; // bump to force clients off stale cached pages
 const SHELL = ["/", "/hero.jpg", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -21,6 +21,20 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(req).catch(() => Response.json({ error: "Offline — reconnect to load live data." }, { status: 503 })));
+    return;
+  }
+  // Navigations are network-first so a new deployment is picked up immediately.
+  // Static assets remain cache-first for speed and offline support.
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+          return res;
+        })
+        .catch(() => caches.match(req).then((hit) => hit || caches.match("/")))
+    );
     return;
   }
   event.respondWith(
