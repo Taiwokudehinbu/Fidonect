@@ -298,6 +298,7 @@ app.post("/api/profile/photo", upload.single("photo"), async (req, res) => {
   const { data: pub } = auth.me.storage.from("avatars").getPublicUrl(objectPath);
   const { data, error } = await auth.me.from("profiles").update({ photo_url: pub.publicUrl }).eq("id", auth.user.id).select("id,photo_url").single();
   if (error) return res.status(500).json({ error: error.message });
+  if (!data || !data.photo_url) return res.status(500).json({ error: "Photo uploaded but your profile was not updated. Check the avatars storage policy." });
   res.json(data);
 });
 

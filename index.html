@@ -488,7 +488,7 @@ if(!f){m.textContent="Choose a JPG/PNG/WebP photo first.";return;}
 m.textContent="Uploading photo…";
 try{var fd=new FormData();fd.append("photo",f);
 var r=await fetch(apiBase()+"/api/profile/photo",{method:"POST",headers:{Authorization:"Bearer "+s.access_token},body:fd});
-var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));if(!j.photo_url)throw new Error("Photo uploaded but not saved to your profile. Please try again.");
 m.textContent="Photo updated.";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
 };
 document.getElementById("cmpBtn").onclick=async function(){
