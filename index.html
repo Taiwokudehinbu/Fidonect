@@ -541,18 +541,18 @@ if(blob&&blob.size<file.size)return new File([blob],"photo.jpg",{type:"image/jpe
 return file;
 }
 async function uploadPhoto(f){
-var s=await ensureSession(),m=document.getElementById("authMsg");
-if(!s){m.textContent="Session expired — log in again.";return;}
-m.textContent="Preparing photo…";
-photoBtn.disabled=true;
+var s=await ensureSession(),n=document.getElementById("photoName");
+if(!s){n.textContent="Session expired — log in again.";return;}
+n.textContent="Preparing photo…";
+photoBtn.disabled=true;photoBtn.textContent="Uploading…";
 try{
 f=await preparePhoto(f);
-m.textContent="Uploading photo…";
+n.textContent="Uploading photo…";
 var fd=new FormData();fd.append("photo",f);
 var r=await fetch(apiBase()+"/api/profile/photo",{method:"POST",headers:{Authorization:"Bearer "+s.access_token},body:fd});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));if(!j.photo_url)throw new Error("Photo uploaded but not saved to your profile. Please try again.");
-m.textContent="Photo updated.";document.getElementById("photoName").textContent="";photoFile.value="";renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
-finally{photoBtn.disabled=false;photoFile.value="";}
+n.textContent="Photo updated.";photoFile.value="";renderAuth();}catch(e){n.textContent="Failed: "+e.message;}
+finally{photoBtn.disabled=false;photoBtn.textContent="Upload photo";photoFile.value="";}
 }
 photoBtn.onclick=function(){photoFile.click();};
 photoFile.onchange=function(){var f=this.files[0];if(!f)return;document.getElementById("photoName").textContent="Selected: "+f.name;uploadPhoto(f);};
