@@ -4,6 +4,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const supabase = require("./supabaseClient");
 const app = express();
 app.use(cors()); app.use(express.json({ limit: "100kb" }));
@@ -32,7 +33,7 @@ let photoUploadMiddleware = null;
 function photoUpload(req, res, next) {
   if (!photoUploadMiddleware) {
     const multer = require("multer");
-    photoUploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }).single("photo");
+    photoUploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } }).single("photo");
   }
   photoUploadMiddleware(req, res, next);
 }
@@ -52,8 +53,9 @@ function isEmail(v) { return typeof v === "string" && v.length <= 254 && /^[^\s@
 // Serve the homepage from the same service (repo-root index.html).
 // Only this file is exposed — backend/.env and other files are never served.
 function sendHome(req, res) {
+  if (!sendHome.html) sendHome.html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   res.setHeader("Cache-Control", "public, max-age=0, s-maxage=60, stale-while-revalidate=300");
-  res.sendFile(path.join(__dirname, "..", "index.html"));
+  res.type("html").send(sendHome.html);
 }
 app.get(["/", "/index.html"], sendHome);
 // Dedicated admin login page (public chrome; all data behind requireAdmin).
@@ -366,7 +368,7 @@ app.post("/api/profile/photo", photoUpload, async (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  if (err && err.code === "LIMIT_FILE_SIZE") return bad(res, "photo must be under 2MB");
+  if (err && err.code === "LIMIT_FILE_SIZE") return bad(res, "photo must be under 4MB");
   next(err);
 });
 
