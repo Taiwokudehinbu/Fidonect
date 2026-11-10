@@ -8,9 +8,9 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-/** Minimal wrapper: the Fidonect web app served from Render, rendered in a WebView. */
+/** Minimal wrapper: the Fidonect web app served from Vercel, rendered in a WebView. */
 public class MainActivity extends Activity {
-    private static final String HOME = "https://fidonect-api.onrender.com/";
+    private static final String HOME = "https://fidonect.vercel.app/";
     private WebView web;
 
     @Override
@@ -30,7 +30,6 @@ public class MainActivity extends Activity {
                     view.loadData("<html><body style='font-family:sans-serif;padding:24px'>"
                             + "<h2>Fidonect needs internet</h2>"
                             + "<p>Connect to the internet and reopen the app.</p>"
-                            + "<p>The free Render backend also sleeps when idle and can take about 60 seconds to wake — wait, then reopen.</p>"
                             + "</body></html>", "text/html", "UTF-8");
                 }
             }
