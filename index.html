@@ -428,7 +428,37 @@ grid.innerHTML=rows.map(function(s){return '<div class="card school"><h3>'+s.nam
 // ---- Phase 1: Auth (Supabase Auth via backend; token in this browser only) ----
 function apiBase(){return (new URLSearchParams(location.search).get("api")||window.FIDONECT_API||(location.protocol==="file:"||/^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname)?"http://localhost:3000":location.origin)).replace(/\/$/,"");}
 function sess(){try{return JSON.parse(localStorage.getItem("fidonect_session")||"null");}catch(e){return null;}}
-function setSess(s){if(s)localStorage.setItem("fidonect_session",JSON.stringify(s));else localStorage.removeItem("fidonect_session");renderAuth();}
+function sessionExpiry(s){if(!s)return 0;if(s.expires_at)return s.expires_at*1000;if(s.expires_in)return Date.now()+s.expires_in*1000;return 0;}
+var refreshPromise=null,refreshTimer=null;
+async function ensureSession(force){
+var s=sess();if(!s)return null;
+var exp=sessionExpiry(s);
+if(!force&&(!exp||exp-Date.now()>60*1000))return s;
+if(!refreshPromise){
+refreshPromise=(async function(){
+try{
+if(!s.refresh_token)throw new Error("Session expired");
+var r=await fetch(apiBase()+"/api/auth/refresh",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refresh_token:s.refresh_token})});
+var j=await r.json();if(!r.ok||!j.session)throw new Error(j.error||"Session refresh failed");
+var ns=j.session;if(!ns.expires_at&&ns.expires_in)ns.expires_at=Math.floor(Date.now()/1000)+ns.expires_in;
+localStorage.setItem("fidonect_session",JSON.stringify(ns));scheduleRefresh();return ns;
+}catch(e){return null;}finally{refreshPromise=null;}
+})();
+}
+return refreshPromise;
+}
+function scheduleRefresh(){
+if(refreshTimer){clearTimeout(refreshTimer);refreshTimer=null;}
+var s=sess();if(!s)return;
+var exp=sessionExpiry(s);if(!exp)return;
+var ms=exp-Date.now()-5*60*1000;if(ms<0)ms=0;
+refreshTimer=setTimeout(async function(){var ns=await ensureSession(true);if(ns)scheduleRefresh();},Math.min(ms,2147483647));
+}
+function setSess(s){
+if(s){if(!s.expires_at&&s.expires_in)s.expires_at=Math.floor(Date.now()/1000)+s.expires_in;localStorage.setItem("fidonect_session",JSON.stringify(s));}
+else localStorage.removeItem("fidonect_session");
+scheduleRefresh();renderAuth();
+}
 async function loadSchoolOptions(){
 try{var rows=await getInstitutions();
 if(rows.length)document.getElementById("schoolList").innerHTML=rows.map(function(s){return '<option value="'+esc(s.name)+'">';}).join("");
@@ -441,8 +471,10 @@ return {ok:r.ok,status:r.status,body:await r.json()};
 }
 async function renderAuth(){
 var s=sess(),form=document.getElementById("authForm"),view=document.getElementById("authedView");
+if(s){s=await ensureSession();if(!s){localStorage.removeItem("fidonect_session");}}
 if(!s){form.style.display="";view.style.display="none";document.getElementById("requests").style.display="none";document.getElementById("completeBox").style.display="none";document.getElementById("navAdmin").style.display="none";document.getElementById("admin").style.display="none";return;}
 var p=await fetchProfile(s.access_token);
+if(!p.ok&&p.status===401){var fresh=await ensureSession(true);if(fresh){s=fresh;p=await fetchProfile(s.access_token);}}
 if(!p.ok){
 if(p.status===404){form.style.display="none";view.style.display="none";
 var cb=document.getElementById("completeBox");cb.style.display="";
@@ -481,7 +513,7 @@ setSess(j.session);m.textContent="Logged in.";
 }catch(e){m.textContent="Failed: "+e.message;}
 };
 document.getElementById("visSave").onclick=async function(){
-var m=document.getElementById("authMsg"),s=sess();if(!s)return;
+var m=document.getElementById("authMsg"),s=await ensureSession();if(!s){m.textContent="Session expired — log in again.";return;}
 try{var r=await fetch(apiBase()+"/api/profile",{method:"PUT",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({visibility:document.getElementById("visEdit").value})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 renderAuth();}catch(e){m.textContent="Failed: "+e.message;}
@@ -509,8 +541,8 @@ if(blob&&blob.size<file.size)return new File([blob],"photo.jpg",{type:"image/jpe
 return file;
 }
 async function uploadPhoto(f){
-var s=sess();if(!s)return;
-var m=document.getElementById("authMsg");
+var s=await ensureSession(),m=document.getElementById("authMsg");
+if(!s){m.textContent="Session expired — log in again.";return;}
 m.textContent="Preparing photo…";
 photoBtn.disabled=true;
 try{
@@ -525,7 +557,7 @@ finally{photoBtn.disabled=false;photoFile.value="";}
 photoBtn.onclick=function(){photoFile.click();};
 photoFile.onchange=function(){var f=this.files[0];if(!f)return;document.getElementById("photoName").textContent="Selected: "+f.name;uploadPhoto(f);};
 document.getElementById("cmpBtn").onclick=async function(){
-var s=sess();if(!s)return;
+var s=await ensureSession();if(!s)return;
 var m=document.getElementById("cmpMsg");
 var body={name:document.getElementById("cmpName").value,type:document.getElementById("cmpType").value,school:document.getElementById("cmpSchool").value,visibility:document.getElementById("cmpVis").value,consent:document.getElementById("cmpConsent").checked};
 m.textContent="Saving profile…";
@@ -551,7 +583,7 @@ m.textContent=j.message;}catch(e){m.textContent="Failed: "+e.message;}
 document.getElementById("resetSave").onclick=async function(){
 var m=document.getElementById("resetMsg");
 var a=document.getElementById("newPass1").value,b=document.getElementById("newPass2").value;
-var s=sess();if(!s){m.textContent="Recovery session missing — request a fresh link.";return;}
+var s=await ensureSession();if(!s){m.textContent="Recovery session missing — request a fresh link.";return;}
 if(a.length<6){m.textContent="Password must be at least 6 characters.";return;}
 if(a!==b){m.textContent="Passwords do not match.";return;}
 m.textContent="Saving…";
@@ -570,7 +602,7 @@ document.getElementById("logoutBtn").onclick=function(){setSess(null);document.g
 // ---- Phase 3: Connections UI (live when logged in, mocks otherwise) ----
 var connState={};
 async function refreshStudents(filter){
-var s=sess();
+var s=await ensureSession();
 if(!s){document.getElementById("requests").style.display="none";return renderStudents(filter);}
 try{
 var h={Authorization:"Bearer "+s.access_token};
@@ -594,7 +626,7 @@ loadRequests(conns);return list.length;
 var currentSchool="";
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 async function loadPosts(){
-var s=sess();
+var s=await ensureSession();
 var box=document.getElementById("postBox"),login=document.getElementById("postLogin"),list=document.getElementById("postList");
 if(!list)return;
 if(!s){box.style.display="none";login.style.display="";list.innerHTML='<p class="muted">Log in to read the community.</p>';return;}
@@ -605,14 +637,14 @@ list.innerHTML=rows.map(function(p){return '<div class="person"><b>'+esc(p.autho
 }catch(e){list.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
 async function sendPost(){
-var s=sess();if(!s||!currentSchool)return;
+var s=await ensureSession();if(!s||!currentSchool)return;
 var inp=document.getElementById("postInput");
 try{var r=await fetch(apiBase()+"/api/communities/"+encodeURIComponent(currentSchool)+"/posts",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({text:inp.value})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 inp.value="";loadPosts();}catch(e){alert("Failed: "+e.message);}
 }
 async function reportPost(id,author){
-var s=sess();if(!s)return;
+var s=await ensureSession();if(!s)return;
 var reason=prompt("Report this post by "+author+" — what happened? (harassment, scam, spam, other)");
 if(!reason)return;
 try{var r=await fetch(apiBase()+"/api/reports",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({target:"Post #"+id+" by "+author,reason:reason})});
@@ -620,21 +652,21 @@ var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 alert("Report received. Moderators will review.");}catch(e){alert("Failed: "+e.message);}
 }
 async function sendRequest(toId){
-var s=sess();if(!s){location.hash="#auth";return;}
+var s=await ensureSession();if(!s){location.hash="#auth";return;}
 try{var r=await fetch(apiBase()+"/api/connections/request",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({toId:toId})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 refreshStudents(document.getElementById("schoolSearch").value);
 }catch(e){alert("Failed: "+e.message);}
 }
 async function respondReq(id,action){
-var s=sess();if(!s)return;
+var s=await ensureSession();if(!s)return;
 try{var r=await fetch(apiBase()+"/api/connections/"+id+"/respond",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({action:action})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 refreshStudents(document.getElementById("schoolSearch").value);
 }catch(e){alert("Failed: "+e.message);}
 }
 async function checkAdmin(){
-var s=sess();var nav=document.getElementById("navAdmin"),sec=document.getElementById("admin");
+var s=await ensureSession();var nav=document.getElementById("navAdmin"),sec=document.getElementById("admin");
 if(!s){nav.style.display="none";sec.style.display="none";return;}
 try{var r=await fetch(apiBase()+"/api/admin/me",{headers:{Authorization:"Bearer "+s.access_token}});
 var j=await r.json();
@@ -643,7 +675,7 @@ else{nav.style.display="none";sec.style.display="none";}
 }catch(e){nav.style.display="none";sec.style.display="none";}
 }
 async function loadAdmin(){
-var s=sess();if(!s)return;
+var s=await ensureSession();if(!s)return;
 var st=document.getElementById("adminStatus");st.textContent="Loading stats…";
 try{var r=await fetch(apiBase()+"/api/admin/stats",{headers:{Authorization:"Bearer "+s.access_token}});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
@@ -656,7 +688,7 @@ st.textContent="Updated "+new Date(j.generatedAt).toLocaleString()+". "+j.report
 }catch(e){st.textContent="Failed: "+e.message;}
 }
 async function loadRequests(preloaded){
-var s=sess(),card=document.getElementById("requests");
+var s=await ensureSession(),card=document.getElementById("requests");
 if(!s){card.style.display="none";return;}
 try{var conns=preloaded;
 if(!conns){var r=await fetch(apiBase()+"/api/connections/mine",{headers:{Authorization:"Bearer "+s.access_token}});conns=await r.json();if(!r.ok)throw new Error();}
@@ -671,6 +703,8 @@ document.getElementById("reqOutgoing").innerHTML="<h3>Sent ("+out.length+")</h3>
 document.getElementById("reqAccepted").innerHTML="<h3>Connected ("+acc.length+")</h3>"+(acc.map(function(c){var oid=c.requester_id===me?c.addressee_id:c.requester_id;var n=c.other?(c.other.name+" — "+(c.other.school||"")):"?";return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+avatarHTML(c.other,36)+'<span>'+esc(n)+'</span><button class="btn ghost" style="margin-left:auto" onclick="openChatWith(\''+oid+'\')">Message</button></div>';}).join("")||'<p class="muted">None yet.</p>');
 }catch(e){card.style.display="none";}
 }
+scheduleRefresh();
+document.addEventListener("visibilitychange",function(){if(!document.hidden){ensureSession().then(function(){scheduleRefresh();});}});
 loadSchoolOptions();renderAuth();
 // Orb: cycling word display (respects reduced-motion)
 (function(){var words=["Connect.","Know.","Prepare.","Belong."];var i=0;var el=document.getElementById("orbWord");if(!el)return;
@@ -680,7 +714,7 @@ setInterval(function(){el.classList.add("fade");setTimeout(function(){i=(i+1)%wo
 var openChatId=null;
 function avatarHTML(p,size){size=size||40;if(p&&p.photo_url)return '<img src="'+p.photo_url+'" alt="" style="width:'+size+'px;height:'+size+'px;border-radius:50%;object-fit:cover;vertical-align:middle" />';var ch=(p&&p.name?p.name.trim().charAt(0):"?").toUpperCase();return '<span style="display:inline-flex;width:'+size+'px;height:'+size+'px;border-radius:50%;background:#0a1f33;color:#fff;align-items:center;justify-content:center;font-weight:800;vertical-align:middle">'+esc(ch)+'</span>';}
 async function openChatWith(uid){
-var s=sess();if(!s){location.href="/connections";return;}
+var s=await ensureSession();if(!s){location.href="/connections";return;}
 try{var r=await fetch(apiBase()+"/api/conversations/open",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({otherId:uid})});
 var j=await r.json();
 if(r.status===403){alert("You're not connected with this user.");return;}
@@ -690,14 +724,14 @@ location.href="/chat/"+j.id;
 }
 async function updateMsgBadge(){
 var b=document.getElementById("msgBadge");if(!b)return;
-var s=sess();if(!s){b.style.display="none";return;}
+var s=await ensureSession();if(!s){b.style.display="none";return;}
 try{var r=await fetch(apiBase()+"/api/conversations",{headers:{Authorization:"Bearer "+s.access_token}});
 var j=await r.json();if(!r.ok)throw 0;
 var n=j.totalUnread||0;b.textContent=n>99?"99+":n;b.style.display=n?"":"none";
 }catch(e){}
 }
 async function loadConversations(quiet){
-var s=sess(),box=document.getElementById("convList");if(!box)return;
+var s=await ensureSession(),box=document.getElementById("convList");if(!box)return;
 if(!s){box.innerHTML='<p class="muted">Log in on the Home page to see your messages.</p>';return;}
 if(!quiet)box.innerHTML='<p class="muted">Loading…</p>'; // quiet = background refresh, no flash
 try{var r=await fetch(apiBase()+"/api/conversations",{headers:{Authorization:"Bearer "+s.access_token}});
@@ -724,12 +758,12 @@ return '<div class="bub'+(m.mine?" me":"")+'"><div>'+esc(m.text)+'</div><div cla
 if(pinned)box.scrollTop=box.scrollHeight;
 }
 async function markChatRead(){
-var s=sess();if(!s||!openChatId)return;
+var s=await ensureSession();if(!s||!openChatId)return;
 try{await fetch(apiBase()+"/api/conversations/"+openChatId+"/read",{method:"POST",headers:{Authorization:"Bearer "+s.access_token}});}catch(e){}
 updateMsgBadge();
 }
 async function reloadThread(){
-var s=sess();if(!s||!openChatId)return;
+var s=await ensureSession();if(!s||!openChatId)return;
 try{var r=await fetch(apiBase()+"/api/conversations/"+openChatId+"/messages?limit=50",{headers:{Authorization:"Bearer "+s.access_token}});
 var j=await r.json();if(!r.ok)return;
 var fresh=j.messages.some(function(m){return !m.mine&&!m.read_at;});
@@ -738,7 +772,7 @@ if(fresh)markChatRead();
 }catch(e){}
 }
 async function openChat(id){
-var s=sess();
+var s=await ensureSession();
 if(!s){document.getElementById("chatBody").innerHTML='<p class="muted">Log in on the Home page to read messages.</p>';return;}
 openChatId=id;
 var box=document.getElementById("threadBox");box.innerHTML='<p class="muted">Loading…</p>';
@@ -754,7 +788,7 @@ markChatRead();
 }catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
 async function sendChat(){
-var s=sess();if(!s||!openChatId)return;
+var s=await ensureSession();if(!s||!openChatId)return;
 var inp=document.getElementById("chatInput"),m=document.getElementById("chatMsg");
 var v=inp.value.trim();
 if(!v){m.textContent="Write something first.";return;}
@@ -774,7 +808,7 @@ m.textContent="";reloadThread();
 }
 var msgTickBusy=false,lastConvPoll=0,lastBadgePoll=0;
 async function msgTick(){
-var s=sess();if(!s||document.hidden||msgTickBusy)return; // no stacked requests
+var s=await ensureSession();if(!s||document.hidden||msgTickBusy)return; // no stacked requests
 msgTickBusy=true;
 try{
 var rt=routeFromPath(),now=Date.now();

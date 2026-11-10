@@ -264,6 +264,15 @@ app.post("/api/auth/login", async (req, res) => {
   res.json({ user: data.user, session: data.session });
 });
 
+app.post("/api/auth/refresh", async (req, res) => {
+  const { refresh_token } = req.body || {};
+  if (typeof refresh_token !== "string" || !refresh_token) return bad(res, "refresh_token is required");
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+  if (error) return res.status(401).json({ error: error.message });
+  res.json({ user: data.user, session: data.session });
+});
+
 app.post("/api/auth/resend", async (req, res) => {
   const { email } = req.body || {};
   if (!isEmail(email)) return bad(res, "email is invalid");
