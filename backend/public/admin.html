@@ -4,23 +4,39 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Fidonect Admin — Sign in</title>
+<title>Fidonect Admin</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#0a1f33;color:#17202a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
-.box{background:#fff;border-radius:16px;padding:24px;max-width:720px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.35)}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#0a1f33;color:#17202a;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:16px}
+.box{background:#fff;border-radius:16px;padding:24px;max-width:980px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.35);margin:auto}
 .brand{font-weight:800;font-size:20px;display:flex;align-items:center;margin-bottom:4px}
 .logo{display:inline-flex;width:30px;height:30px;border-radius:8px;background:#2dd4bf;color:#062a26;align-items:center;justify-content:center;margin-right:8px;font-weight:800}
 .muted{color:#637083}.small{font-size:12px}
-.input{width:100%;padding:12px;margin:6px 0;border:1px solid #d7dee8;border-radius:10px;font:inherit}
-.btn{cursor:pointer;border-radius:999px;border:1px solid #0a1f33;padding:12px 22px;background:#0a1f33;color:#fff;font-weight:700}
+.input,textarea,select{width:100%;padding:11px;margin:6px 0;border:1px solid #d7dee8;border-radius:10px;font:inherit;background:#fff}
+textarea{min-height:90px;resize:vertical}
+.btn{cursor:pointer;border-radius:999px;border:1px solid #0a1f33;padding:11px 18px;background:#0a1f33;color:#fff;font-weight:700}
 .btn.ghost{background:#fff;color:#0a1f33}
+.btn.danger{background:#991b1b;border-color:#991b1b}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .btn:focus-visible{outline:3px solid #2dd4bf;outline-offset:2px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:12px 0}
 .stat{background:#f6f7fb;border-radius:12px;padding:12px;text-align:center}
 .stat b{font-size:22px;display:block}
 .person{background:#f6f7fb;border-radius:10px;padding:10px;margin:8px 0}
 .deny{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:12px}
+.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:10px;padding:12px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid #dbe3ed;margin:14px 0}
+.tab{border:0;background:transparent;padding:10px 14px;font-weight:700;color:#637083;cursor:pointer;border-bottom:3px solid transparent}
+.tab.active{color:#0a1f33;border-bottom-color:#2dd4bf}
+.panel{display:none}.panel.active{display:block}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;margin-right:4px}
+.badge.published{background:#dcfce7;color:#166534}.badge.draft{background:#fef3c7;color:#92400e}.badge.archived{background:#e2e8f0;color:#475569}
+.badge.verified{background:#dbeafe;color:#1e40af}.badge.unverified{background:#fee2e2;color:#991b1b}
+.admin-item{border:1px solid #dbe3ed;border-radius:12px;padding:12px;margin:8px 0;background:#fff}
+.admin-item h4{margin:0 0 4px;font-size:16px}
+.admin-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.admin-actions .btn{padding:7px 12px;font-size:13px}
 </style>
 </head>
 <body>
@@ -36,24 +52,81 @@ body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-s
 </div>
 
 <div id="dashBox" style="display:none">
-<p><b id="aWho"></b> <button id="aLogout" class="btn ghost">Sign out</button></p>
+<p><b id="aWho"></b> <button id="aLogout" class="btn ghost">Sign out</button> <a class="btn ghost" href="/" style="text-decoration:none">Open site</a></p>
+<div class="tabs" role="tablist">
+<button class="tab active" data-tab="overview" type="button">Overview</button>
+<button class="tab" data-tab="scholarships" type="button">Scholarships</button>
+</div>
+
+<div id="overviewPanel" class="panel active">
 <div class="grid" id="aStats"></div>
 <div id="aUsers"></div>
 <div id="aPosts"></div>
 <p class="muted small" id="aNote"></p>
 </div>
+
+<div id="scholarshipsPanel" class="panel">
+<div class="ok" style="display:none" id="aScholarshipOk"></div>
+<div class="deny" style="display:none" id="aScholarshipDeny"></div>
+<h3 id="aFormTitle">Add a scholarship</h3>
+<input id="aScholarshipId" type="hidden" />
+<div class="form-grid">
+<input id="aS_title" class="input" placeholder="Title *" maxlength="200" />
+<input id="aS_organisation" class="input" placeholder="Organisation / sponsor *" maxlength="160" />
+<input id="aS_country" class="input" placeholder="Country *" maxlength="80" />
+<input id="aS_level" class="input" placeholder="Academic level * e.g. Undergraduate" maxlength="80" />
+<input id="aS_funding" class="input" placeholder="Funding type * e.g. Full funding" maxlength="80" />
+<input id="aS_deadline" class="input" type="date" />
+<input id="aS_url" class="input" placeholder="Official https:// URL *" maxlength="2048" />
+<select id="aS_status" class="input"><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select>
+</div>
+<textarea id="aS_description" placeholder="Short description (max 5000 chars)" maxlength="5000"></textarea>
+<textarea id="aS_eligibility" placeholder="Eligibility (max 5000 chars) — quote the official source, do not invent" maxlength="5000"></textarea>
+<textarea id="aS_documents" placeholder="Required documents (max 5000 chars)" maxlength="5000"></textarea>
+<label class="muted small" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input id="aS_verified" type="checkbox" style="width:auto" /> I have checked the official source and verified this opportunity</label>
+<div class="admin-actions">
+<button id="aSave" class="btn" type="button">Save</button>
+<button id="aPublish" class="btn ghost" type="button">Save &amp; publish</button>
+<button id="aClear" class="btn ghost" type="button">New / clear</button>
+</div>
+<p class="muted small">Only verified, official links belong here. No invented scholarships, requirements, or deadlines.</p>
+<h3>All scholarships</h3>
+<div id="aScholarshipList"><p class="muted">Loading…</p></div>
+</div>
 </div>
 
 <script>
 var API = location.origin;
-function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-function token(){ try { var s = JSON.parse(localStorage.getItem("fidonect_admin_session") || "null"); return s && s.access_token; } catch (e) { return null; } }
+var adminToken = null;
+var editingId = null;
+function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+function token() { try { var s = JSON.parse(localStorage.getItem("fidonect_admin_session") || "null"); return s && s.access_token; } catch (e) { return null; } }
+function headers() { return { "Content-Type": "application/json", Authorization: "Bearer " + adminToken }; }
 function showLogin(msg) {
   document.getElementById("loginBox").style.display = "";
   document.getElementById("dashBox").style.display = "none";
   if (msg) document.getElementById("aMsg").textContent = msg;
 }
+function setDeny(box, message) {
+  var el = document.getElementById(box);
+  if (!message) { el.style.display = "none"; el.textContent = ""; return; }
+  el.style.display = ""; el.textContent = message;
+}
+function setOk(message) {
+  var el = document.getElementById("aScholarshipOk");
+  if (!message) { el.style.display = "none"; el.textContent = ""; return; }
+  el.style.display = ""; el.textContent = message;
+}
+async function api(path, options) {
+  var r = await fetch(API + path, Object.assign({ headers: headers() }, options || {}));
+  var j = null;
+  try { j = await r.json(); } catch (e) { j = {}; }
+  if (r.status === 401) { localStorage.removeItem("fidonect_admin_session"); showLogin("Session expired. Sign in again."); throw new Error("Session expired"); }
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
 async function loadDash(tok) {
+  adminToken = tok;
   var me = await (await fetch(API + "/api/admin/me", { headers: { Authorization: "Bearer " + tok } })).json();
   if (!me.isAdmin) {
     localStorage.removeItem("fidonect_admin_session");
@@ -69,20 +142,136 @@ async function loadDash(tok) {
   document.getElementById("loginBox").style.display = "none";
   document.getElementById("dashBox").style.display = "";
   document.getElementById("aWho").textContent = me.email;
-  var r = await fetch(API + "/api/admin/stats", { headers: { Authorization: "Bearer " + tok } });
-  var j = await r.json();
-  if (!r.ok) { document.getElementById("aNote").textContent = "Failed: " + (j.error || r.status); return; }
-  function card(t, v) { return '<div class="stat"><b>' + v + '</b><span class="muted small">' + t + '</span></div>'; }
-  function n(x) { return x.status === "ok" ? x.count : "pending"; }
-  document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions));
-  document.getElementById("aUsers").innerHTML = "<h3>Recent users</h3>" + ((j.recentUsers || []).map(function (u) {
-    return "<div class=\"person\"><b>" + esc(u.name) + "</b> <span class=\"muted small\">" + esc(u.email) + " — " + esc(u.school || "no school") + "</span></div>";
-  }).join("") || '<p class="muted">No user data yet.</p>');
-  document.getElementById("aPosts").innerHTML = "<h3>Recent posts</h3>" + ((j.recentPosts || []).map(function (p) {
-    return "<div class=\"person\"><b>" + esc(p.author_name) + "</b> <span class=\"muted small\">" + esc(p.school) + "</span><p>" + esc(p.text) + "</p></div>";
-  }).join("") || '<p class="muted">No posts yet.</p>');
-  document.getElementById("aNote").textContent = "Reports: review in Supabase dashboard > Table Editor > reports. Updated " + new Date(j.generatedAt).toLocaleString() + ".";
+  await loadStats();
+  await loadScholarships();
 }
+async function loadStats() {
+  try {
+    var j = await api("/api/admin/stats");
+    function card(t, v) { return '<div class="stat"><b>' + v + '</b><span class="muted small">' + t + '</span></div>'; }
+    function n(x) { return x.status === "ok" ? x.count : "pending"; }
+    document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions));
+    document.getElementById("aUsers").innerHTML = "<h3>Recent users</h3>" + ((j.recentUsers || []).map(function (u) {
+      return "<div class=\"person\"><b>" + esc(u.name) + "</b> <span class=\"muted small\">" + esc(u.email) + " — " + esc(u.school || "no school") + "</span></div>";
+    }).join("") || '<p class="muted">No user data yet.</p>');
+    document.getElementById("aPosts").innerHTML = "<h3>Recent posts</h3>" + ((j.recentPosts || []).map(function (p) {
+      return "<div class=\"person\"><b>" + esc(p.author_name) + "</b> <span class=\"muted small\">" + esc(p.school) + "</span><p>" + esc(p.text) + "</p></div>";
+    }).join("") || '<p class="muted">No posts yet.</p>');
+    document.getElementById("aNote").textContent = "Reports: review in Supabase dashboard > Table Editor > reports. Updated " + new Date(j.generatedAt).toLocaleString() + ".";
+  } catch (e) {
+    document.getElementById("aNote").textContent = "Stats failed: " + e.message;
+  }
+}
+function clearForm() {
+  editingId = null;
+  document.getElementById("aScholarshipId").value = "";
+  ["aS_title","aS_organisation","aS_country","aS_level","aS_funding","aS_deadline","aS_url","aS_description","aS_eligibility","aS_documents"].forEach(function (id) { document.getElementById(id).value = ""; });
+  document.getElementById("aS_status").value = "draft";
+  document.getElementById("aS_verified").checked = false;
+  document.getElementById("aFormTitle").textContent = "Add a scholarship";
+  setDeny("aScholarshipDeny", "");
+  setOk("");
+}
+function formBody() {
+  return {
+    title: document.getElementById("aS_title").value.trim(),
+    organisation: document.getElementById("aS_organisation").value.trim(),
+    country: document.getElementById("aS_country").value.trim(),
+    academic_level: document.getElementById("aS_level").value.trim(),
+    funding_type: document.getElementById("aS_funding").value.trim(),
+    deadline: document.getElementById("aS_deadline").value.trim() || null,
+    official_url: document.getElementById("aS_url").value.trim(),
+    description: document.getElementById("aS_description").value.trim(),
+    eligibility: document.getElementById("aS_eligibility").value.trim(),
+    required_documents: document.getElementById("aS_documents").value.trim(),
+    verified: document.getElementById("aS_verified").checked
+  };
+}
+async function saveScholarship(publish) {
+  var body = formBody();
+  if (publish) body.status = "published";
+  else body.status = document.getElementById("aS_status").value;
+  try {
+    var j;
+    if (editingId) j = await api("/api/admin/scholarships/" + editingId, { method: "PATCH", body: JSON.stringify(body) });
+    else j = await api("/api/admin/scholarships", { method: "POST", body: JSON.stringify(body) });
+    editingId = j.id;
+    document.getElementById("aScholarshipId").value = j.id;
+    document.getElementById("aFormTitle").textContent = "Edit scholarship #" + j.id;
+    setDeny("aScholarshipDeny", "");
+    setOk("Saved. Status: " + j.status + (j.verified ? " • verified" : " • awaiting verification") + ".");
+    await loadScholarships();
+  } catch (e) {
+    setOk("");
+    setDeny("aScholarshipDeny", e.message);
+  }
+}
+async function loadScholarships() {
+  var list = document.getElementById("aScholarshipList");
+  try {
+    var j = await api("/api/admin/scholarships");
+    setDeny("aScholarshipDeny", "");
+    list.innerHTML = (j.scholarships || []).map(function (s) {
+      return '<div class="admin-item"><h4>' + esc(s.title) + '</h4>' +
+        '<div class="muted small">' + esc(s.organisation) + ' • ' + esc(s.country) + ' • ' + esc(s.academic_level) + ' • ' + esc(s.funding_type) + '</div>' +
+        '<p><span class="badge ' + esc(s.status) + '">' + esc(s.status) + '</span><span class="badge ' + (s.verified ? "verified" : "unverified") + '">' + (s.verified ? "verified" : "unverified") + '</span>' +
+        (s.deadline ? '<span class="muted small">Deadline: ' + esc(s.deadline) + '</span>' : "") + '</p>' +
+        '<div class="admin-actions"><button class="btn ghost" type="button" data-edit="' + s.id + '">Edit</button>' +
+        (s.status !== "published" ? '<button class="btn ghost" type="button" data-publish="' + s.id + '">Publish</button>' : '<button class="btn ghost" type="button" data-unpublish="' + s.id + '">Unpublish</button>') +
+        (s.verified ? "" : '<button class="btn ghost" type="button" data-verify="' + s.id + '">Verify</button>') +
+        '<button class="btn danger" type="button" data-archive="' + s.id + '">Archive</button></div></div>';
+    }).join("") || '<p class="muted">No scholarships yet. Add the first verified opportunity above.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load scholarships.</p>';
+    setDeny("aScholarshipDeny", e.message);
+  }
+}
+async function patchScholarship(id, patch) {
+  try {
+    await api("/api/admin/scholarships/" + id, { method: "PATCH", body: JSON.stringify(patch) });
+    setDeny("aScholarshipDeny", "");
+    await loadScholarships();
+  } catch (e) { setDeny("aScholarshipDeny", e.message); }
+}
+function editScholarship(id) {
+  // Fetch the full row from the admin list and fill the form.
+  api("/api/admin/scholarships").then(function (j) {
+    var s = (j.scholarships || []).filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!s) return;
+    editingId = s.id;
+    document.getElementById("aScholarshipId").value = s.id;
+    document.getElementById("aFormTitle").textContent = "Edit scholarship #" + s.id;
+    document.getElementById("aS_title").value = s.title || "";
+    document.getElementById("aS_organisation").value = s.organisation || "";
+    document.getElementById("aS_country").value = s.country || "";
+    document.getElementById("aS_level").value = s.academic_level || "";
+    document.getElementById("aS_funding").value = s.funding_type || "";
+    document.getElementById("aS_deadline").value = s.deadline || "";
+    document.getElementById("aS_url").value = s.official_url || "";
+    document.getElementById("aS_description").value = s.description || "";
+    document.getElementById("aS_eligibility").value = s.eligibility || "";
+    document.getElementById("aS_documents").value = s.required_documents || "";
+    document.getElementById("aS_status").value = s.status || "draft";
+    document.getElementById("aS_verified").checked = !!s.verified;
+    setDeny("aScholarshipDeny", "");
+    setOk("");
+    document.getElementById("scholarshipsPanel").scrollIntoView({ behavior: "smooth" });
+  }).catch(function (e) { setDeny("aScholarshipDeny", e.message); });
+}
+document.getElementById("aScholarshipList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-edit") || b.getAttribute("data-publish") || b.getAttribute("data-unpublish") || b.getAttribute("data-verify") || b.getAttribute("data-archive");
+  if (!id) return;
+  if (b.hasAttribute("data-edit")) editScholarship(id);
+  else if (b.hasAttribute("data-publish")) patchScholarship(id, { status: "published" });
+  else if (b.hasAttribute("data-unpublish")) patchScholarship(id, { status: "draft" });
+  else if (b.hasAttribute("data-verify")) patchScholarship(id, { verified: true });
+  else if (b.hasAttribute("data-archive")) { if (confirm("Archive this scholarship? It will disappear from the public list.")) patchScholarship(id, { status: "archived" }); }
+});
+document.getElementById("aSave").onclick = function () { saveScholarship(false); };
+document.getElementById("aPublish").onclick = function () { saveScholarship(true); };
+document.getElementById("aClear").onclick = clearForm;
 document.getElementById("aLogin").onclick = async function () {
   var m = document.getElementById("aMsg"); m.textContent = "Signing in…";
   try {
@@ -95,11 +284,21 @@ document.getElementById("aLogin").onclick = async function () {
     loadDash(j.session.access_token);
   } catch (e) { m.textContent = "Failed: " + e.message; }
 };
-document.getElementById("aLogout").onclick = function () {
+document.getElementById("aLogout").onclick = async function () {
+  if (adminToken) { try { await fetch(API + "/api/auth/logout", { method: "POST", headers: headers() }); } catch (e) {} }
   localStorage.removeItem("fidonect_admin_session");
   showLogin("Signed out.");
 };
-// Minimal escaping for admin-rendered user content.
+var tabs = document.querySelectorAll(".tab");
+for (var i = 0; i < tabs.length; i++) {
+  tabs[i].onclick = function () {
+    for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("active");
+    this.classList.add("active");
+    var name = this.getAttribute("data-tab");
+    document.getElementById("overviewPanel").classList.toggle("active", name === "overview");
+    document.getElementById("scholarshipsPanel").classList.toggle("active", name === "scholarships");
+  };
+}
 document.getElementById("aStats").innerHTML = "";
 (function () {
   var t = token();

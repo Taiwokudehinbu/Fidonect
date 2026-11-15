@@ -1,127 +1,155 @@
-# Fidonect → Vercel migration guide
+# Fidonect → Vercel deployment guide
 
-Status: **code prepared locally and tested; deployment not yet run** (needs your Vercel account).
-Render stays untouched until you verify Vercel.
+**Production:** https://fidonect.vercel.app/
+
+Render remains deployed at https://fidonect-api.onrender.com/ as a fallback until
+final verification is complete. For rollback, point DNS/links back to Render and
+delete the Vercel project; Supabase data is untouched.
 
 ---
 
-## 1. What the audit found
+## 1. Current architecture
 
 | Item | Reality |
 |---|---|
-| Frontend | Single `index.html` (vanilla JS, no build step) + `styles.css`, served by Express |
-| Backend | Express 4 in `backend/server.js`, 824 lines, ~40 routes |
+| Frontend | Single `index.html` (vanilla JS, no build step), served by Express |
+| Backend | Express 4 in `backend/server.js`, one serverless function on Vercel |
 | Database | **Supabase PostgREST via `@supabase/supabase-js`** (not Prisma) |
 | Auth | Supabase Auth (email/password, JWT bearer tokens) |
-| Prisma | `backend/prisma/schema.prisma` is a **legacy SQLite scaffold**; `server.js` never imports it, and `backend/fidonect.db` is unused. Nothing to migrate. |
-| Uploads | Photos go to **Supabase Storage** (`avatars` bucket), not local disk |
-| Background jobs | None. The only in-memory state is a best-effort message rate limiter, which resets on restart (already true on Render). |
-| Env vars actually used | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `ADMIN_EMAILS`, optional `APP_URL` |
-| Not used | `DATABASE_URL`, service-role key, JWT secret, Prisma migrations |
+| Uploads | Supabase Storage (`avatars` bucket), not local disk |
+| Prisma | `backend/prisma/schema.prisma` is a legacy SQLite scaffold; `server.js` never imports it |
+| Background jobs | None. The in-memory rate limiter resets between serverless instances |
+| Required env vars | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
+| Optional env vars | `ADMIN_EMAILS`, `APP_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS` |
 
-**No database migration or schema change is required for hosting.** Vercel only changes where Express runs.
+The Phase 0.1 security migration and Phase 1 scholarship schema are **additive
+SQL migrations**. Existing auth, profiles, connections, messages, institutions,
+and photo upload continue to work before and after they are applied.
 
 ---
 
-## 2. Files added/changed for Vercel
+## 2. Files that matter for deployment
 
 | File | Purpose |
 |---|---|
 | `api/index.js` | Serverless entry: `module.exports = require("../backend/server.js")` |
-| `backend/server.js` | Added `if (require.main === module) app.listen(...)` + `module.exports = app`. Render and local behavior unchanged. |
-| `package.json` (root) | Vercel dependency manifest (same runtime deps as `backend/package.json`) |
-| `vercel.json` | One function, all routes rewritten to it, includes `index.html` + `backend/public/**` |
+| `backend/server.js` | Express API, static app shell, scholarship/admin routes |
+| `backend/lib/validation.js` | Query/body validation shared with tests |
+| `backend/public/admin.html` | Protected admin dashboard (overview + scholarships) |
+| `backend/public/sw.js` | Service worker (`fidonect-v13`) |
+| `index.html` | Web app shell, navigation, profile, scholarships UI |
+| `package.json` (root) | Vercel dependency manifest |
+| `vercel.json` | One function, all routes, includes app shell/public files |
 | `.vercelignore` | Keeps Android/APK/backups/prisma/seed out of the upload |
-| `.gitignore` | Ignores `backups/` and `.vercel/` |
+| `.github/workflows/ci.yml` | `npm ci`, syntax checks, and tests on Node 22 |
 
-`backend/package.json` and `render.yaml` are **unchanged**, so Render keeps deploying exactly as before.
-
-> Dependency note: root `package.json` mirrors the runtime dependencies in `backend/package.json`.
-> If you add a runtime dependency later, add it to **both**, or Vercel will fail to resolve it.
+Root and `backend/package.json` both list runtime dependencies. If you add one,
+add it to both. `backend/package.json` is still used by Render.
 
 ---
 
-## 3. Environment variables to add in Vercel
+## 3. Environment variables (Vercel)
 
-Project → Settings → Environment Variables. Add for **Production, Preview, Development**.
+Project → Settings → Environment Variables. Add for **Production, Preview, and
+Development**.
 
 | Name | Value | Required |
 |---|---|---|
 | `SUPABASE_URL` | `https://jwtpjgpucblrhlrdgzqi.supabase.co` | Yes |
-| `SUPABASE_ANON_KEY` | your existing anon / publishable key (same one Render uses) | Yes |
-| `ADMIN_EMAILS` | comma-separated admin emails (same as Render) | Yes (for admin) |
-| `APP_URL` | `https://<your-vercel-domain>` once known | Recommended (password-reset links) |
+| `SUPABASE_ANON_KEY` | existing anon / publishable key | Yes |
+| `ADMIN_EMAILS` | comma-separated admin emails | Optional if a `user_roles` row is seeded |
+| `APP_URL` | `https://fidonect.vercel.app` | Recommended (password-reset links) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key | Optional; server-side only |
+| `CORS_ORIGINS` | comma-separated extra origins | Optional; production Vercel and localhost are built in |
 
-Do **not** add `DATABASE_URL`, a service-role key, or a JWT secret — the app does not use them.
-Never put the anon key in `index.html`; it stays server-side, as today.
+Do **not** put the anon or service-role key in `index.html`. Both stay
+server-side. Never commit a key or print one in a terminal transcript.
+
+Admin access accepts either an email in `ADMIN_EMAILS` or a seeded `user_roles`
+row (`super_admin`, `content_admin`, `moderator`). Public scholarship reads use
+the anon client; admin writes use `SUPABASE_SERVICE_ROLE_KEY` when configured,
+otherwise the verified admin JWT plus database RLS.
+
+CORS is an explicit allowlist. Arbitrary `*.vercel.app` origins are not trusted;
+add preview origins through `CORS_ORIGINS` if needed.
+
+### Phase 1 database migrations (required once)
+
+Scholarships and the security hardening need SQL applied in Supabase. Follow
+`backend/migrations/README.md`:
+
+1. Take a verified backup first (`node scripts/backup-supabase.mjs` after
+   setting `SUPABASE_SERVICE_ROLE_KEY` locally, or use a dashboard backup).
+2. Run `backend/migrations/20261114_phase0_security.sql`.
+3. Run `backend/migrations/20261114_phase1_scholarships.sql`.
+4. Seed the first admin with `20261114_seed_admin_role.example.sql`.
+5. Verify login, photo upload, connections, messages, admin access, and all
+   **588 institutions**.
+6. Redeploy only if you changed environment variables.
+
+Until these migrations are applied, `/scholarships` shows an honest empty setup
+state and admin scholarship writes return a setup message. Existing features
+keep working because the API falls back to the old profile table.
 
 ---
 
-## 4. Deploy (dashboard, recommended)
+## 4. Deploy
 
-1. Push the prepared files to GitHub **only when you approve** (I have not pushed).
-2. Go to <https://vercel.com/new> → sign in with GitHub → **Import** `Taiwokudehinbu/Fidonect`.
-3. Settings:
-   - Framework Preset: **Other**
-   - Root Directory: **`.`** (repo root)
-   - Build Command: leave empty
-   - Output Directory: leave empty
-   - Install Command: leave default (`npm install`)
-4. Add the four environment variables above.
-5. **Deploy**.
-6. Copy the production URL (e.g. `https://fidonect.vercel.app`), then set `APP_URL` to it and redeploy.
-7. In **Supabase → Authentication → URL Configuration**:
-   - Site URL: `https://<your-vercel-domain>`
-   - Redirect URLs: add `https://<your-vercel-domain>/**`
-   - Keep the old Render URL in the list during the transition (so nothing breaks).
-8. Do **not** delete or suspend Render yet.
+1. Push the prepared files to GitHub.
+2. Vercel imports `Taiwokudehinbu/Fidonect` with **Root Directory `.`**,
+   Framework Preset **Other**, no build command, and the default install command.
+3. Add the environment variables above, then deploy.
+4. In **Supabase → Authentication → URL Configuration**:
+   - Site URL: `https://fidonect.vercel.app`
+   - Redirect URLs: add `https://fidonect.vercel.app/**`
+   - Keep the old Render URL during the transition.
+5. Do **not** delete or suspend Render until final verification passes.
 
-### CLI alternative (no Git push needed)
+### CLI alternative
 
 ```powershell
-npx vercel login          # authorizes this machine (browser/email)
-npx vercel                 # preview deploy
-npx vercel --prod          # production deploy
+npx vercel login
+npx vercel            # preview
+npx vercel --prod     # production
 ```
 
-The CLI uploads the local working tree, so you can test Vercel before pushing to GitHub.
-
 ---
 
-## 5. Post-deploy verification (run these)
+## 5. Post-deploy verification
 
 ```powershell
-$base = "https://<your-vercel-domain>"
+$base = "https://fidonect.vercel.app"
 Invoke-RestMethod "$base/health"
 Invoke-RestMethod "$base/api/status"                 # institutions must equal 588
-$i = Invoke-RestMethod "$base/api/institutions"; $i.Count   # must be 588
+$i = Invoke-RestMethod "$base/api/institutions"; $i.Count
 Invoke-WebRequest "$base/" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/messages" -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest "$base/scholarships" -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest "$base/profile" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/admin" -UseBasicParsing | Select-Object StatusCode
+npm run smoke
 ```
 
-Then in the app: register → login → connections → Message → send/reply → unread badge →
-admin login → institution search/pagination.
+Then in the app: register → login → connections → Message → send/reply →
+unread badge → profile photo upload → scholarships setup state (before
+migrations) or filters/bookmarks (after migrations) → admin login → institution
+search/pagination.
 
-Expected: **588 institutions**, same as Render today.
-
----
-
-## 6. Rollback
-
-Nothing on Render changed. If Vercel misbehaves, keep using
-`https://fidonect-api.onrender.com` and delete the Vercel project. No data rollback is
-needed because Vercel never touches Supabase.
+Expected: **588 institutions**, unchanged data, and no console errors.
 
 ---
 
-## 7. Notes / limits
+## 6. Limits and residual hardening
 
-- Vercel Hobby is free for personal, non-commercial projects. If Fidonect becomes commercial,
-  Vercel's terms require a paid plan.
-- Functions are stateless: the in-memory message throttle resets between instances. Messages,
-  conversations, and reads are all in Supabase, so no data is lost.
-- Supabase access is over HTTPS/PostgREST, so serverless cold starts do not exhaust database
-  connections (no direct Postgres pool to manage).
-- Android APK still points at the Render URL. Update `MainActivity.java` only after Vercel is
-  verified; old APKs keep working against Render in the meantime.
+- Vercel Hobby is free for personal, non-commercial projects. Commercial use
+  requires a paid plan.
+- Functions are stateless; messages, conversations, and reads are in Supabase.
+- Supabase access is over HTTPS/PostgREST, so cold starts do not exhaust a
+  Postgres pool.
+- The app still uses inline scripts/styles, so a strict CSP is deferred. The API
+  already sends anti-sniffing, frame, referrer, and permissions headers and uses
+  the CORS allowlist.
+- Android source points at Vercel and supports photo upload, JS dialogs, and
+  external links. Installed users only receive those fixes after installing a
+  rebuilt APK; a web deploy cannot update an old APK.
+- CI runs syntax checks and the Node test suite; `npm run smoke` is read-only.

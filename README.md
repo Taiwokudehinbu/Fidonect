@@ -1,39 +1,96 @@
 # Fidonect — Connect. Know. Prepare. Belong.
 
-**Live app:** https://fidonect-api.onrender.com/ (homepage + API; data from Supabase)
+**Production:** https://fidonect.vercel.app/ (web app + API, Supabase data)
 
-AI-powered student & campus connection platform for Nigerian universities & polytechnics.
-MVP: registration, institution/department selection, student discovery, connections,
-messaging, communities, Fido AI (with Official / Community / AI labels), mentors,
-info hub, search, notifications, report/block, admin dashboard.
+Fidonect helps Nigerian students connect before resumption. It combines a
+searchable directory of **588 institutions**, student profiles and connections,
+private messaging, community posts, honest AI-labelled campus guidance, and a
+public **Scholarships** directory that only links to official sources.
 
-## Run (no install needed)
-Open `index.html` in a browser. Data persists in `localStorage`.
+## What is live
 
-- `index.html` — app shell
-- `styles.css` — mobile-first styles
-- `app.js` — MVP logic + seed data (FUTA, UNILAG, UI, OAU, YabaTech)
+- Email/password auth (Supabase Auth), email confirmation and password reset
+- Profiles, visibility controls, and profile photo upload
+- Institution directory, faculty/department/programme pages, hub info
+- Student discovery, connection requests, accepted-connection messaging
+- Community posts, reports, admin dashboard
+- Scholarships (Phase 1): filters, pagination, verification labels, bookmarks
+- Mobile bottom navigation plus a More menu; `/profile` account page
 
-## Backend scaffold (optional, needs Node)
-```
-cd backend
+Scholarships and the security hardening need the SQL migrations in
+`backend/migrations/` applied once. Until then `/scholarships` deliberately
+shows an honest setup/empty state instead of placeholder content.
+
+## Run locally
+
+Requirements: Node 22+, a Supabase project, and `backend/.env` containing
+`SUPABASE_URL` and `SUPABASE_ANON_KEY`. Never commit that file.
+
+```sh
 npm install
-npm start  # http://localhost:3000/health
+npm start
+# open http://localhost:3000/health
 ```
-See `backend/server.js`. This is a minimal Express API stub for
-auth/profile/discovery/community/fido/mentors/messages/hub/admin
-to be expanded in Phase 2.
 
-**Deploying on Vercel:** see `VERCEL-DEPLOY.md` (env vars, import steps, verification).
-Render (`render.yaml`) remains supported and unchanged.
+`npm start` runs `backend/server.js`; it loads `backend/.env` explicitly, so it
+works from the repository root. Optional server-side variables:
+
+- `ADMIN_EMAILS` — comma-separated admin account emails
+- `APP_URL` — public URL used in password-reset links
+- `SUPABASE_SERVICE_ROLE_KEY` — optional service-role key for admin writes and backups
+- `CORS_ORIGINS` — extra allowed origins (official Vercel/localhost are built in)
+
+The service-role key is server-side only. Admin routes fall back to the verified
+admin JWT plus database `user_roles` policies when it is absent.
+
+## Tests and checks
+
+```sh
+npm test                 # validation + static security regression tests
+node --check backend/server.js
+npm run smoke            # read-only checks against production
+FIDONECT_BASE=http://localhost:3000 npm run smoke
+```
+
+CI runs the syntax checks and tests on Node 22 (`.github/workflows/ci.yml`).
+
+## Database migrations
+
+Read `backend/migrations/README.md` first. The order is:
+
+1. Take a verified backup (`node scripts/backup-supabase.mjs` or dashboard backup).
+2. `backend/migrations/20261114_phase0_security.sql`
+3. `backend/migrations/20261114_phase1_scholarships.sql`
+4. Seed the first admin with `20261114_seed_admin_role.example.sql`.
+
+The migrations are additive and idempotent: no tables are dropped, no users or
+institutions are deleted, and no content is invented. After applying them,
+verify login, photo upload, connections, messages, admin access, and the
+588-institution directory.
+
+## Deploy
+
+- **Vercel** (production): `api/index.js` imports `backend/server.js`; see
+  `VERCEL-DEPLOY.md` for env vars and verification.
+- **Render** (`render.yaml`) remains a supported fallback until final Vercel
+  verification.
+- **Android** source in `android/` points at the Vercel URL and supports photo
+  upload, JS dialogs, and external links. Installed users only receive these
+  fixes after a rebuilt APK is installed.
+
+## Trust, safety, and content rules
+
+- No invented scholarships, requirements, deadlines, or unverified news.
+- Scholarship listings must link to the official source; admins mark them verified.
+- No copyrighted book/research hosting without permission; link to legitimate sources.
+- No betting, gambling, or cash prizes in future Games modules.
+- Reports and moderation use Supabase RLS; secrets never ship to the browser.
 
 ## Roadmap
-- Phase 1 (MVP): this repo — connection + communities + basic Fido AI
-- Phase 2: mentorship verification + verified institutional info + improved AI (RAG)
-- Phase 3: accommodation + marketplace + services
-- Phase 4: institution partnerships + alumni + recruitment
-- Monetization, privacy/safety, and responsible-AI requirements: `PRD.md` §§22–28 (MVP vs future split; no payment/ads code in MVP; pre-production gates in §28).
 
-## Trust & Safety
-Phone/email verification, reporting, blocking, moderation, privacy controls
-(phone hidden by default), mentor verification (student ID / institutional email).
+- Phase 1 (done): core connection + communities + AI-honesty labels + scholarships shell
+- Phase 2: mentorship verification, richer verified institution info, improved Fido (RAG)
+- Phase 3: accommodation, marketplace, services
+- Phase 4: institution partnerships, alumni, recruitment
+
+Privacy, safety, and responsible-AI requirements: `PRD.md` §§22–28.

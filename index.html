@@ -75,15 +75,54 @@ h2{border-left:4px solid #f59e0b;padding-left:10px}
 .feat span{font-size:12px;color:#cbd5e1}
 .feat:hover{background:rgba(255,255,255,.22)}
 footer{text-align:center;padding:20px;color:#637083;font-size:13px}
-@media(max-width:700px){.hero h1{font-size:28px}.menu-btn{display:inline-block}#mainNav{display:none;width:100%;flex-direction:column}#mainNav.open{display:flex}#mainNav a{padding:8px 0}}
-@media(max-width:600px){.hero h1{font-size:28px}nav{width:100%}}
+/* Phase 1 shared components */
+.lede{color:#637083;max-width:680px;line-height:1.55}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.filter-check{display:flex;align-items:center;gap:8px;font-size:14px;padding:10px 12px;border:1px solid #d7dee8;border-radius:10px;background:#fff}
+.filter-check input{width:auto}
+.scholarship-card{display:flex;flex-direction:column;gap:10px;border-top:4px solid #2dd4bf}
+.scholarship-card h3{margin:0;font-size:19px;line-height:1.25}
+.scholarship-card .org{font-weight:700;color:#0f2a43}
+.scholarship-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.scholarship-card p{margin:0;line-height:1.45}
+.scholarship-card .desc{color:#425466;font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.scholarship-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:8px}
+.scholarship-actions .btn{padding:9px 14px;font-size:14px}
+.verified{background:#dcfce7;color:#166534;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700}
+.awaiting{background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700}
+.deadline{background:#e0f2fe;color:#075985;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700}
+.saved{background:#0a1f33;color:#fff}
+.empty-state{background:#fff;border:1px dashed #c9d4e2;border-radius:14px;padding:22px;text-align:center;color:#425466}
+.empty-state b{display:block;color:#0a1f33;margin-bottom:4px}
+.pager{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.pager button:disabled{opacity:.45;cursor:not-allowed}
+.bottom-nav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;border-top:1px solid #dbe3ed;box-shadow:0 -6px 24px rgba(15,42,67,.12);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.bottom-nav a,.bottom-nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:transparent;color:#637083;text-decoration:none;font-size:11px;font-weight:700;padding:6px 2px;cursor:pointer;border-radius:10px}
+.bottom-nav a span,.bottom-nav button span{font-size:20px;line-height:1}
+.bottom-nav a.active,.bottom-nav button.active{color:#0a1f33;background:#e6f6f3}
+.more-sheet{display:none;position:fixed;inset:0;z-index:70;background:rgba(10,31,51,.58);align-items:flex-end}
+.more-sheet.open{display:flex}
+.more-sheet .sheet{background:#fff;width:100%;max-height:85vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sheet-head b{font-size:20px;color:#0a1f33}
+.sheet-head button{border:0;background:#eef2f7;border-radius:999px;width:36px;height:36px;font-size:18px;cursor:pointer}
+.sheet-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sheet-grid a,.sheet-item{display:block;border:1px solid #dbe3ed;border-radius:12px;padding:14px;color:#0a1f33;text-decoration:none;font-weight:700;background:#f8fafc}
+.sheet-grid a small,.sheet-item small{display:block;color:#637083;font-weight:500;margin-top:3px}
+.sheet-item.disabled{color:#94a3b8;background:#f1f5f9}
+@media(max-width:700px){
+.hero h1{font-size:28px}.menu-btn{display:inline-block}#mainNav{display:none;width:100%;flex-direction:column}#mainNav.open{display:flex}#mainNav a{padding:8px 0}
+.bottom-nav{display:flex}body{padding-bottom:84px}.wrap{padding-bottom:90px}
+}
+@media(max-width:600px){.hero h1{font-size:28px}nav{width:100%}.sheet-grid{grid-template-columns:1fr}}
+@media(min-width:701px){.bottom-nav{display:none!important}}
 </style>
 </head>
 <body>
 <header class="topbar">
 <div class="brand"><a href="/" style="color:#fff;text-decoration:none"><span class="logo">F</span> Fidonect</a></div>
 <button id="menuBtn" class="menu-btn" aria-label="Open menu">☰</button>
-<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
+<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/scholarships">Scholarships</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/profile">My Profile</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
 </header>
 
 <div class="wrap" id="home">
@@ -94,15 +133,17 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="cta-row"><a href="#auth" class="btn btn-gold" style="text-decoration:none">Join free</a><a href="/institutions" class="btn btn-light" style="text-decoration:none">Explore schools</a></div>
 <div class="feat-grid">
 <a class="feat" href="/institutions"><b>Institutions</b><span>588 schools — search, filter, open any school page</span></a>
+<a class="feat" href="/scholarships"><b>Scholarships</b><span>Verified opportunities with official links only</span></a>
 <a class="feat" href="/connections"><b>Connections</b><span>Find classmates, connect, message your circle</span></a>
+<a class="feat" href="/profile"><b>My Profile</b><span>Your school, visibility, photo and account</span></a>
 <a class="feat" href="/ai-honesty"><b>Ask Fido</b><span>Campus guidance with honest Official / Community / AI labels</span></a>
 <a class="feat" href="/about"><b>About</b><span>What Fidonect is, who it serves, and how it works</span></a>
 </div>
-<div class="stats"><div class="stat"><b>2,400+</b><span>students connecting</span></div><div class="stat"><b id="statSchools">–</b><span>institutions listed</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
+<div class="stats"><div class="stat"><b>Verified</b><span>labels on every answer</span></div><div class="stat"><b id="statSchools">–</b><span>institutions listed</span></div><div class="stat"><b>Free</b><span>core forever</span></div></div>
 </div>
 
-<div class="card" id="auth" data-page="home connections">
-<h2>Join Fidonect (MVP test)</h2>
+<div class="card" id="auth" data-page="home connections profile">
+<h2 id="authTitle">Join Fidonect</h2>
 <div id="authForm">
 <input id="authName" class="input" placeholder="Full name" />
 <input id="authEmail" class="input" placeholder="Email" type="email" />
@@ -145,6 +186,13 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 </div>
 
+<div class="card" id="homeScholarships" data-page="home" style="display:none">
+<h2>Recommended scholarships</h2>
+<p class="lede">Published opportunities from official sources. Always verify eligibility and deadlines on the official page — Fidonect never guarantees an award.</p>
+<div class="grid" id="homeScholarshipGrid"></div>
+<p><a class="btn ghost" href="/scholarships" style="text-decoration:none">Browse all scholarships</a></p>
+</div>
+
 <div class="card" data-page="institutions">
 <h2>Find your school</h2>
 <div class="search-row">
@@ -167,8 +215,33 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div id="schoolDetail"></div>
 </div>
 
+<div id="scholarships" data-page="scholarships">
+<div class="card">
+<h2>Scholarships <span id="scholarshipCount" class="pill"></span></h2>
+<p class="lede">Verified opportunities with official links only. Fidonect does not invent awards, requirements, or deadlines — open the official page before applying.</p>
+<div class="search-row">
+<input id="scholarshipSearch" class="input" placeholder="Search title, organisation, or country" autocomplete="off" />
+<button id="scholarshipFind" class="btn">Search</button>
+<button id="scholarshipReset" class="btn ghost">Reset</button>
+</div>
+<div class="filter-grid" style="margin-top:10px">
+<select id="scholarshipLevel" class="input" aria-label="Academic level">
+<option value="">All levels</option><option>Undergraduate</option><option>Postgraduate</option><option>PhD</option><option>Any</option>
+</select>
+<select id="scholarshipFunding" class="input" aria-label="Funding type">
+<option value="">All funding types</option><option>Full funding</option><option>Partial funding</option><option>Tuition</option><option>Stipend</option><option>Other</option>
+</select>
+<label class="filter-check"><input type="checkbox" id="scholarshipVerified" /> Verified only</label>
+</div>
+</div>
+<div id="scholarshipNotice" class="muted"></div>
+<div class="grid" id="scholarshipGrid"></div>
+<div class="pager"><button id="scholarshipPrev" class="btn ghost" type="button">← Prev</button><span id="scholarshipPageLabel" class="muted"></span><button id="scholarshipNext" class="btn ghost" type="button">Next →</button></div>
+</div>
+
 <div id="students" data-page="connections">
-<h2>Sample student connections (mock data)</h2>
+<h2>Student connections</h2>
+<p class="lede">Discover registered students who share their profile. Connection requests and messages stay private.</p>
 <div class="grid" id="studentGrid"></div>
 </div>
 
@@ -210,14 +283,6 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div id="fidoAns" style="margin-top:10px"></div>
 </div>
 
-<div class="card" id="live" data-page="institutions">
-<h2>Live test — Supabase</h2>
-<p class="muted">Reads <code>institutions</code> via your backend. Mock data above is untouched.</p>
-<div class="search-row"><button id="loadLive" class="btn">Load institutions</button></div>
-<p id="liveMsg" class="muted">Not loaded yet. Start backend first.</p>
-<div class="grid" id="liveGrid"></div>
-</div>
-
 <div class="card" id="how" data-page="about">
 <h2>How it works</h2>
 <p><b>1. Create your account</b> — register with your name, email, and school path. Your profile visibility is yours to control.</p>
@@ -248,6 +313,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <div class="card" id="admin" style="display:none">
 <h2>Admin dashboard</h2>
+<p><a class="btn ghost" href="/admin" style="text-decoration:none">Manage scholarships &amp; content</a></p>
 <p class="muted" id="adminStatus">Checking access…</p>
 <div class="grid" id="adminStats"></div>
 <div id="adminUsers"></div>
@@ -255,21 +321,37 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <p class="muted small">Reports are reviewed in Supabase dashboard > Table Editor > reports. Never grant admin by code alone — access comes from the server's admin list.</p>
 </div>
 
-<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
+<nav class="bottom-nav" aria-label="Primary mobile navigation">
+<a href="/" data-nav="home"><span>⌂</span>Home</a>
+<a href="/institutions" data-nav="institutions"><span>▦</span>Schools</a>
+<a href="/connections" data-nav="connections"><span>◎</span>Connect</a>
+<a href="/scholarships" data-nav="scholarships"><span>★</span>Scholarships</a>
+<button type="button" id="moreBtn" aria-label="Open more menu"><span>☰</span>More</button>
+</nav>
+
+<div class="more-sheet" id="moreSheet" role="dialog" aria-modal="true" aria-labelledby="moreTitle">
+<div class="sheet">
+<div class="sheet-head"><b id="moreTitle">More</b><button type="button" id="moreClose" aria-label="Close menu">✕</button></div>
+<div class="sheet-grid">
+<a href="/messages">Messages<small>Your private chats</small></a>
+<a href="/profile">My Profile<small>School, photo and visibility</small></a>
+<a href="/scholarships">Scholarships<small>Verified opportunities</small></a>
+<a href="/ai-honesty">AI Honesty<small>How Fido labels answers</small></a>
+<a href="/about">About<small>Mission and safety</small></a>
+<a href="/admin" id="moreAdmin" style="display:none">Admin<small>Content and moderation</small></a>
+<span class="sheet-item disabled">News<small>Coming in the next phase</small></span>
+<span class="sheet-item disabled">Research Hub<small>Coming in the next phase</small></span>
+<span class="sheet-item disabled">Book Club<small>Coming in the next phase</small></span>
+<span class="sheet-item disabled">Games<small>Coming in the next phase</small></span>
+</div>
+<p class="muted small" style="margin:12px 0 0">Fidonect keeps the core free. No betting, gambling, or cash prizes will be added to Games.</p>
+</div>
+</div>
+
+<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/scholarships">Scholarships</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
 
 <script>
-var schools = [
-{name:"University of Lagos", loc:"Akoka, Lagos", students:1240, ownership:"Federal", kind:"University"},
-{name:"University of Ibadan", loc:"Ibadan, Oyo", students:860, ownership:"Federal", kind:"University"},
-{name:"Federal University of Technology, Akure", loc:"Akure, Ondo", students:890, ownership:"Federal", kind:"University"}
-];
-var students = [
-{name:"Adaeze O.", dept:"Biology", school:"University of Lagos", session:"2026/2027"},
-{name:"Tunde B.", dept:"Biology", school:"University of Lagos", session:"2026/2027"},
-{name:"Mariam S.", dept:"Computer Science", school:"University of Ibadan", session:"2026/2027"},
-{name:"Fatima A.", dept:"Microbiology", school:"Federal University of Technology, Akure", session:"2026/2027"}
-];
-var liveSchools=null; // live rows from Supabase when reachable; mocks otherwise
+var liveSchools=[]; // live rows from the API; never show invented fallback schools
 var currentCat="";
 function normSchools(list){return list.map(function(s){return {id:s.id,name:s.name,loc:s.location||s.loc,ownership:s.ownership||"",state:s.state||"",kind:s.kind||"",live:!!s.id};});}
 function ownPill(o){if(o==="Federal")return ' <span class="pill-fed">Federal</span>';if(o==="State")return ' <span class="pill-state">State</span>';if(o==="Private")return ' <span class="pill-priv">Private</span>';return '';}
@@ -301,20 +383,21 @@ try{var rows=await getInstitutions();
 if(rows.length){liveSchools=normSchools(rows);var st=document.getElementById("statSchools");if(st)st.textContent=rows.length;return;}}catch(e){}
 if(attempt===1){document.getElementById("resultMsg").textContent="Waking backend, retrying…";await new Promise(function(res){setTimeout(res,4000);});}
 }
-liveSchools=null;
+liveSchools=[];
+document.getElementById("resultMsg").textContent="Institutions are temporarily unavailable. Check your connection and try again.";
 }
 var schoolPage=1;var PAGE_SIZE=12;
 function renderSchools(filter){
 var q=(filter||"").toLowerCase();
-var base=liveSchools||normSchools(schools);
+var base=liveSchools||[];
 var list=base.filter(function(s){return (!q || s.name.toLowerCase().indexOf(q)>-1) && (!currentCat || s.ownership===currentCat) && (!currentKind || s.kind===currentKind);});
 var totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
 if(schoolPage>totalPages)schoolPage=totalPages;
 var page=list.slice((schoolPage-1)*PAGE_SIZE,schoolPage*PAGE_SIZE);
 document.getElementById("schoolCount").textContent=list.length+" shown";
 document.getElementById("schoolGrid").innerHTML=page.map(function(s){
-return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+s.loc+ownPill(s.ownership)+(s.kind?' <span class="pill">'+s.kind+'</span>':"")+'</p><p>'+(s.live?'<a class="btn ghost" style="text-decoration:none" href="/schools/'+s.id+'">Open school page</a>':'<button class="btn ghost" onclick="showTree(null)">View departments</button>')+'</p></div>';
-}).join("")||'<p class="muted">No schools match.</p>';
+return '<div class="card school"><h3>'+esc(s.name)+'</h3><p class="muted">'+esc(s.loc)+ownPill(s.ownership)+(s.kind?' <span class="pill">'+esc(s.kind)+'</span>':"")+'</p><p>'+(s.live?'<a class="btn ghost" style="text-decoration:none" href="/schools/'+s.id+'">Open school page</a>':'<span class="muted">Details unavailable</span>')+'</p></div>';
+}).join("")||'<div class="empty-state"><b>No institutions loaded</b>Check your connection and try again. We never show made-up school records.</div>';
 document.getElementById("pageLabel").textContent=list.length?("Page "+schoolPage+" of "+totalPages):"";
 document.getElementById("prevPage").disabled=schoolPage<=1;
 document.getElementById("nextPage").disabled=schoolPage>=totalPages;
@@ -341,7 +424,7 @@ html+='</div>';return html;
 }
 async function showTree(id){
 var box=document.getElementById("schoolDetail");
-if(id===null){box.innerHTML='<p class="muted">Offline mock — start the backend and reload for live departments.</p>';return;}
+if(id===null){box.innerHTML='<div class="empty-state"><b>Details unavailable</b>Open a live institution from the directory to see its departments.</div>';return;}
 box.innerHTML='<p class="muted">Loading departments…</p>';
 try{var r=await fetch(apiBase()+"/api/institutions/"+id+"/tree");var t=await r.json();
 if(!r.ok)throw new Error(t.error||("HTTP "+r.status));
@@ -377,11 +460,7 @@ box.scrollIntoView();
 }catch(e){box.innerHTML='<p><a href="/#schools">← Back to all schools</a></p><p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
 function renderStudents(filter){
-var q=(filter||"").toLowerCase();
-var list=students.filter(function(s){return !q || (s.name+s.dept+s.school).toLowerCase().indexOf(q)>-1;});
-document.getElementById("studentGrid").innerHTML=list.map(function(s,i){
-return '<div class="person"><h4>'+s.name+'</h4><div>'+s.dept+' — '+s.school+'</div><div class="muted">'+s.session+'</div><p><button class="btn ghost" onclick="this.textContent=\'✓ Connected\'">Connect</button></p></div>';
-}).join("")||'<p class="muted">No students match.</p>';
+document.getElementById("studentGrid").innerHTML='<div class="empty-state"><b>Log in to see registered students</b>Fidonect only shows real, registered profiles. Create an account or log in above to discover classmates.</div>';
 }
 async function askFido(){
 var q=document.getElementById("fidoQ").value.trim(),box=document.getElementById("fidoAns");
@@ -403,28 +482,12 @@ await loadSchools();
 schoolPage=1;
 var q=document.getElementById("schoolSearch").value;
 var n=renderSchools(q); var sn=await refreshStudents(q);
-var live=liveSchools?" (live)":" (mock data)";
+var live=liveSchools&&liveSchools.length?"":" (directory unavailable)";
 var cat=currentCat?(" — "+currentCat):"";
 var knd=currentKind?(" — "+currentKind):"";
 document.getElementById("resultMsg").textContent=n+" school(s)"+cat+knd+" found for \""+ (q||"all schools") +"\""+live+".";
 };
 document.getElementById("schoolSearch").onkeydown=function(e){if(e.key==="Enter")document.getElementById("findBtn").click();};
-document.getElementById("loadLive").onclick=async function(){
-var msg=document.getElementById("liveMsg"), grid=document.getElementById("liveGrid");
-// API base: ?api=... > window.FIDONECT_API > same origin when hosted > localhost default.
-// Local double-click (file://) and localhost keep using http://localhost:3000.
-var isLocal = location.protocol==="file:" || /^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname);
-var apiBase=(new URLSearchParams(location.search).get("api")||window.FIDONECT_API||(isLocal?"http://localhost:3000":location.origin)).replace(/\/$/,"");
-msg.textContent="Loading from backend…"; grid.innerHTML="";
-try{
-var r=await fetch(apiBase+"/api/institutions/test");
-var rows=await r.json();
-if(!r.ok) throw new Error(rows.error||("HTTP "+r.status));
-if(!rows.length){msg.textContent="Connected OK — table is empty. Run backend/supabase-setup.sql in Supabase SQL Editor.";return;}
-msg.textContent="Connected OK — "+rows.length+" institution(s) from Supabase.";
-grid.innerHTML=rows.map(function(s){return '<div class="card school"><h3>'+s.name+'</h3><p class="muted">'+(s.location||"")+'</p></div>';}).join("");
-}catch(e){msg.textContent="Failed: "+e.message+" — is backend running (npm start) and SQL executed?";}
-};
 // ---- Phase 1: Auth (Supabase Auth via backend; token in this browser only) ----
 function apiBase(){return (new URLSearchParams(location.search).get("api")||window.FIDONECT_API||(location.protocol==="file:"||/^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname)?"http://localhost:3000":location.origin)).replace(/\/$/,"");}
 function sess(){try{return JSON.parse(localStorage.getItem("fidonect_session")||"null");}catch(e){return null;}}
@@ -462,17 +525,138 @@ scheduleRefresh();renderAuth();
 async function loadSchoolOptions(){
 try{var rows=await getInstitutions();
 if(rows.length)document.getElementById("schoolList").innerHTML=rows.map(function(s){return '<option value="'+esc(s.name)+'">';}).join("");
-else document.getElementById("schoolList").innerHTML='<option value="University of Lagos"><option value="University of Ibadan"><option value="Federal University of Technology, Akure">';
 }catch(e){/* offline: free text still works */}
 }
+// ---- Phase 1: Scholarships ----
+var scholarshipState={items:[],bookmarks:{},offset:0,limit:12,total:0};
+function scholarshipDate(d){
+if(!d)return "Deadline not listed";
+try{return new Date(d+"T00:00:00").toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});}catch(e){return d;}
+}
+function scholarshipCardHTML(s){
+var saved=!!scholarshipState.bookmarks[s.id];
+var verified=s.verified?'<span class="verified">✓ Verified</span>':'<span class="awaiting">Awaiting verification</span>';
+return '<article class="card scholarship-card">'+
+'<div class="scholarship-meta"><span class="deadline">'+esc(scholarshipDate(s.deadline))+'</span>'+verified+'</div>'+
+'<h3>'+esc(s.title)+'</h3>'+
+'<div class="org">'+esc(s.organisation)+'</div>'+
+'<div class="scholarship-meta"><span class="pill">'+esc(s.country)+'</span><span class="pill">'+esc(s.academic_level)+'</span><span class="pill">'+esc(s.funding_type)+'</span></div>'+
+(s.description?'<p class="desc">'+esc(s.description)+'</p>':'')+
+'<div class="scholarship-actions"><a class="btn ghost" style="text-decoration:none" href="'+esc(s.official_url)+'" target="_blank" rel="noopener noreferrer">Official page</a>'+
+'<button type="button" class="btn ghost'+(saved?" saved":"")+'" data-bookmark="'+s.id+'">'+(saved?"★ Saved":"☆ Save")+'</button></div>'+
+'</article>';
+}
+function renderScholarshipGrid(items){
+var grid=document.getElementById("scholarshipGrid");
+if(!grid)return;
+grid.innerHTML=(items||[]).map(scholarshipCardHTML).join("")||'<div class="empty-state"><b>No scholarships match</b>Try clearing filters. New opportunities appear here only after an admin verifies the official source.</div>';
+var total=scholarshipState.total||0;
+document.getElementById("scholarshipCount").textContent=total?total+" opportunities":"";
+var pages=Math.max(1,Math.ceil(total/scholarshipState.limit));
+document.getElementById("scholarshipPageLabel").textContent=total?("Page "+(Math.floor(scholarshipState.offset/scholarshipState.limit)+1)+" of "+pages):"";
+document.getElementById("scholarshipPrev").disabled=scholarshipState.offset<=0;
+document.getElementById("scholarshipNext").disabled=scholarshipState.offset+scholarshipState.limit>=total;
+}
+async function loadScholarshipBookmarks(){
+var s=await ensureSession();
+scholarshipState.bookmarks={};
+if(!s)return;
+try{
+var r=await fetch(apiBase()+"/api/scholarships/bookmarks/mine",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();
+if(r.ok&&Array.isArray(j.bookmarks))j.bookmarks.forEach(function(b){if(b.scholarship_id)scholarshipState.bookmarks[b.scholarship_id]=true;});
+}catch(e){}
+}
+async function toggleScholarshipBookmark(id){
+var s=await ensureSession();
+if(!s){location.href="/profile";return;}
+var saved=!!scholarshipState.bookmarks[id];
+try{
+var r=await fetch(apiBase()+"/api/scholarships/"+id+"/bookmark",{method:saved?"DELETE":"POST",headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(saved)delete scholarshipState.bookmarks[id];else scholarshipState.bookmarks[id]=true;
+renderScholarshipGrid(scholarshipState.items);
+}catch(e){document.getElementById("scholarshipNotice").textContent="Could not save that scholarship: "+e.message;}
+}
+async function loadScholarships(reset){
+if(reset)scholarshipState.offset=0;
+var notice=document.getElementById("scholarshipNotice");
+var params=new URLSearchParams();
+params.set("limit",String(scholarshipState.limit));
+params.set("offset",String(scholarshipState.offset));
+var q=document.getElementById("scholarshipSearch").value.trim();
+var level=document.getElementById("scholarshipLevel").value;
+var funding=document.getElementById("scholarshipFunding").value;
+if(q)params.set("q",q);
+if(level)params.set("level",level);
+if(funding)params.set("funding",funding);
+if(document.getElementById("scholarshipVerified").checked)params.set("verified","true");
+notice.textContent="Loading scholarships…";
+try{
+var r=await fetch(apiBase()+"/api/scholarships?"+params.toString());
+var j=await r.json();
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){
+scholarshipState.items=[];scholarshipState.total=0;
+notice.innerHTML='<div class="empty-state"><b>Scholarships are being set up</b>The database migration has not been applied yet. No placeholder or invented awards will be shown.</div>';
+document.getElementById("scholarshipGrid").innerHTML="";
+document.getElementById("scholarshipCount").textContent="";
+document.getElementById("scholarshipPageLabel").textContent="";
+document.getElementById("scholarshipPrev").disabled=true;
+document.getElementById("scholarshipNext").disabled=true;
+return;
+}
+scholarshipState.items=j.scholarships||[];scholarshipState.total=j.total||0;
+await loadScholarshipBookmarks();
+renderScholarshipGrid(scholarshipState.items);
+notice.textContent=scholarshipState.total?("Showing "+scholarshipState.items.length+" of "+scholarshipState.total+" published opportunities."):"No published scholarships yet. This space stays empty until an admin adds and verifies an official opportunity.";
+}catch(e){
+scholarshipState.items=[];scholarshipState.total=0;
+notice.textContent="Could not load scholarships: "+e.message;
+document.getElementById("scholarshipGrid").innerHTML="";
+document.getElementById("scholarshipCount").textContent="";
+document.getElementById("scholarshipPageLabel").textContent="";
+document.getElementById("scholarshipPrev").disabled=true;
+document.getElementById("scholarshipNext").disabled=true;
+}
+}
+async function loadHomeScholarships(){
+var card=document.getElementById("homeScholarships"),grid=document.getElementById("homeScholarshipGrid");
+if(!card||!grid)return;
+try{
+var r=await fetch(apiBase()+"/api/scholarships?limit=3");
+var j=await r.json();
+if(!r.ok||j.setupRequired||!j.scholarships||!j.scholarships.length)return;
+await loadScholarshipBookmarks();
+grid.innerHTML=j.scholarships.map(scholarshipCardHTML).join("");
+card.setAttribute("data-ready","1");
+card.style.display="";
+}catch(e){}
+}
+document.getElementById("scholarshipGrid").addEventListener("click",function(e){
+var b=e.target.closest?e.target.closest("[data-bookmark]"):null;
+if(b)toggleScholarshipBookmark(Number(b.getAttribute("data-bookmark")));
+});
+document.getElementById("scholarshipFind").onclick=function(){loadScholarships(true);};
+document.getElementById("scholarshipSearch").onkeydown=function(e){if(e.key==="Enter")loadScholarships(true);};
+document.getElementById("scholarshipLevel").onchange=function(){loadScholarships(true);};
+document.getElementById("scholarshipFunding").onchange=function(){loadScholarships(true);};
+document.getElementById("scholarshipVerified").onchange=function(){loadScholarships(true);};
+document.getElementById("scholarshipPrev").onclick=function(){if(scholarshipState.offset>0){scholarshipState.offset=Math.max(0,scholarshipState.offset-scholarshipState.limit);loadScholarships(false);}};
+document.getElementById("scholarshipNext").onclick=function(){if(scholarshipState.offset+scholarshipState.limit<scholarshipState.total){scholarshipState.offset+=scholarshipState.limit;loadScholarships(false);}};
+document.getElementById("scholarshipReset").onclick=function(){document.getElementById("scholarshipSearch").value="";document.getElementById("scholarshipLevel").value="";document.getElementById("scholarshipFunding").value="";document.getElementById("scholarshipVerified").checked=false;loadScholarships(true);};
+
 async function fetchProfile(token){
 var r=await fetch(apiBase()+"/api/profile",{headers:{Authorization:"Bearer "+token}});
 return {ok:r.ok,status:r.status,body:await r.json()};
 }
 async function renderAuth(){
 var s=sess(),form=document.getElementById("authForm"),view=document.getElementById("authedView");
+var authTitle=document.getElementById("authTitle");
+if(authTitle)authTitle.textContent=(routeFromPath()==="profile")?(s?"My profile":"Log in to Fidonect"):"Join Fidonect";
 if(s){s=await ensureSession();if(!s){localStorage.removeItem("fidonect_session");}}
-if(!s){form.style.display="";view.style.display="none";document.getElementById("requests").style.display="none";document.getElementById("completeBox").style.display="none";document.getElementById("navAdmin").style.display="none";document.getElementById("admin").style.display="none";return;}
+if(!s){form.style.display="";view.style.display="none";document.getElementById("requests").style.display="none";document.getElementById("completeBox").style.display="none";setAdminVisible(false);return;}
 var p=await fetchProfile(s.access_token);
 if(!p.ok&&p.status===401){var fresh=await ensureSession(true);if(fresh){s=fresh;p=await fetchProfile(s.access_token);}}
 if(!p.ok){
@@ -555,7 +739,7 @@ n.textContent="Photo updated.";photoFile.value="";renderAuth();}catch(e){n.textC
 finally{photoBtn.disabled=false;photoBtn.textContent="Upload photo";photoFile.value="";}
 }
 photoBtn.onclick=function(){photoFile.click();};
-photoFile.onchange=function(){var f=this.files[0];if(!f)return;document.getElementById("photoName").textContent="Selected: "+f.name;uploadPhoto(f);};
+photoFile.onchange=function(){var f=this.files[0];if(!f)return;document.getElementById("photoName").textContent="Preparing photo…";uploadPhoto(f);};
 document.getElementById("cmpBtn").onclick=async function(){
 var s=await ensureSession();if(!s)return;
 var m=document.getElementById("cmpMsg");
@@ -598,8 +782,12 @@ if(!code)return;
 document.getElementById("resetBox").style.display="none";
 fetch(apiBase()+"/api/auth/recover",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:code})}).then(async function(r){var j=await r.json();if(!r.ok)throw new Error(j.error||"");setSess(j.session);document.getElementById("authForm").style.display="none";document.getElementById("resetBox").style.display="";document.getElementById("resetMsg").textContent="Link verified — set a new password below.";try{window.history.replaceState({},"","/");}catch(e){}}).catch(function(e){document.getElementById("resetBox").style.display="";document.getElementById("resetMsg").textContent="Link invalid or expired: "+e.message+" — use Forgot password for a fresh link.";});
 })();
-document.getElementById("logoutBtn").onclick=function(){setSess(null);document.getElementById("authMsg").textContent="Logged out.";};
-// ---- Phase 3: Connections UI (live when logged in, mocks otherwise) ----
+document.getElementById("logoutBtn").onclick=async function(){
+var s=await ensureSession();
+if(s){try{await fetch(apiBase()+"/api/auth/logout",{method:"POST",headers:{Authorization:"Bearer "+s.access_token}});}catch(e){}}
+setSess(null);document.getElementById("authMsg").textContent="Logged out.";closeMore();
+};
+// ---- Phase 3: Connections UI (real registered profiles only) ----
 var connState={};
 async function refreshStudents(filter){
 var s=await ensureSession();
@@ -624,7 +812,7 @@ loadRequests(conns);return list.length;
 }catch(e){document.getElementById("studentGrid").innerHTML='<p class="muted">Couldn\'t load registered students ('+esc(e.message)+'). Check your connection and refresh — or log in again on the Home page.</p>';return 0;}
 }
 var currentSchool="";
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 async function loadPosts(){
 var s=await ensureSession();
 var box=document.getElementById("postBox"),login=document.getElementById("postLogin"),list=document.getElementById("postList");
@@ -665,14 +853,20 @@ var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 refreshStudents(document.getElementById("schoolSearch").value);
 }catch(e){alert("Failed: "+e.message);}
 }
+function setAdminVisible(on){
+var nav=document.getElementById("navAdmin"),sec=document.getElementById("admin"),more=document.getElementById("moreAdmin");
+if(nav)nav.style.display=on?"":"none";
+if(more)more.style.display=on?"":"none";
+if(sec)sec.style.display=on?"":"none";
+}
 async function checkAdmin(){
-var s=await ensureSession();var nav=document.getElementById("navAdmin"),sec=document.getElementById("admin");
-if(!s){nav.style.display="none";sec.style.display="none";return;}
+var s=await ensureSession();
+if(!s){setAdminVisible(false);return;}
 try{var r=await fetch(apiBase()+"/api/admin/me",{headers:{Authorization:"Bearer "+s.access_token}});
 var j=await r.json();
-if(r.ok&&j.isAdmin){nav.style.display="";sec.style.display="";loadAdmin();}
-else{nav.style.display="none";sec.style.display="none";}
-}catch(e){nav.style.display="none";sec.style.display="none";}
+if(r.ok&&j.isAdmin){setAdminVisible(true);loadAdmin();}
+else{setAdminVisible(false);}
+}catch(e){setAdminVisible(false);}
 }
 async function loadAdmin(){
 var s=await ensureSession();if(!s)return;
@@ -822,13 +1016,15 @@ else{if(now-lastBadgePoll>=8000){lastBadgePoll=now;await updateMsgBadge();}}
 // connections messages chat ai about" (space-separated); full page loads keep this stateless.
 // Future pages (Map, Events, Communities…): add a server route, a section with
 // data-page="newpage", a nav link, and one line in routeFromPath/PAGE_TITLES.
-var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
+var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",scholarships:"Scholarships — Fidonect",profile:"My Profile — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
 function routeFromPath(){
-var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|messages|chat|ai-honesty|about)/);}catch(e){}
+var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|scholarships|profile|messages|chat|ai-honesty|about)/);}catch(e){}
 if(!m)return "home";
 var seg=m[1];
 if(seg==="schools"||seg==="institutions")return "institutions";
 if(seg==="students"||seg==="connections")return "connections";
+if(seg==="scholarships")return "scholarships";
+if(seg==="profile")return "profile";
 if(seg==="messages")return "messages";
 if(seg==="chat")return "chat";
 if(seg==="ai-honesty")return "ai";
@@ -838,9 +1034,27 @@ function routeTo(page){
 document.body.setAttribute("data-route",page);
 var s=sess();
 var els=document.querySelectorAll("[data-page]");
-for(var i=0;i<els.length;i++){var p=(els[i].getAttribute("data-page")||"").split(" ");if(els[i].id==="requests"&&!s){els[i].style.display="none";continue;}els[i].style.display=(p.indexOf(page)>-1)?"":"none";}
+for(var i=0;i<els.length;i++){var p=(els[i].getAttribute("data-page")||"").split(" ");if(els[i].id==="requests"&&!s){els[i].style.display="none";continue;}if(els[i].id==="homeScholarships"){els[i].style.display=(p.indexOf(page)>-1&&els[i].getAttribute("data-ready")==="1")?"":"none";continue;}els[i].style.display=(p.indexOf(page)>-1)?"":"none";}
+var title=document.getElementById("authTitle");
+if(title)title.textContent=page==="profile"?(s?"My profile":"Log in to Fidonect"):"Join Fidonect";
+var bottom=document.querySelectorAll(".bottom-nav a[data-nav]");
+for(var j=0;j<bottom.length;j++)bottom[j].classList.toggle("active",bottom[j].getAttribute("data-nav")===page);
+var moreBtn=document.getElementById("moreBtn");
+if(moreBtn)moreBtn.classList.toggle("active",["messages","chat","ai","about","profile"].indexOf(page)>-1);
 if(PAGE_TITLES[page])document.title=PAGE_TITLES[page];
 }
+function openMore(){
+document.getElementById("moreSheet").classList.add("open");
+document.body.style.overflow="hidden";
+}
+function closeMore(){
+document.getElementById("moreSheet").classList.remove("open");
+document.body.style.overflow="";
+}
+document.getElementById("moreBtn").onclick=openMore;
+document.getElementById("moreClose").onclick=closeMore;
+document.getElementById("moreSheet").onclick=function(e){if(e.target===this)closeMore();};
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeMore();});
 (async function(){
 document.getElementById("menuBtn").onclick=function(){document.getElementById("mainNav").classList.toggle("open");};
 document.getElementById("chatInput").onkeydown=function(e){if(e.key==="Enter")sendChat();};
@@ -851,6 +1065,8 @@ routeTo(routeFromPath());
 if(m)showSchoolPage(m[1]);
 else if(cm)openChat(cm[1]);
 else if(routeFromPath()==="messages")loadConversations();
+if(routeFromPath()==="scholarships")loadScholarships(true);
+if(routeFromPath()==="home")loadHomeScholarships();
 updateMsgBadge();
 // Chat: ~2s while a thread is open, messages list: 3s, badge: 8s. msgTick
 // throttles per route, skips while the tab is hidden, and re-fetches right

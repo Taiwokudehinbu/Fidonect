@@ -1,15 +1,74 @@
-// Fidonect backend stub — run with `npm install && npm start` (requires Node 18+).
-// Phase-1 stub: in-memory stores. Replace with DB + auth + RAG in Phase 2.
-require("dotenv").config();
+// Fidonect API — Express app served by Vercel (and optionally Render).
+require("dotenv").config({ path: require("path").join(__dirname, ".env") });
+require("express-async-errors"); // converts rejected async handlers into next(err)
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
+const { createClient } = require("@supabase/supabase-js");
 const supabase = require("./supabaseClient");
+const { isText, isEmail, isHttpUrl, isIsoDate, parsePositiveInt, cleanText, uniqueSlug } = require("./lib/validation");
 const app = express();
-app.use(cors()); app.use(express.json({ limit: "100kb" }));
-app.set("trust proxy", 1); // correct protocol/host behind Render's proxy
+app.set("trust proxy", 1);
 app.disable("x-powered-by");
+
+// CORS allowlist: official site, its main preview alias, local development,
+// plus explicit CORS_ORIGINS. Arbitrary *.vercel.app origins are not trusted.
+// Requests without an Origin header (curl, server-to-server, same-origin) pass.
+const OFFICIAL_ORIGINS = new Set([
+  "https://fidonect.vercel.app",
+  "https://fidonect-git-main-taiwokudehinbu.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000"
+]);
+function originAllowed(origin) {
+  if (!origin) return true;
+  if (OFFICIAL_ORIGINS.has(origin)) return true;
+  const extra = (process.env.CORS_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (extra.includes(origin)) return true;
+  if (process.env.NODE_ENV !== "production" && origin === "null") return true;
+  return false;
+}
+app.use(cors({
+  origin(origin, cb) { cb(null, originAllowed(origin)); },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400
+}));
+app.use(express.json({ limit: "100kb" }));
+
+// Conservative security headers that do not break the existing inline UI.
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
+// Best-effort in-memory rate limit. Serverless instances are isolated, so this
+// is a speed bump, not a global quota; it stops casual brute-force loops.
+const rateBuckets = new Map();
+function rateLimit(name, max, windowMs) {
+  return function (req, res, next) {
+    const key = name + ":" + (req.ip || (req.socket && req.socket.remoteAddress) || "unknown");
+    const now = Date.now();
+    const hits = (rateBuckets.get(key) || []).filter(t => now - t < windowMs);
+    if (hits.length >= max) {
+      res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
+      return res.status(429).json({ error: "Too many requests. Please wait a minute and try again." });
+    }
+    hits.push(now);
+    rateBuckets.set(key, hits);
+    if (rateBuckets.size > 5000) {
+      for (const [k, v] of rateBuckets) {
+        if (!v.length || now - v[v.length - 1] > windowMs) rateBuckets.delete(k);
+      }
+    }
+    next();
+  };
+}
 function appUrl(req) {
   const env = (process.env.APP_URL || "").replace(/\/$/, "");
   if (env) return env;
@@ -44,11 +103,35 @@ const instCache = new Map();
 const statusCache = { at: 0, body: null };
 const treeCache = new Map();
 
-// Cheap-slice input validation: valid requests behave exactly as before;
-// malformed bodies get 400 instead of polluting the stores.
-function isText(v, max = 200) { return typeof v === "string" && v.trim().length > 0 && v.length <= max; }
 function bad(res, msg) { return res.status(400).json({ error: msg }); }
-function isEmail(v) { return typeof v === "string" && v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+// Optional service-role client. Admin routes use it when configured; otherwise
+// they fall back to the verified admin's own JWT and the database admin policies.
+let serviceClient = null;
+function adminDb() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  if (!serviceClient) {
+    serviceClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  }
+  return serviceClient;
+}
+function missingRelation(error) {
+  const code = String((error && error.code) || "");
+  const message = String((error && error.message) || "");
+  return code === "PGRST205" || code === "42P01" ||
+    /could not find the table|relation .* does not exist|does not exist/i.test(message);
+}
+// Read from the privacy-safe view when it exists; fall back to profiles before
+// the security migration has been applied so deployments stay backward-compatible.
+async function profilesFrom(client, build) {
+  let result = await build(client.from("visible_profiles"));
+  if (result && result.error && missingRelation(result.error)) {
+    result = await build(client.from("profiles"));
+  }
+  return result;
+}
 
 // Serve the homepage from the same service (repo-root index.html).
 // Only this file is exposed — backend/.env and other files are never served.
@@ -66,7 +149,7 @@ app.get("/admin", (req, res) => {
 // Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
 app.get(["/schools", "/schools/:id"], sendHome);
 // Feature pages (client-side router in index.html; same shell, no new backend logic).
-app.get(["/institutions", "/connections", "/ai-honesty", "/about", "/messages"], sendHome);
+app.get(["/institutions", "/connections", "/ai-honesty", "/about", "/messages", "/scholarships", "/profile"], sendHome);
 app.get("/chat/:id", sendHome);
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
@@ -227,14 +310,31 @@ function dbErr(res, error) {
   res.status(auth ? 401 : 500).json({ error: (error && error.message) || "Database error" });
 }
 function adminEmails() { return (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean); }
+// Admin access is either the legacy env allowlist or a seeded user_roles row.
+// The role lookup uses the user's own JWT ("read own roles" RLS policy), so it
+// works before/without a service-role key.
+async function dbAdminRole(auth) {
+  try {
+    const { data, error } = await auth.me.from("user_roles").select("role").eq("user_id", auth.user.id);
+    if (error) return null;
+    const roles = (data || []).map(r => r.role);
+    return roles.find(r => ["super_admin", "content_admin", "moderator"].includes(r)) || null;
+  } catch (e) {
+    return null;
+  }
+}
+async function isAdminUser(auth) {
+  if (adminEmails().includes((auth.user.email || "").toLowerCase())) return true;
+  return !!(await dbAdminRole(auth));
+}
 async function requireAdmin(req, res) {
   const auth = await verifiedUser(req).catch(() => null);
   if (!auth) { res.status(401).json({ error: "Missing or invalid Authorization Bearer token" }); return null; }
-  if (!adminEmails().includes((auth.user.email || "").toLowerCase())) { res.status(403).json({ error: "Admin only" }); return null; }
+  if (!(await isAdminUser(auth))) { res.status(403).json({ error: "Admin only" }); return null; }
   return auth;
 }
 
-app.post("/api/auth/signup", async (req, res) => {
+app.post("/api/auth/signup", rateLimit("signup", 10, 60 * 1000), async (req, res) => {
   const { name, email, password, type, school, visibility, consent } = req.body || {};
   if (!isText(name, 100)) return bad(res, "name is required (text, max 100 chars)");
   if (!isEmail(email)) return bad(res, "email is invalid");
@@ -255,7 +355,7 @@ app.post("/api/auth/signup", async (req, res) => {
   res.json({ user: data.user, session: data.session });
 });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", rateLimit("login", 20, 60 * 1000), async (req, res) => {
   const { email, password } = req.body || {};
   if (!isEmail(email) || typeof password !== "string" || !password) return bad(res, "email and password are required");
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
@@ -273,7 +373,7 @@ app.post("/api/auth/refresh", async (req, res) => {
   res.json({ user: data.user, session: data.session });
 });
 
-app.post("/api/auth/resend", async (req, res) => {
+app.post("/api/auth/resend", rateLimit("resend", 5, 60 * 1000), async (req, res) => {
   const { email } = req.body || {};
   if (!isEmail(email)) return bad(res, "email is invalid");
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
@@ -282,7 +382,7 @@ app.post("/api/auth/resend", async (req, res) => {
   res.json({ ok: true, message: "Confirmation email re-sent if the account exists." });
 });
 
-app.post("/api/auth/forgot", async (req, res) => {
+app.post("/api/auth/forgot", rateLimit("forgot", 5, 60 * 1000), async (req, res) => {
   const { email } = req.body || {};
   if (!isEmail(email)) return bad(res, "email is invalid");
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
@@ -291,7 +391,7 @@ app.post("/api/auth/forgot", async (req, res) => {
   res.json({ ok: true, message: "If that email is registered, a reset link is on its way." });
 });
 
-app.post("/api/auth/recover", async (req, res) => {
+app.post("/api/auth/recover", rateLimit("recover", 20, 60 * 1000), async (req, res) => {
   const { code } = req.body || {};
   if (typeof code !== "string" || !code) return bad(res, "code is required");
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
@@ -300,7 +400,7 @@ app.post("/api/auth/recover", async (req, res) => {
   res.json({ user: data.user, session: data.session });
 });
 
-app.put("/api/auth/password", async (req, res) => {
+app.put("/api/auth/password", rateLimit("password", 20, 60 * 1000), async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
   const { password } = req.body || {};
@@ -308,6 +408,14 @@ app.put("/api/auth/password", async (req, res) => {
   const { data, error } = await auth.me.auth.updateUser({ password });
   if (error) return res.status(400).json({ error: error.message });
   res.json({ ok: true, user: data.user });
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (auth) {
+    try { await auth.me.auth.signOut(); } catch (e) { /* session may already be gone */ }
+  }
+  res.json({ ok: true });
 });
 
 app.post("/api/profile/complete", async (req, res) => {
@@ -360,7 +468,7 @@ app.put("/api/profile", async (req, res) => {
   res.json(data);
 });
 
-app.post("/api/profile/photo", photoUpload, async (req, res) => {
+app.post("/api/profile/photo", rateLimit("photo", 20, 60 * 1000), photoUpload, async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
   if (!req.file) return bad(res, "photo file is required");
@@ -385,13 +493,14 @@ app.use((err, req, res, next) => {
 app.get("/api/students", async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
-  const { data, error } = await auth.me.from("profiles")
-    .select("id,name,user_type,school,dept,session,photo_url").neq("visibility", "private").neq("id", auth.user.id).limit(50);
+  const { data, error } = await profilesFrom(auth.me, q => q
+    .select("id,name,user_type,school,dept,session,photo_url")
+    .neq("visibility", "private").neq("id", auth.user.id).limit(50));
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.post("/api/connections/request", async (req, res) => {
+app.post("/api/connections/request", rateLimit("connect", 60, 60 * 1000), async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
   const toId = req.body && req.body.toId;
@@ -415,7 +524,7 @@ app.get("/api/connections/mine", async (req, res) => {
   const ids = [...new Set((data || []).flatMap(c => [c.requester_id, c.addressee_id]).filter(id => id !== auth.user.id))];
   let names = {};
   if (ids.length) {
-    const { data: profs } = await auth.me.from("profiles").select("id,name,school,photo_url").in("id", ids);
+    const { data: profs } = await profilesFrom(auth.me, q => q.select("id,name,school,photo_url").in("id", ids));
     (profs || []).forEach(p => { names[p.id] = p; });
   }
   res.json((data || []).map(c => ({ ...c, other: names[c.requester_id === auth.user.id ? c.addressee_id : c.requester_id] || null })));
@@ -471,7 +580,7 @@ async function threadOther(client, uid, convoId) {
   if (error || !data) return null;
   const other = (data.map(p => p.user_id).filter(id => id !== uid))[0] || null;
   if (!other) return null;
-  const { data: prof } = await client.from("profiles").select("id,name,photo_url,school").eq("id", other).single();
+  const { data: prof } = await profilesFrom(client, q => q.select("id,name,photo_url,school").eq("id", other).single());
   return prof || { id: other, name: "Student" };
 }
 async function requireThread(req, res) {
@@ -539,7 +648,7 @@ app.get("/api/conversations", async (req, res) => {
   });
   const otherIds = [...new Set(Object.values(otherByConvo))];
   const profQ = otherIds.length
-    ? auth.me.from("profiles").select("id,name,photo_url,school").in("id", otherIds)
+    ? profilesFrom(auth.me, q => q.select("id,name,photo_url,school").in("id", otherIds))
     : Promise.resolve({ data: [], error: null });
   const [pr, un, lasts] = await Promise.all([
     profQ,
@@ -585,7 +694,7 @@ app.get("/api/conversations/:id/messages", async (req, res) => {
   // The other participant's profile and the messages are independent —
   // fetch them together (requireThread already gave us the other id).
   const profQ = t.otherId
-    ? t.me.from("profiles").select("id,name,photo_url,school").eq("id", t.otherId).single()
+    ? profilesFrom(t.me, q => q.select("id,name,photo_url,school").eq("id", t.otherId).single())
     : Promise.resolve({ data: null, error: null });
   const [mr, pr] = await Promise.all([q, profQ]);
   if (mr.error) return dbErr(res, mr.error);
@@ -848,7 +957,7 @@ app.post("/api/fido/ask", async (req, res) => {
   return res.json(ai("I can guide you step by step on: next steps after admission, JAMB CAPS and subject combinations, cut-off marks, Direct Entry, clearance documents, course registration, fees, accommodation, scholarships, finding courses, orientation, resumption prep, campus safety, NYSC, and study tips" + where + ". Try: 'I just got admitted — what next?' or 'What subjects do I need for Medicine?'"));
 });
 app.get("/api/mentors", (req, res) => res.json(db.mentors));
-app.post("/api/reports", async (req, res) => {
+app.post("/api/reports", rateLimit("report", 30, 60 * 1000), async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Log in to report" });
   if (!req.body || !isText(req.body.target, 200) || !isText(req.body.reason, 500)) return bad(res, "target and reason are required");
@@ -860,17 +969,25 @@ app.post("/api/reports", async (req, res) => {
 });
 
 app.get("/api/admin/me", async (req, res) => {
-  const auth = await authedUser(req).catch(() => null);
+  // Verify the token with Supabase Auth; never trust an unverified JWT payload.
+  const auth = await verifiedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
-  res.json({ isAdmin: adminEmails().includes((auth.user.email || "").toLowerCase()), email: auth.user.email });
+  const email = auth.user.email || null;
+  const role = await dbAdminRole(auth);
+  res.json({
+    isAdmin: adminEmails().includes((email || "").toLowerCase()) || !!role,
+    email,
+    role: role || (adminEmails().includes((email || "").toLowerCase()) ? "env_admin" : null)
+  });
 });
 
 app.get("/api/admin/stats", async (req, res) => {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
+  const db = adminDb() || auth.me;
   async function count(table, client) {
     try {
-      const r = await (client || auth.me).from(table).select("id", { count: "exact", head: true });
+      const r = await (client || db).from(table).select("id", { count: "exact", head: true });
       if (r.error) return { status: "pending", detail: String(r.error.message || r.error).slice(0, 120) };
       return { status: "ok", count: r.count };
     } catch (e) { return { status: "pending", detail: String((e && e.message) || e).slice(0, 120) }; }
@@ -880,12 +997,12 @@ app.get("/api/admin/stats", async (req, res) => {
   const [users, posts, institutions] = await Promise.all([count("profiles"), count("posts"), count("institutions", supabase)]);
   let recentUsers = [];
   if (users.status === "ok") {
-    const r = await auth.me.from("profiles").select("name,email,school,visibility,created_at").order("created_at", { ascending: false }).limit(20);
+    const r = await db.from("profiles").select("name,email,school,visibility,created_at").order("created_at", { ascending: false }).limit(20);
     if (!r.error) recentUsers = r.data || [];
   }
   let recentPosts = [];
   if (posts.status === "ok") {
-    const r = await auth.me.from("posts").select("author_name,school,text,created_at").order("created_at", { ascending: false }).limit(20);
+    const r = await db.from("posts").select("author_name,school,text,created_at").order("created_at", { ascending: false }).limit(20);
     if (!r.error) recentPosts = r.data || [];
   }
   res.json({
@@ -895,10 +1012,253 @@ app.get("/api/admin/stats", async (req, res) => {
   });
 });
 
+// ---- Phase 1: Scholarships (official links only; no invented awards) ----
+const SCHOLARSHIP_PUBLIC_FIELDS = "id,slug,title,organisation,country,academic_level,funding_type,description,eligibility,required_documents,deadline,official_url,verified,published_at,created_at,updated_at";
+const SCHOLARSHIP_ADMIN_FIELDS = SCHOLARSHIP_PUBLIC_FIELDS + ",status,created_by,verified_at,verified_by";
+
+function scholarshipInput(body, partial) {
+  const src = body || {};
+  const out = {};
+  const required = {
+    title: [3, 200], organisation: [2, 160], country: [2, 80],
+    academic_level: [2, 80], funding_type: [2, 80]
+  };
+  if (!partial) {
+    for (const [field, [min, max]] of Object.entries(required)) {
+      if (!isText(src[field], max) || src[field].trim().length < min) {
+        return { error: field + " is required (text, " + min + "–" + max + " chars)" };
+      }
+    }
+    if (!isHttpUrl(src.official_url)) return { error: "official_url must be a valid http(s) URL" };
+  }
+  for (const [field, [min, max]] of Object.entries(required)) {
+    if (src[field] === undefined) continue;
+    if (typeof src[field] !== "string" || src[field].trim().length < min || src[field].length > max) {
+      return { error: field + " is invalid (text, " + min + "–" + max + " chars)" };
+    }
+    out[field] = src[field].trim();
+  }
+  for (const [field, max] of Object.entries({ description: 5000, eligibility: 5000, required_documents: 5000 })) {
+    if (src[field] === undefined) continue;
+    if (typeof src[field] !== "string" || src[field].length > max) return { error: field + " is invalid (text, max " + max + " chars)" };
+    out[field] = src[field].trim();
+  }
+  if (src.official_url !== undefined) {
+    if (!isHttpUrl(src.official_url)) return { error: "official_url must be a valid http(s) URL" };
+    out.official_url = src.official_url.trim();
+  }
+  if (src.deadline !== undefined) {
+    if (src.deadline === null || src.deadline === "") out.deadline = null;
+    else if (!isIsoDate(src.deadline)) return { error: "deadline must be YYYY-MM-DD" };
+    else out.deadline = src.deadline;
+  }
+  if (src.status !== undefined) {
+    if (!["draft", "published", "archived"].includes(src.status)) return { error: "status must be draft, published, or archived" };
+    out.status = src.status;
+  }
+  if (src.verified !== undefined) {
+    if (typeof src.verified !== "boolean") return { error: "verified must be true or false" };
+    out.verified = src.verified;
+  }
+  return { patch: out };
+}
+
+function scholarshipDbError(res, error) {
+  if (missingRelation(error)) {
+    return res.status(503).json({
+      error: "Scholarships are not set up yet. Run backend/migrations/20261114_phase1_scholarships.sql in the Supabase SQL Editor.",
+      setupRequired: true
+    });
+  }
+  if (error && (error.code === "42501" || error.code === "PGRST301")) {
+    return res.status(403).json({ error: "Admin content permission denied. Run the security migration and seed an admin role, or set SUPABASE_SERVICE_ROLE_KEY." });
+  }
+  return res.status(500).json({ error: (error && error.message) || "Database error" });
+}
+
+async function auditAdmin(auth, action, target, details) {
+  const db = adminDb() || auth.me;
+  try {
+    await db.from("admin_audit_log").insert({
+      actor_id: auth.user.id, actor_email: auth.user.email || null,
+      action, target: target || null, details: details || null
+    });
+  } catch (e) { /* audit is best-effort until its migration is applied */ }
+}
+
+app.get("/api/scholarships", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const limit = parsePositiveInt(req.query.limit, 20, 50);
+  let offset = Number(req.query.offset);
+  if (!Number.isInteger(offset) || offset < 0) offset = 0;
+  if (offset > 5000) offset = 5000;
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let query = supabase.from("scholarships").select(SCHOLARSHIP_PUBLIC_FIELDS, { count: "exact" })
+    .eq("status", "published");
+  if (q) query = query.or("title.ilike.%" + q + "%,organisation.ilike.%" + q + "%,country.ilike.%" + q + "%");
+  if (isText(req.query.country, 80)) query = query.eq("country", req.query.country.trim());
+  if (isText(req.query.level, 80)) query = query.eq("academic_level", req.query.level.trim());
+  if (isText(req.query.funding, 80)) query = query.eq("funding_type", req.query.funding.trim());
+  if (req.query.verified === "true") query = query.eq("verified", true);
+  const { data, error, count } = await query
+    .order("deadline", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) {
+    if (missingRelation(error)) return res.json({ scholarships: [], total: 0, limit, offset, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ scholarships: data || [], total: count || 0, limit, offset, setupRequired: false });
+});
+
+app.get("/api/scholarships/bookmarks/mine", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("scholarship_bookmarks")
+    .select("scholarship_id,created_at,scholarships(" + SCHOLARSHIP_PUBLIC_FIELDS + ")")
+    .eq("user_id", auth.user.id).order("created_at", { ascending: false });
+  if (error) {
+    if (missingRelation(error)) return res.json({ bookmarks: [], setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ bookmarks: data || [], setupRequired: false });
+});
+
+app.post("/api/scholarships/:id/bookmark", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const { error } = await auth.me.from("scholarship_bookmarks").insert({ user_id: auth.user.id, scholarship_id: id });
+  if (error) {
+    if (error.code === "23505") return res.json({ ok: true, bookmarked: true });
+    return scholarshipDbError(res, error);
+  }
+  res.json({ ok: true, bookmarked: true });
+});
+
+app.delete("/api/scholarships/:id/bookmark", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const { error } = await auth.me.from("scholarship_bookmarks")
+    .delete().eq("user_id", auth.user.id).eq("scholarship_id", id);
+  if (error) return scholarshipDbError(res, error);
+  res.json({ ok: true, bookmarked: false });
+});
+
+app.get("/api/scholarships/:idOrSlug", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const key = String(req.params.idOrSlug || "");
+  let query = supabase.from("scholarships").select(SCHOLARSHIP_PUBLIC_FIELDS).eq("status", "published");
+  query = /^\d+$/.test(key) ? query.eq("id", Number(key)) : query.eq("slug", key);
+  const { data, error } = await query.single();
+  if (error) {
+    if (missingRelation(error)) return res.status(503).json({ error: "Scholarships are not set up yet.", setupRequired: true });
+    if (error.code === "PGRST116") return res.status(404).json({ error: "Scholarship not found" });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json(data);
+});
+
+app.get("/api/admin/scholarships", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const status = String(req.query.status || "");
+  let query = db.from("scholarships").select(SCHOLARSHIP_ADMIN_FIELDS, { count: "exact" });
+  if (["draft", "published", "archived"].includes(status)) query = query.eq("status", status);
+  if (isText(req.query.q, 80)) {
+    const q = req.query.q.trim().replace(/[%,()]/g, " ");
+    query = query.or("title.ilike.%" + q + "%,organisation.ilike.%" + q + "%");
+  }
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).limit(100);
+  if (error) return scholarshipDbError(res, error);
+  res.json({ scholarships: data || [], total: count || 0 });
+});
+
+app.post("/api/admin/scholarships", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const parsed = scholarshipInput(req.body, false);
+  if (parsed.error) return bad(res, parsed.error);
+  const db = adminDb() || auth.me;
+  const now = new Date().toISOString();
+  const row = {
+    ...parsed.patch,
+    slug: uniqueSlug(parsed.patch.title),
+    status: parsed.patch.status || "draft",
+    verified: parsed.patch.verified === true,
+    created_by: auth.user.id
+  };
+  if (row.status === "published") row.published_at = now;
+  if (row.verified) { row.verified_at = now; row.verified_by = auth.user.id; }
+  const { data, error } = await db.from("scholarships").insert(row).select(SCHOLARSHIP_ADMIN_FIELDS).single();
+  if (error) return scholarshipDbError(res, error);
+  await auditAdmin(auth, "scholarship.create", String(data.id), { title: data.title, status: data.status });
+  res.status(201).json(data);
+});
+
+app.patch("/api/admin/scholarships/:id", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const parsed = scholarshipInput(req.body, true);
+  if (parsed.error) return bad(res, parsed.error);
+  if (!Object.keys(parsed.patch).length) return bad(res, "nothing to update");
+  const db = adminDb() || auth.me;
+  const { data: existing, error: findError } = await db.from("scholarships")
+    .select("id,status,published_at,verified").eq("id", id).single();
+  if (findError) {
+    if (findError.code === "PGRST116") return res.status(404).json({ error: "Scholarship not found" });
+    return scholarshipDbError(res, findError);
+  }
+  const patch = { ...parsed.patch };
+  const now = new Date().toISOString();
+  if (patch.status === "published" && !existing.published_at) patch.published_at = now;
+  if (patch.verified === true && !existing.verified) { patch.verified_at = now; patch.verified_by = auth.user.id; }
+  if (patch.verified === false && existing.verified) { patch.verified_at = null; patch.verified_by = null; }
+  const { data, error } = await db.from("scholarships").update(patch).eq("id", id).select(SCHOLARSHIP_ADMIN_FIELDS).single();
+  if (error) return scholarshipDbError(res, error);
+  await auditAdmin(auth, "scholarship.update", String(id), patch);
+  res.json(data);
+});
+
+app.delete("/api/admin/scholarships/:id", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const db = adminDb() || auth.me;
+  const { data, error } = await db.from("scholarships").update({ status: "archived" })
+    .eq("id", id).select(SCHOLARSHIP_ADMIN_FIELDS).single();
+  if (error) {
+    if (error.code === "PGRST116") return res.status(404).json({ error: "Scholarship not found" });
+    return scholarshipDbError(res, error);
+  }
+  await auditAdmin(auth, "scholarship.archive", String(id), { title: data.title });
+  res.json(data);
+});
+
+// JSON 404 for unknown API routes, then a final error handler so async
+// rejections never leak stack traces to clients.
+app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
+app.use((err, req, res, next) => {
+  if (err && err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "photo must be under 4MB" });
+  if (res.headersSent) return next(err);
+  const status = err && (err.status || err.statusCode) || 500;
+  if (status >= 500) console.error("Unhandled API error:", (err && err.message) || err);
+  res.status(status).json({ error: status >= 500 ? "Something went wrong. Please try again." : ((err && err.message) || "Request failed") });
+});
+
 const PORT = process.env.PORT || 3000;
 // Render/local run a long-lived process; Vercel imports this module as a
 // serverless handler and must not call listen().
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`Fidonect API stub on :${PORT}`));
+  app.listen(PORT, () => console.log(`Fidonect API listening on :${PORT}`));
 }
 module.exports = app;

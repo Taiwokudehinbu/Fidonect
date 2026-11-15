@@ -28,10 +28,13 @@ drop policy if exists "insert own profile" on profiles;
 create policy "insert own profile" on profiles
   for insert to authenticated with check (auth.uid() = id);
 
--- 4/5: any logged-in user can read profiles (needed for discovery; tighten later)
+-- 4/5: own profile only. Discovery uses the privacy-safe `visible_profiles`
+-- view created by migrations/20261114_phase0_security.sql; do not re-open
+-- this table to every authenticated user (it exposes emails).
 drop policy if exists "read profiles" on profiles;
-create policy "read profiles" on profiles
-  for select to authenticated using (true);
+drop policy if exists "read own profile" on profiles;
+create policy "read own profile" on profiles
+  for select to authenticated using (auth.uid() = id);
 
 -- 5/5: update own profile only
 drop policy if exists "update own profile" on profiles;
