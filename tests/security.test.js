@@ -42,3 +42,11 @@ test("server does not use a wildcard CORS policy", () => {
   assert.match(server, /originAllowed/);
   assert.match(server, /OFFICIAL_ORIGINS/);
 });
+
+test("package manifests are valid JSON without a byte-order mark", () => {
+  for (const file of ["package.json", "backend/package.json"]) {
+    const bytes = fs.readFileSync(path.join(root, file));
+    assert.notDeepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf], file + " must not start with a BOM");
+    assert.doesNotThrow(() => JSON.parse(bytes.toString("utf8")), file + " must be valid JSON");
+  }
+});
