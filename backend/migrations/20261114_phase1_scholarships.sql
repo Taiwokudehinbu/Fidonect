@@ -65,6 +65,7 @@ alter table public.scholarships enable row level security;
 alter table public.scholarship_bookmarks enable row level security;
 
 grant select on public.scholarships to anon, authenticated;
+revoke insert, update, delete on public.scholarships from anon;
 grant select, insert, delete on public.scholarship_bookmarks to authenticated;
 revoke all on public.scholarship_bookmarks from anon;
 

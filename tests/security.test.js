@@ -35,6 +35,7 @@ test("scholarship migration is additive and public reads are limited to publishe
   assert.match(scholarshipSql, /create table if not exists public\.scholarship_bookmarks/);
   assert.match(scholarshipSql, /status = 'published'/);
   assert.match(scholarshipSql, /enable row level security/);
+  assert.match(scholarshipSql, /revoke insert, update, delete on public\.scholarships from anon/);
   assert.doesNotMatch(scholarshipSql, /drop table/i);
   assert.doesNotMatch(scholarshipSql, /delete from/i);
 });
