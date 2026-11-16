@@ -67,6 +67,13 @@ select * from public.visible_profiles limit 1;
 select has_table_privilege('authenticated', 'public.participants', 'INSERT') as participants_insert;
 select has_table_privilege('authenticated', 'public.conversations', 'INSERT') as conversations_insert;
 
+-- no avatar write policy should allow a bare bucket match; every write policy
+-- must include the storage.foldername(name) = auth.uid() check
+select policyname, cmd, with_check from pg_policies
+where schemaname = 'storage' and tablename = 'objects'
+  and policyname ilike '%avatar%'
+order by policyname, cmd;
+
 -- scholarships should exist and be empty until an admin adds verified content
 select count(*) from public.scholarships;
 ```
