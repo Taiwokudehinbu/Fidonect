@@ -38,6 +38,16 @@ $$;
 revoke execute on function public.has_role(text) from public;
 grant execute on function public.has_role(text) to authenticated, service_role;
 
+-- Messaging helpers are for signed-in users only. open_conversation already
+-- rejects a null auth.uid(), but least-privilege grants make that explicit.
+revoke execute on function public.is_participant(bigint) from public;
+revoke execute on function public.is_participant(bigint) from anon;
+grant execute on function public.is_participant(bigint) to authenticated, service_role;
+
+revoke execute on function public.open_conversation(uuid) from public;
+revoke execute on function public.open_conversation(uuid) from anon;
+grant execute on function public.open_conversation(uuid) to authenticated;
+
 drop policy if exists "read own roles" on public.user_roles;
 create policy "read own roles" on public.user_roles
   for select to authenticated using (user_id = auth.uid());

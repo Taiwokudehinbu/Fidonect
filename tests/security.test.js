@@ -28,6 +28,8 @@ test("the broad profile read policy is removed by the security migration", () =>
   assert.match(securitySql, /storage\.foldername\(name\)/);
   assert.match(securitySql, /upload own avatars %/);
   assert.match(securitySql, /drop policy if exists %I on storage\.objects/);
+  assert.match(securitySql, /revoke execute on function public\.open_conversation\(uuid\) from anon/);
+  assert.match(securitySql, /revoke execute on function public\.is_participant\(bigint\) from anon/);
 });
 
 test("scholarship migration is additive and public reads are limited to published rows", () => {
