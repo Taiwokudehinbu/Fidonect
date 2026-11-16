@@ -163,6 +163,28 @@ create policy "read thread participants" on public.participants
 drop policy if exists "upload own avatars" on storage.objects;
 drop policy if exists "update own avatars" on storage.objects;
 drop policy if exists "delete own avatars" on storage.objects;
+
+-- Older dashboard-created policies can have a generated suffix (for example
+-- "upload own avatars 1oj01fe_0") and may allow any authenticated user to
+-- upload into any avatar folder. Remove those suffixed duplicates while keeping
+-- the safe policies created below.
+do $$
+declare pol record;
+begin
+  for pol in
+    select policyname from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and cmd in ('INSERT', 'UPDATE', 'DELETE')
+      and (
+        policyname like 'upload own avatars %' or
+        policyname like 'update own avatars %' or
+        policyname like 'delete own avatars %'
+      )
+  loop
+    execute format('drop policy if exists %I on storage.objects', pol.policyname);
+  end loop;
+end $$;
+
 create policy "upload own avatars" on storage.objects
   for insert to authenticated with check (
     bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text

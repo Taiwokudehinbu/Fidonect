@@ -26,6 +26,8 @@ test("the broad profile read policy is removed by the security migration", () =>
   assert.match(securitySql, /visible_profiles/);
   assert.match(securitySql, /revoke insert on public\.participants from authenticated/);
   assert.match(securitySql, /storage\.foldername\(name\)/);
+  assert.match(securitySql, /upload own avatars %/);
+  assert.match(securitySql, /drop policy if exists %I on storage\.objects/);
 });
 
 test("scholarship migration is additive and public reads are limited to published rows", () => {
