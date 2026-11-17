@@ -22,9 +22,10 @@ delete the Vercel project; Supabase data is untouched.
 | Required env vars | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
 | Optional env vars | `ADMIN_EMAILS`, `APP_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS` |
 
-The Phase 0.1 security migration and Phase 1 scholarship schema are **additive
-SQL migrations**. Existing auth, profiles, connections, messages, institutions,
-and photo upload continue to work before and after they are applied.
+The Phase 0.1 security, Phase 1 scholarship, and Phase 2 mentorship/hub/Fido
+schemas are **additive SQL migrations**. Existing auth, profiles, connections,
+messages, institutions, and photo upload continue to work before and after they
+are applied. Phase 2 content stays empty or unverified until an admin reviews it.
 
 ---
 
@@ -33,11 +34,11 @@ and photo upload continue to work before and after they are applied.
 | File | Purpose |
 |---|---|
 | `api/index.js` | Serverless entry: `module.exports = require("../backend/server.js")` |
-| `backend/server.js` | Express API, static app shell, scholarship/admin routes |
+| `backend/server.js` | Express API, static app shell, scholarship/mentor/hub/admin routes |
 | `backend/lib/validation.js` | Query/body validation shared with tests |
-| `backend/public/admin.html` | Protected admin dashboard (overview + scholarships) |
+| `backend/public/admin.html` | Protected admin dashboard (overview, scholarships, mentors, institution info) |
 | `backend/public/sw.js` | Service worker (`fidonect-v13`) |
-| `index.html` | Web app shell, navigation, profile, scholarships UI |
+| `index.html` | Web app shell, navigation, profile, scholarships, mentors, Fido UI |
 | `package.json` (root) | Vercel dependency manifest |
 | `vercel.json` | One function, all routes, includes app shell/public files |
 | `.vercelignore` | Keeps Android/APK/backups/prisma/seed out of the upload |
@@ -73,23 +74,26 @@ otherwise the verified admin JWT plus database RLS.
 CORS is an explicit allowlist. Arbitrary `*.vercel.app` origins are not trusted;
 add preview origins through `CORS_ORIGINS` if needed.
 
-### Phase 1 database migrations (required once)
+### Phase 1 / Phase 2 database migrations (required once)
 
-Scholarships and the security hardening need SQL applied in Supabase. Follow
-`backend/migrations/README.md`:
+Scholarships, mentors, verified institution info, Fido feedback, and the security
+hardening need SQL applied in Supabase. Follow `backend/migrations/README.md`:
 
 1. Take a verified backup first (`node scripts/backup-supabase.mjs` after
    setting `SUPABASE_SERVICE_ROLE_KEY` locally, or use a dashboard backup).
 2. Run `backend/migrations/20261114_phase0_security.sql`.
 3. Run `backend/migrations/20261114_phase1_scholarships.sql`.
-4. Seed the first admin with `20261114_seed_admin_role.example.sql`.
-5. Verify login, photo upload, connections, messages, admin access, and all
+4. Run `backend/migrations/20261116_phase2_mentorship_hubs_fido.sql`.
+5. Seed the first admin with `20261114_seed_admin_role.example.sql`.
+6. Verify login, photo upload, connections, messages, admin access, mentor
+   apply/verify/request, hub verified/community labels, Fido feedback, and all
    **588 institutions**.
-6. Redeploy only if you changed environment variables.
+7. Redeploy only if you changed environment variables.
 
-Until these migrations are applied, `/scholarships` shows an honest empty setup
-state and admin scholarship writes return a setup message. Existing features
-keep working because the API falls back to the old profile table.
+Until these migrations are applied, `/scholarships` and `/mentors` show honest
+empty setup states, admin writes return a setup message, and Fido falls back to
+AI-labelled guidance. Existing features keep working because the API falls back
+to the old profile and hub columns where needed.
 
 ---
 
@@ -125,17 +129,21 @@ $i = Invoke-RestMethod "$base/api/institutions"; $i.Count
 Invoke-WebRequest "$base/" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/messages" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/scholarships" -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest "$base/mentors" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/profile" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/admin" -UseBasicParsing | Select-Object StatusCode
+Invoke-RestMethod "$base/api/mentors"
 npm run smoke
 ```
 
 Then in the app: register → login → connections → Message → send/reply →
 unread badge → profile photo upload → scholarships setup state (before
-migrations) or filters/bookmarks (after migrations) → admin login → institution
-search/pagination.
+migrations) or filters/bookmarks (after migrations) → mentor application →
+admin verify → mentor request → accept → Message → admin hub verification
+and Fido feedback → admin login → institution search/pagination.
 
-Expected: **588 institutions**, unchanged data, and no console errors.
+Expected: **588 institutions**, unchanged existing data, honest empty Phase 2
+states until admins add content, and no console errors.
 
 ---
 

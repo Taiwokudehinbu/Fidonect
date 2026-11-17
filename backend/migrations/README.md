@@ -22,7 +22,14 @@ drop tables, reseed institutions, or change the official production URL.
    - creates `scholarships` and `scholarship_bookmarks`
    - adds RLS, indexes, updated-at trigger
    - grants public read only to published rows
-4. Seed the first admin role using `20261114_seed_admin_role.example.sql`
+4. `20261116_phase2_mentorship_hubs_fido.sql`
+   - creates `mentor_profiles`, `mentor_requests`, `fido_feedback`
+   - creates the filtered public `mentor_directory` view
+   - adds richer, source-attributed and verifiable `hub_pages` columns
+   - extends `open_conversation()` so an accepted mentorship request also
+     unlocks private messaging
+   - keeps all mentor/hub content empty or unverified until an admin acts
+5. Seed the first admin role using `20261114_seed_admin_role.example.sql`
    (copy it, replace the placeholder email, run it once).
 
 ## Backup runbook
@@ -76,12 +83,34 @@ order by policyname, cmd;
 
 -- scholarships should exist and be empty until an admin adds verified content
 select count(*) from public.scholarships;
+
+-- Phase 2 tables start empty; existing hub rows must start unverified
+select count(*) from public.mentor_profiles;
+select count(*) from public.mentor_requests;
+select count(*) from public.fido_feedback;
+select count(*) from public.hub_pages where verified;
+
+-- public mentor view must expose no email or private evidence
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'mentor_directory'
+order by ordinal_position;
+
+-- Phase 2 policies should exist on all four surfaces
+select tablename, policyname, cmd from pg_policies
+where schemaname = 'public'
+  and tablename in ('mentor_profiles', 'mentor_requests', 'hub_pages', 'fido_feedback')
+order by tablename, policyname;
 ```
 
 Then:
-- Log in as the seeded admin and open `/admin` to manage scholarships.
-- Open `/scholarships` and confirm the empty state (not a crash) before adding content.
-- Verify login, profile photo upload, connections, messages, and the 588-institution directory still work.
+- Log in as the seeded admin and open `/admin` to manage scholarships, mentor
+  verification, institution information, and Fido feedback.
+- Open `/scholarships` and `/mentors` and confirm honest empty states before
+  adding content.
+- Verify login, profile photo upload, connections, messages, mentor request
+  acceptance/messaging, and the 588-institution directory still work.
+- Confirm Fido labels hub content `Community` until an admin marks that hub
+  verified, and that sources appear when an official URL exists.
 
 ## Rollback
 
@@ -95,3 +124,5 @@ you investigate**, then remove it again:
 ```
 
 Do not drop the new tables/columns to roll back; they are additive and harmless.
+To hide Phase 2 mentor listings without losing applications, set
+`mentor_profiles.status = 'paused'` (or `listed = false`) instead of deleting rows.

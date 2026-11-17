@@ -56,12 +56,15 @@ textarea{min-height:90px;resize:vertical}
 <div class="tabs" role="tablist">
 <button class="tab active" data-tab="overview" type="button">Overview</button>
 <button class="tab" data-tab="scholarships" type="button">Scholarships</button>
+<button class="tab" data-tab="mentors" type="button">Mentors</button>
+<button class="tab" data-tab="hubs" type="button">Institution info</button>
 </div>
 
 <div id="overviewPanel" class="panel active">
 <div class="grid" id="aStats"></div>
 <div id="aUsers"></div>
 <div id="aPosts"></div>
+<div id="aFeedback"></div>
 <p class="muted small" id="aNote"></p>
 </div>
 
@@ -93,6 +96,41 @@ textarea{min-height:90px;resize:vertical}
 <h3>All scholarships</h3>
 <div id="aScholarshipList"><p class="muted">Loading…</p></div>
 </div>
+
+<div id="mentorsPanel" class="panel">
+<div class="ok" style="display:none" id="aMentorOk"></div>
+<div class="deny" style="display:none" id="aMentorDeny"></div>
+<h3>Mentor applications</h3>
+<p class="muted small">Verify only after checking the applicant's evidence. A verified badge is never granted automatically. Public mentor listings never show email or private evidence.</p>
+<div id="aMentorList"><p class="muted">Loading…</p></div>
+</div>
+
+<div id="hubsPanel" class="panel">
+<div class="ok" style="display:none" id="aHubOk"></div>
+<div class="deny" style="display:none" id="aHubDeny"></div>
+<h3 id="aHubFormTitle">Edit institution information</h3>
+<p class="muted small">Provide a source and only tick “verified” after checking it. Existing community content stays labelled unverified until then.</p>
+<div class="form-grid">
+<select id="aHubInstitution" class="input"><option value="">Choose an institution…</option></select>
+<input id="aHubSource" class="input" maxlength="120" placeholder="Source label * e.g. Official school portal" />
+<input id="aHubSourceUrl" class="input" maxlength="2048" placeholder="Source https:// URL (optional)" />
+</div>
+<textarea id="aHubOverview" maxlength="5000" placeholder="Overview"></textarea>
+<textarea id="aHubAdmission" maxlength="5000" placeholder="Admission information"></textarea>
+<textarea id="aHubRegistration" maxlength="5000" placeholder="Registration process"></textarea>
+<textarea id="aHubDates" maxlength="5000" placeholder="Key dates / academic calendar"></textarea>
+<textarea id="aHubClearance" maxlength="5000" placeholder="Clearance requirements"></textarea>
+<textarea id="aHubFees" maxlength="5000" placeholder="School fees (quote official source, do not invent)"></textarea>
+<textarea id="aHubAccommodation" maxlength="5000" placeholder="Accommodation"></textarea>
+<textarea id="aHubTransport" maxlength="5000" placeholder="Transport / how to get to campus"></textarea>
+<textarea id="aHubFacilities" maxlength="5000" placeholder="Facilities"></textarea>
+<textarea id="aHubFaq" placeholder="FAQ — one per line: Question | Answer"></textarea>
+<textarea id="aHubLinks" placeholder="Official links — one per line: Label | https://URL"></textarea>
+<label class="muted small" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input id="aHubVerified" type="checkbox" style="width:auto" /> I checked the source and verified this institution information</label>
+<div class="admin-actions"><button id="aHubSave" class="btn" type="button">Save hub page</button><button id="aHubClear" class="btn ghost" type="button">New / clear</button></div>
+<h3>Edited hub pages</h3>
+<div id="aHubList"><p class="muted">Loading…</p></div>
+</div>
 </div>
 
 <script>
@@ -112,8 +150,9 @@ function setDeny(box, message) {
   if (!message) { el.style.display = "none"; el.textContent = ""; return; }
   el.style.display = ""; el.textContent = message;
 }
-function setOk(message) {
-  var el = document.getElementById("aScholarshipOk");
+function setOk(message, box) {
+  var el = document.getElementById(box || "aScholarshipOk");
+  if (!el) return;
   if (!message) { el.style.display = "none"; el.textContent = ""; return; }
   el.style.display = ""; el.textContent = message;
 }
@@ -144,13 +183,16 @@ async function loadDash(tok) {
   document.getElementById("aWho").textContent = me.email;
   await loadStats();
   await loadScholarships();
+  await loadMentorAdmin();
+  await loadHubInstitutions();
+  await loadHubsAdmin();
 }
 async function loadStats() {
   try {
     var j = await api("/api/admin/stats");
     function card(t, v) { return '<div class="stat"><b>' + v + '</b><span class="muted small">' + t + '</span></div>'; }
     function n(x) { return x.status === "ok" ? x.count : "pending"; }
-    document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions));
+    document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions)) + card("Mentors", n(j.mentors)) + card("Mentor requests", n(j.mentorRequests)) + card("Hub pages", n(j.hubs)) + card("Fido feedback", n(j.fidoFeedback));
     document.getElementById("aUsers").innerHTML = "<h3>Recent users</h3>" + ((j.recentUsers || []).map(function (u) {
       return "<div class=\"person\"><b>" + esc(u.name) + "</b> <span class=\"muted small\">" + esc(u.email) + " — " + esc(u.school || "no school") + "</span></div>";
     }).join("") || '<p class="muted">No user data yet.</p>');
@@ -158,6 +200,7 @@ async function loadStats() {
       return "<div class=\"person\"><b>" + esc(p.author_name) + "</b> <span class=\"muted small\">" + esc(p.school) + "</span><p>" + esc(p.text) + "</p></div>";
     }).join("") || '<p class="muted">No posts yet.</p>');
     document.getElementById("aNote").textContent = "Reports: review in Supabase dashboard > Table Editor > reports. Updated " + new Date(j.generatedAt).toLocaleString() + ".";
+    loadFeedback();
   } catch (e) {
     document.getElementById("aNote").textContent = "Stats failed: " + e.message;
   }
@@ -233,6 +276,163 @@ async function patchScholarship(id, patch) {
     await loadScholarships();
   } catch (e) { setDeny("aScholarshipDeny", e.message); }
 }
+// ---- Phase 2: mentors, institution hubs, Fido feedback ----
+async function loadFeedback() {
+  var box = document.getElementById("aFeedback");
+  if (!box) return;
+  try {
+    var j = await api("/api/admin/fido-feedback?limit=20");
+    var rows = j.feedback || [];
+    box.innerHTML = "<h3>Recent Fido feedback</h3>" + (rows.map(function (f) {
+      return '<div class="person"><b>' + (f.helpful ? "👍 Helpful" : "👎 Needs correction") + '</b> <span class="muted small">' +
+        esc(f.school || "no school") + " • " + esc(new Date(f.created_at).toLocaleString()) + '</span><p>' + esc(f.question) + '</p>' +
+        (f.correction ? '<p class="muted small">Correction: ' + esc(f.correction) + '</p>' : "") + '</div>';
+    }).join("") || '<p class="muted">No Fido feedback yet.</p>');
+  } catch (e) {
+    box.innerHTML = '<p class="muted small">Fido feedback unavailable: ' + esc(e.message) + '</p>';
+  }
+}
+function mentorBadge(status) {
+  return '<span class="badge ' + (status === "verified" ? "verified" : status === "rejected" ? "unverified" : "draft") + '">' + esc(status) + '</span>';
+}
+async function loadMentorAdmin() {
+  var list = document.getElementById("aMentorList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/mentors");
+    setDeny("aMentorDeny", "");
+    list.innerHTML = (j.mentors || []).map(function (m) {
+      var p = m.profile || {};
+      return '<div class="admin-item"><h4>' + esc(p.name || "Applicant") + ' ' + mentorBadge(m.status) + '</h4>' +
+        '<div class="muted small">' + esc(p.email || "no email") + ' • ' + esc(m.institution_name) + ' • ' + esc(m.department || m.faculty || "no department") + ' • ' + esc(m.level || "no level") + '</div>' +
+        '<p>' + esc(m.bio) + '</p><p class="muted small">Help: ' + esc((m.help_areas || []).join(", ")) + ' • Method: ' + esc(m.verification_method) + '</p>' +
+        (m.verification_detail ? '<p class="muted small">Private evidence: ' + esc(m.verification_detail) + '</p>' : "") +
+        (m.admin_note ? '<p class="muted small">Admin note: ' + esc(m.admin_note) + '</p>' : "") +
+        '<div class="admin-actions">' +
+        (m.status !== "verified" ? '<button class="btn ghost" type="button" data-mentor-verify="' + esc(m.user_id) + '">Verify</button>' : '<button class="btn ghost" type="button" data-mentor-reset="' + esc(m.user_id) + '">Reset review</button>') +
+        (m.status !== "rejected" ? '<button class="btn ghost" type="button" data-mentor-reject="' + esc(m.user_id) + '">Reject</button>' : "") +
+        '<button class="btn danger" type="button" data-mentor-unlist="' + esc(m.user_id) + '" data-listed="' + (m.listed ? "1" : "0") + '">' + (m.listed ? "Unlist" : "List") + '</button>' +
+        '</div></div>';
+    }).join("") || '<p class="muted">No mentor applications yet.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load mentor applications.</p>';
+    setDeny("aMentorDeny", e.message);
+  }
+}
+async function patchMentorAdmin(userId, status, listed) {
+  try {
+    var body = { status: status };
+    if (listed !== undefined) body.listed = listed;
+    await api("/api/admin/mentors/" + userId, { method: "PATCH", body: JSON.stringify(body) });
+    setDeny("aMentorDeny", "");
+    setOk("Mentor updated.", "aMentorOk");
+    await loadMentorAdmin();
+    await loadStats();
+  } catch (e) { setOk("", "aMentorOk"); setDeny("aMentorDeny", e.message); }
+}
+async function loadHubInstitutions() {
+  var sel = document.getElementById("aHubInstitution");
+  if (!sel || sel.options.length > 1) return;
+  try {
+    var r = await fetch(API + "/api/institutions");
+    var rows = await r.json();
+    if (!Array.isArray(rows)) return;
+    sel.innerHTML = '<option value="">Choose an institution…</option>' + rows.map(function (i) {
+      return '<option value="' + esc(i.id) + '">' + esc(i.name) + (i.location ? " — " + esc(i.location) : "") + '</option>';
+    }).join("");
+  } catch (e) { /* the admin can still type an ID below */ }
+}
+async function loadHubsAdmin() {
+  var list = document.getElementById("aHubList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/hubs");
+    setDeny("aHubDeny", "");
+    list.innerHTML = (j.hubs || []).map(function (h) {
+      var i = h.institution || {};
+      return '<div class="admin-item"><h4>' + esc(i.name || ("Institution #" + h.institution_id)) + ' ' + (h.verified ? '<span class="badge verified">verified</span>' : '<span class="badge unverified">unverified</span>') + '</h4>' +
+        '<div class="muted small">' + esc(i.location || "") + ' • Source: ' + esc(h.source || "Community") + ' • Updated: ' + esc(new Date(h.updated_at).toLocaleString()) + '</div>' +
+        '<div class="admin-actions"><button class="btn ghost" type="button" data-hub-edit="' + esc(h.institution_id) + '">Edit</button></div></div>';
+    }).join("") || '<p class="muted">No institution information has been added yet.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load institution information.</p>';
+    setDeny("aHubDeny", e.message);
+  }
+}
+function clearHubForm() {
+  document.getElementById("aHubInstitution").value = "";
+  ["aHubOverview","aHubAdmission","aHubRegistration","aHubDates","aHubClearance","aHubFees","aHubAccommodation","aHubTransport","aHubFacilities","aHubFaq","aHubLinks","aHubSource","aHubSourceUrl"].forEach(function (id) {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("aHubVerified").checked = false;
+  document.getElementById("aHubFormTitle").textContent = "Add institution information";
+  setDeny("aHubDeny", "");
+  setOk("", "aHubOk");
+}
+async function editHub(institutionId) {
+  if (!institutionId) return;
+  document.getElementById("aHubInstitution").value = String(institutionId);
+  try {
+    var j = await api("/api/admin/hubs/" + institutionId);
+    var h = j.hub || {};
+    document.getElementById("aHubFormTitle").textContent = "Edit " + (j.institution.name || ("Institution #" + institutionId));
+    document.getElementById("aHubOverview").value = h.overview || "";
+    document.getElementById("aHubAdmission").value = h.admission || "";
+    document.getElementById("aHubRegistration").value = h.registration || "";
+    document.getElementById("aHubDates").value = h.dates || "";
+    document.getElementById("aHubClearance").value = h.clearance || "";
+    document.getElementById("aHubFees").value = h.fees || "";
+    document.getElementById("aHubAccommodation").value = h.accommodation || "";
+    document.getElementById("aHubTransport").value = h.transport || "";
+    document.getElementById("aHubFacilities").value = h.facilities || "";
+    document.getElementById("aHubFaq").value = (h.faq || []).map(function (f) { return f.question + " | " + f.answer; }).join("\n");
+    document.getElementById("aHubLinks").value = (h.official_links || []).map(function (l) { return l.label + " | " + l.url; }).join("\n");
+    document.getElementById("aHubSource").value = h.source || "";
+    document.getElementById("aHubSourceUrl").value = h.source_url || "";
+    document.getElementById("aHubVerified").checked = !!h.verified;
+    setDeny("aHubDeny", "");
+    setOk("", "aHubOk");
+  } catch (e) { setDeny("aHubDeny", e.message); }
+}
+function parsePairLines(text, label) {
+  var out = [];
+  var lines = String(text || "").split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+  for (var i = 0; i < lines.length; i++) {
+    var at = lines[i].indexOf("|");
+    if (at < 1) throw new Error(label + " line " + (i + 1) + ' must use "left | right".');
+    out.push([lines[i].slice(0, at).trim(), lines[i].slice(at + 1).trim()]);
+  }
+  return out;
+}
+async function saveHub() {
+  var institutionId = document.getElementById("aHubInstitution").value;
+  if (!institutionId) { setDeny("aHubDeny", "Choose an institution first."); return; }
+  try {
+    var faqs = parsePairLines(document.getElementById("aHubFaq").value, "FAQ").map(function (p) { return { question: p[0], answer: p[1] }; });
+    var links = parsePairLines(document.getElementById("aHubLinks").value, "Official link").map(function (p) { return { label: p[0], url: p[1] }; });
+    var body = {
+      overview: document.getElementById("aHubOverview").value.trim(),
+      admission: document.getElementById("aHubAdmission").value.trim(),
+      registration: document.getElementById("aHubRegistration").value.trim(),
+      dates: document.getElementById("aHubDates").value.trim(),
+      clearance: document.getElementById("aHubClearance").value.trim(),
+      fees: document.getElementById("aHubFees").value.trim(),
+      accommodation: document.getElementById("aHubAccommodation").value.trim(),
+      transport: document.getElementById("aHubTransport").value.trim(),
+      facilities: document.getElementById("aHubFacilities").value.trim(),
+      faq: faqs,
+      official_links: links,
+      source: document.getElementById("aHubSource").value.trim() || "Community",
+      source_url: document.getElementById("aHubSourceUrl").value.trim() || null,
+      verified: document.getElementById("aHubVerified").checked
+    };
+    var j = await api("/api/admin/hubs/" + institutionId, { method: "PUT", body: JSON.stringify(body) });
+    setDeny("aHubDeny", "");
+    setOk("Institution information saved. Status: " + (j.verified ? "verified" : "unverified") + ".", "aHubOk");
+    await loadHubsAdmin();
+    await loadStats();
+  } catch (e) { setOk("", "aHubOk"); setDeny("aHubDeny", e.message); }
+}
 function editScholarship(id) {
   // Fetch the full row from the admin list and fill the form.
   api("/api/admin/scholarships").then(function (j) {
@@ -269,6 +469,27 @@ document.getElementById("aScholarshipList").addEventListener("click", function (
   else if (b.hasAttribute("data-verify")) patchScholarship(id, { verified: true });
   else if (b.hasAttribute("data-archive")) { if (confirm("Archive this scholarship? It will disappear from the public list.")) patchScholarship(id, { status: "archived" }); }
 });
+document.getElementById("aMentorList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-mentor-verify") || b.getAttribute("data-mentor-reject") || b.getAttribute("data-mentor-reset") || b.getAttribute("data-mentor-unlist");
+  if (!id) return;
+  if (b.hasAttribute("data-mentor-verify")) patchMentorAdmin(id, "verified");
+  else if (b.hasAttribute("data-mentor-reject")) patchMentorAdmin(id, "rejected");
+  else if (b.hasAttribute("data-mentor-reset")) patchMentorAdmin(id, "pending");
+  else if (b.hasAttribute("data-mentor-unlist")) patchMentorAdmin(id, b.getAttribute("data-listed") === "1" ? "paused" : "pending", b.getAttribute("data-listed") !== "1");
+});
+document.getElementById("aHubList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-hub-edit");
+  if (id) editHub(id);
+});
+document.getElementById("aHubInstitution").addEventListener("change", function () {
+  if (this.value) editHub(this.value); else clearHubForm();
+});
+document.getElementById("aHubSave").onclick = saveHub;
+document.getElementById("aHubClear").onclick = clearHubForm;
 document.getElementById("aSave").onclick = function () { saveScholarship(false); };
 document.getElementById("aPublish").onclick = function () { saveScholarship(true); };
 document.getElementById("aClear").onclick = clearForm;
@@ -295,8 +516,10 @@ for (var i = 0; i < tabs.length; i++) {
     for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("active");
     this.classList.add("active");
     var name = this.getAttribute("data-tab");
-    document.getElementById("overviewPanel").classList.toggle("active", name === "overview");
-    document.getElementById("scholarshipsPanel").classList.toggle("active", name === "scholarships");
+    var panels = document.querySelectorAll(".panel");
+    for (var k = 0; k < panels.length; k++) panels[k].classList.remove("active");
+    var panel = document.getElementById(name + "Panel");
+    if (panel) panel.classList.add("active");
   };
 }
 document.getElementById("aStats").innerHTML = "";

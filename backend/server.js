@@ -103,6 +103,21 @@ const instCache = new Map();
 const statusCache = { at: 0, body: null };
 const treeCache = new Map();
 
+// Verified institution information (Phase 2). The full select is tried first;
+// pre-migration deployments fall back to the original Phase 2 columns.
+const HUB_FULL_FIELDS = "overview,clearance,fees,accommodation,admission,registration,dates,transport,facilities,faq,official_links,source,source_url,verified,updated_at";
+const HUB_LEGACY_FIELDS = "overview,clearance,fees,accommodation,source";
+async function readHub(institutionId) {
+  if (!supabase || !institutionId) return null;
+  let result = await supabase.from("hub_pages").select(HUB_FULL_FIELDS)
+    .eq("institution_id", institutionId).maybeSingle();
+  if (result.error && /column/i.test(result.error.message || "")) {
+    result = await supabase.from("hub_pages").select(HUB_LEGACY_FIELDS)
+      .eq("institution_id", institutionId).maybeSingle();
+  }
+  return result.error ? null : (result.data || null);
+}
+
 function bad(res, msg) { return res.status(400).json({ error: msg }); }
 
 // Optional service-role client. Admin routes use it when configured; otherwise
@@ -149,7 +164,7 @@ app.get("/admin", (req, res) => {
 // Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
 app.get(["/schools", "/schools/:id"], sendHome);
 // Feature pages (client-side router in index.html; same shell, no new backend logic).
-app.get(["/institutions", "/connections", "/ai-honesty", "/about", "/messages", "/scholarships", "/profile"], sendHome);
+app.get(["/institutions", "/connections", "/mentors", "/ai-honesty", "/about", "/messages", "/scholarships", "/profile"], sendHome);
 app.get("/chat/:id", sendHome);
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
@@ -232,11 +247,11 @@ app.get("/api/institutions/:id/tree", async (req, res) => {
   })();
   if (iErr || !inst) return res.status(404).json({ error: "Institution not found" });
   // Faculties and hub are independent; run them together.
-  const [facRes, hubRes] = await Promise.all([
+  const [facRes, hub] = await Promise.all([
     supabase.from("faculties").select("id,name").eq("institution_id", id).order("name"),
-    supabase.from("hub_pages").select("overview,clearance,fees,accommodation,source").eq("institution_id", id).single()
+    readHub(id)
   ]);
-  const facs = facRes.data, fErr = facRes.error, hub = hubRes.data;
+  const facs = facRes.data, fErr = facRes.error;
   if (fErr) return res.status(500).json({ error: fErr.message });
   const facIds = (facs || []).map(f => f.id);
   let depts = [];
@@ -561,6 +576,19 @@ async function acceptedConnection(client, uid, otherId) {
   return data.some(c => (c.requester_id === uid && c.addressee_id === otherId) ||
     (c.addressee_id === uid && c.requester_id === otherId));
 }
+// Phase 2: an accepted mentorship request is also a valid messaging gate.
+// A missing mentor_requests table means the migration is not applied yet, so
+// this simply falls back to connection-only messaging.
+async function acceptedMentorRequest(client, uid, otherId) {
+  try {
+    const { data, error } = await client.from("mentor_requests").select("requester_id,mentor_id")
+      .eq("status", "accepted")
+      .or("requester_id.eq." + uid + ",mentor_id.eq." + uid).limit(200);
+    if (error || !data) return false;
+    return data.some(r => (r.requester_id === uid && r.mentor_id === otherId) ||
+      (r.mentor_id === uid && r.requester_id === otherId));
+  } catch (e) { return false; }
+}
 async function myConversationIds(client, uid) {
   const { data, error } = await client.from("participants").select("conversation_id").eq("user_id", uid).limit(200);
   if (error || !data) return null;
@@ -607,11 +635,12 @@ app.post("/api/conversations/open", async (req, res) => {
   if (otherId === auth.user.id) return bad(res, "cannot message yourself");
   if (!supabase && !auth.me) return res.status(500).json({ error: "Supabase not configured" });
   // independent reads — run them together instead of one after the other
-  const [ok, found] = await Promise.all([
+  const [ok, mentorOk, found] = await Promise.all([
     acceptedConnection(auth.me, auth.user.id, otherId),
+    acceptedMentorRequest(auth.me, auth.user.id, otherId),
     findSharedConversation(auth.me, auth.user.id, otherId),
   ]);
-  if (!ok) return res.status(403).json({ error: "You're not connected with this user." });
+  if (!ok && !mentorOk) return res.status(403).json({ error: "You're not connected with this user." });
   if (found.error) return res.status(500).json({ error: found.error });
   let convoId = found.id;
   if (!convoId) {
@@ -794,8 +823,7 @@ async function findSchool(text) {
 }
 async function findHub(institutionId) {
   if (!supabase || !institutionId) return null;
-  const { data } = await supabase.from("hub_pages").select("overview,clearance,fees,accommodation,source").eq("institution_id", institutionId).single();
-  return data || null;
+  return readHub(institutionId);
 }
 async function findCourses(text) {
   // Live lookup in department records (covers only some schools so far — never invent).
@@ -828,6 +856,33 @@ async function findCourses(text) {
   }
   return [...new Set(out)].slice(0, 6);
 }
+function hubVerified(hub) { return !!(hub && hub.verified === true); }
+function hubSources(hub) {
+  const out = [];
+  if (hub && typeof hub.source_url === "string" && /^https?:\/\//i.test(hub.source_url)) {
+    out.push({ label: "Institution source", url: hub.source_url });
+  }
+  const links = hub && Array.isArray(hub.official_links) ? hub.official_links : [];
+  links.slice(0, 6).forEach(l => {
+    if (l && typeof l.url === "string" && /^https?:\/\//i.test(l.url)) {
+      out.push({ label: String(l.label || "Official link").slice(0, 80), url: l.url });
+    }
+  });
+  return out;
+}
+function findFaq(hub, q) {
+  const items = hub && Array.isArray(hub.faq) ? hub.faq : [];
+  const words = new Set(q.replace(/[^a-z0-9]+/g, " ").split(" ").filter(w => w.length >= 4));
+  let best = null, bestScore = 0;
+  for (const item of items) {
+    if (!item || typeof item.question !== "string" || typeof item.answer !== "string") continue;
+    const qWords = item.question.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(w => w.length >= 4);
+    let score = 0;
+    qWords.forEach(w => { if (words.has(w)) score++; });
+    if (score > bestScore) { bestScore = score; best = item; }
+  }
+  return bestScore >= 2 ? best : null;
+}
 app.post("/api/fido/ask", async (req, res) => {
   // PRD §25: Responsible AI principles. This endpoint must always:
   // - Label answers as Official / Community / AI guidance
@@ -850,12 +905,31 @@ app.post("/api/fido/ask", async (req, res) => {
   }
   const sName = school ? school.name : null;
   const hub = await findHub(school && school.id).catch(() => null);
-  const official = (text) => ({ answer: text, source: "Official", school: sName, verify: true, context: { school: sName } });
-  const community = (text) => ({ answer: text, source: "Community", school: sName, verify: true, context: { school: sName } });
-  const ai = (text) => { 
+  const official = (text) => ({ answer: text, source: "Official", school: sName, verify: true, context: { school: sName }, sources: [] });
+  const community = (text) => ({ answer: text, source: "Community", school: sName, verify: true, context: { school: sName }, sources: [] });
+  const ai = (text) => {
     // AI guidance: label clearly, always reference official sources where possible,
     // never present as institutional decision, encourage user verification.
-    return ({ answer: text, source: "AI guidance", school: sName, verify: true, context: { school: sName } });
+    return ({ answer: text, source: "AI guidance", school: sName, verify: true, context: { school: sName }, sources: [] });
+  };
+  // Hub content is labelled Official only when an admin marked it verified.
+  // Otherwise it is community-provided context and must say so.
+  const hubAnswer = (text, page) => {
+    const verified = hubVerified(page);
+    const when = page && page.updated_at ? " Last updated " + new Date(page.updated_at).toLocaleDateString() + "." : "";
+    const note = verified
+      ? " This institution page is verified by a Fidonect admin." + when
+      : " This is community-provided information and is not yet verified by Fidonect — confirm it on the school portal." + when;
+    return ({
+      answer: text + note,
+      source: verified ? "Official" : "Community",
+      school: sName,
+      verify: true,
+      verified,
+      updated_at: page && page.updated_at ? page.updated_at : null,
+      sources: hubSources(page),
+      context: { school: sName }
+    });
   };
   const where = sName ? " at " + sName : "";
   // Directory intelligence: answer from the live NUC/NBTE/NCCE dataset (Official source).
@@ -893,6 +967,11 @@ app.post("/api/fido/ask", async (req, res) => {
   if (/^(hi|hey|hello|good (morning|afternoon|evening)|thanks|thank you|bye|goodbye)\b/.test(q) || /who are you|what can you do|help me/.test(q)) {
     return res.json(ai("Hello! I'm Fido, your campus guide. I can walk you through admission steps, clearance documents, fees, accommodation, course registration, finding courses, and resumption prep" + where + ". Try: 'I just got admitted — what next?'"));
   }
+  // Verified/community institution FAQs are the most specific answer we hold.
+  const faq = findFaq(hub, q);
+  if (faq) {
+    return res.json(hubAnswer("From the institution FAQ — " + faq.question + " " + faq.answer, hub));
+  }
   if (/admitted|after admission|just got|newly admitted|next step/.test(q)) {
     return res.json(ai("Congrats on your admission" + where + "! Typical next steps: (1) accept the offer on JAMB CAPS and print your JAMB admission letter; (2) watch your school portal for the admission and screening list; (3) gather clearance documents — O-level results, birth certificate, LGA letter, passport photos; (4) pay acceptance and school fees only through official portal channels; (5) sort accommodation early; (6) complete course registration within the window; (7) attend orientation and matriculation." + (sName ? " Ask in the " + sName + " community — students there have done this recently." : " Tell me your school and I'll share its campus info.")));
   }
@@ -903,6 +982,7 @@ app.post("/api/fido/ask", async (req, res) => {
     return res.json(ai("On JAMB CAPS" + where + ": (1) log in and check your admission status often; (2) click Accept once offered — ignoring it can forfeit the slot; (3) print your admission letter from the portal; (4) confirm your O-level results are uploaded on the JAMB portal. Only trust offers shown on CAPS or the official school portal — anyone asking for money to 'secure' admission is running a scam."));
   }
   if (/regist|enrol|course form/.test(q)) {
+    if (hub && hub.registration) return res.json(hubAnswer("For course registration" + where + ": " + hub.registration + " Pay fees first, register inside the window, print your forms, and confirm with your level adviser.", hub));
     return res.json(ai("For course registration" + where + ": (1) pay your acceptance and school fees first — most portals block registration until payment; (2) log in to the student portal inside the registration window; (3) select the semester's courses using your departmental handbook; (4) submit and print your registration forms; (5) confirm with your level adviser. Late registration attracts extra charges, so don't wait."));
   }
   if (/direct entry|de form|de admission|transcript|a-level|a level|nd result|hnd/.test(q)) {
@@ -918,25 +998,42 @@ app.post("/api/fido/ask", async (req, res) => {
     return res.json(ai("Tell me the course and the school — e.g. 'Does UNILAG offer Computer Science?' — and I'll check our records. Note department data covers only some schools so far; for the full picture, check the school portal or JAMB brochure."));
   }
   if (/clearance|screening/.test(q)) {
-    if (hub && hub.clearance) return res.json(official("For clearance" + where + ": " + hub.clearance + " Go in this order: confirm your name on the admission list, present originals plus photocopies, then keep every receipt. Always confirm on your school portal — requirements vary by department."));
+    if (hub && hub.clearance) return res.json(hubAnswer("For clearance" + where + ": " + hub.clearance + " Go in this order: confirm your name on the admission list, present originals plus photocopies, then keep every receipt. Always confirm on your school portal — requirements vary by department.", hub));
     return res.json(ai("For clearance" + where + ", go in this order: (1) confirm your name on the admission or screening list; (2) gather originals plus 3–4 photocopies of each — JAMB admission letter, O-level result(s), birth certificate or age declaration, LGA identification letter, passport photos; (3) present them at the screening venue; (4) keep every receipt." + (sName ? " Ask in the " + sName + " community for department-specific experience." : " Tell me your school for its specific requirements.")));
   }
   if (/document|what .*(need|require|bring)|checklist/.test(q)) {
-    if (hub && hub.clearance) return res.json(official("Documents" + where + ": " + hub.clearance + " Carry originals plus photocopies, and confirm the exact list on your school portal."));
+    if (hub && hub.clearance) return res.json(hubAnswer("Documents" + where + ": " + hub.clearance + " Carry originals plus photocopies, and confirm the exact list on your school portal.", hub));
     return res.json(ai("Most schools ask for: JAMB admission letter and result slip, O-level result(s), birth certificate or age declaration, LGA or state identification letter, 8–12 passport photographs, acceptance fee receipt, and departmental screening forms. Carry originals plus 3–4 photocopies of each in a file jacket. Exact lists vary — confirm on your school portal before travelling."));
   }
   if (/accommod|hostel|housing|lodge/.test(q)) {
-    if (hub && hub.accommodation) return res.json(official("Accommodation" + where + ": " + hub.accommodation + " Apply the moment clearance opens — school hostels fill fast."));
-    return res.json(community("Accommodation plan" + where + ": (1) apply for the school hostel immediately after clearance; (2) line up a private hostel nearby as backup; (3) before paying, inspect security, water, light, and distance to campus; (4) never pay into personal accounts or before seeing the room. Ask connected students where they stay."));
+    if (hub && hub.accommodation) return res.json(hubAnswer("Accommodation" + where + ": " + hub.accommodation + " Apply the moment clearance opens — school hostels fill fast.", hub));
+    return res.json(ai("Accommodation plan" + where + ": (1) apply for the school hostel immediately after clearance; (2) line up a private hostel nearby as backup; (3) before paying, inspect security, water, light, and distance to campus; (4) never pay into personal accounts or before seeing the room. Ask connected students where they stay."));
   }
   if (/fee|school charges|payment|tuition/.test(q)) {
-    if (hub && hub.fees) return res.json(official("Fees" + where + ": " + hub.fees + " Pay only through channels named on the official portal and keep every receipt."));
+    if (hub && hub.fees) return res.json(hubAnswer("Fees" + where + ": " + hub.fees + " Pay only through channels named on the official portal and keep every receipt.", hub));
     return res.json(ai("I don't hold verified fee figures for every school" + (sName ? " — including " + sName + " — " : "") + " so tell me your school and I'll share what we hold. Generally: check the official school portal for the current schedule (it changes per session and faculty), pay only through official channels, keep receipts, and never pay into personal accounts — report payment scams."));
+  }
+  if (/(important|key|academic|school|admission|resumption).*(date|dates|calendar|timetable)|when.*(resume|resumption|session)/.test(q)) {
+    if (hub && hub.dates) return res.json(hubAnswer("Key dates" + where + ": " + hub.dates + " Dates change per session — confirm on the official portal before travelling or paying.", hub));
+  }
+  if (/transport|bus|shuttle|how.*(get|travel).*(campus|school)|direction/.test(q)) {
+    if (hub && hub.transport) return res.json(hubAnswer("Transport" + where + ": " + hub.transport, hub));
+  }
+  if (/facilit|library|lab|laboratory|clinic|health cent|sports/.test(q)) {
+    if (hub && hub.facilities) return res.json(hubAnswer("Facilities" + where + ": " + hub.facilities, hub));
+  }
+  if (/official (website|site|portal|link)|school (website|portal)|where.*(verify|confirm)/.test(q)) {
+    const links = hubSources(hub);
+    if (links.length) {
+      const label = links.map(l => l.label + ": " + l.url).join("; ");
+      return res.json({ ...hubAnswer("Use these official channels" + where + ": " + label + ". Fidonect links out and never asks for your password or payment details.", hub), sources: links });
+    }
   }
   if (/cut.?off|post-utme|postutme|merit list|supplementary|supplemental/.test(q)) {
     return res.json(ai("On cut-off marks and screening" + where + ": (1) meet the general JAMB cut-off, then the departmental cut-off — departments set theirs separately and figures change every year, so last year's numbers are a guide only; (2) register for the school's post-UTME or screening exercise before its deadline; (3) track merit, supplementary, and VC lists on the portal. Only trust lists on the official portal or JAMB CAPS."));
   }
   if (/admission|jamb/.test(q)) {
+    if (hub && hub.admission) return res.json(hubAnswer("Admission information" + where + ": " + hub.admission + " Also track JAMB CAPS and accept your offer there. Only trust offers on CAPS or the official school portal.", hub));
     return res.json(ai("For admission" + where + ": (1) track JAMB CAPS and accept your offer there; (2) watch the school portal for merit, supplementary, or VC lists; (3) note departmental cut-off marks change every year, so treat last year's figures as a guide only; (4) print your JAMB admission letter early. Only trust offers on CAPS or the official portal — anyone asking for money to 'secure' admission is running a scam."));
   }
   if (/resum|prepare|first semester|freshers|fresher|new student|packing|pack/.test(q)) {
@@ -949,14 +1046,446 @@ app.post("/api/fido/ask", async (req, res) => {
     return res.json(ai("On NYSC (looking ahead): after graduation your school mobilizes you — (1) finish strong, since graduation and clearance come first; (2) keep your personal details consistent across JAMB, school, and NYSC records to avoid mobilization issues; (3) watch your school's student-affairs notices in final year for the mobilization timetable. Focus on getting admitted and settled first — we'll walk the NYSC road when you get there."));
   }
   if (/campus life|safe|safety|secur|scam|fraud|theft|night|emergency|health/.test(q)) {
-    return res.json(community("Staying safe on campus" + where + ": (1) avoid lonely routes at night and share your movement with a roommate; (2) lock your room and travel light with valuables; (3) use the school health centre early when sick — don't self-medicate for long; (4) verify every payment, hostel offer, and 'exam expo' before committing — scams target freshers most. Save your department and security contacts in your phone. Ask in the community which areas students recommend." + (sName ? "" : " Tell me your school for campus-specific pointers.")));
+    return res.json(ai("Staying safe on campus" + where + ": (1) avoid lonely routes at night and share your movement with a roommate; (2) lock your room and travel light with valuables; (3) use the school health centre early when sick — don't self-medicate for long; (4) verify every payment, hostel offer, and 'exam expo' before committing — scams target freshers most. Save your department and security contacts in your phone. Ask in the community which areas students recommend." + (sName ? "" : " Tell me your school for campus-specific pointers.")));
   }
   if (/study|exam|gp|grade|reading|tutorial|past question/.test(q)) {
     return res.json(ai("Study smart" + where + ": (1) get each course outline in week one; (2) build a weekly timetable and protect study hours; (3) join department study threads and ask mentors for past questions; (4) revise weekly instead of cramming; (5) guard your first-semester GPA — it sets your foundation. Which course is giving you trouble? I can share how to approach it."));
   }
   return res.json(ai("I can guide you step by step on: next steps after admission, JAMB CAPS and subject combinations, cut-off marks, Direct Entry, clearance documents, course registration, fees, accommodation, scholarships, finding courses, orientation, resumption prep, campus safety, NYSC, and study tips" + where + ". Try: 'I just got admitted — what next?' or 'What subjects do I need for Medicine?'"));
 });
-app.get("/api/mentors", (req, res) => res.json(db.mentors));
+// ---- Phase 2: Mentorship, verified institution info, Fido feedback ----
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(v) { return typeof v === "string" && UUID_RE.test(v); }
+function phase2DbError(res, error, label) {
+  if (missingRelation(error)) {
+    return res.status(503).json({
+      error: (label || "Phase 2 content") + " is not set up yet. Run backend/migrations/20261116_phase2_mentorship_hubs_fido.sql in the Supabase SQL Editor.",
+      setupRequired: true
+    });
+  }
+  if (error && (error.code === "42501" || error.code === "PGRST301")) {
+    return res.status(403).json({ error: "Permission denied. Sign in with an admin account or run the Phase 2 migration." });
+  }
+  return res.status(500).json({ error: (error && error.message) || "Database error" });
+}
+const MENTOR_PUBLIC_FIELDS = "user_id,name,photo_url,user_type,institution_id,institution_name,faculty,department,programme,level,bio,help_areas,verified_at,updated_at,institution_location,ownership,kind";
+const MENTOR_ADMIN_FIELDS = "*";
+
+function mentorInput(body) {
+  const src = body || {};
+  if (!isText(src.school, 160) || src.school.trim().length < 2) return { error: "school is required (2–160 chars)" };
+  if (!isText(src.bio, 2000) || src.bio.trim().length < 20) return { error: "bio is required (20–2000 chars)" };
+  let areas = src.help_areas;
+  if (typeof areas === "string") areas = areas.split(",");
+  if (!Array.isArray(areas)) return { error: "help_areas must be an array of up to 8 short areas" };
+  areas = [...new Set(areas.map(a => typeof a === "string" ? a.trim() : "").filter(Boolean))];
+  if (areas.length < 1 || areas.length > 8) return { error: "help_areas must contain 1–8 areas" };
+  if (areas.some(a => a.length < 2 || a.length > 80)) return { error: "each help area must be 2–80 chars" };
+  const method = src.verification_method;
+  if (!["institutional_email", "student_id", "other"].includes(method)) {
+    return { error: "verification_method must be institutional_email, student_id, or other" };
+  }
+  const optional = {};
+  for (const [field, max] of Object.entries({ faculty: 160, department: 160, programme: 160, level: 80 })) {
+    if (src[field] === undefined || src[field] === null || src[field] === "") continue;
+    if (typeof src[field] !== "string" || src[field].length > max) return { error: field + " is invalid (max " + max + " chars)" };
+    optional[field] = src[field].trim();
+  }
+  let detail = null;
+  if (src.verification_detail !== undefined && src.verification_detail !== null) {
+    if (typeof src.verification_detail !== "string" || src.verification_detail.length > 300) {
+      return { error: "verification_detail is invalid (max 300 chars)" };
+    }
+    detail = src.verification_detail.trim() || null;
+  }
+  return {
+    data: {
+      school: src.school.trim(),
+      institution_id: src.institution_id === undefined ? undefined : parsePositiveInt(src.institution_id, 0),
+      bio: src.bio.trim(),
+      help_areas: areas,
+      verification_method: method,
+      verification_detail: detail,
+      ...optional
+    }
+  };
+}
+
+app.get("/api/mentors", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const limit = parsePositiveInt(req.query.limit, 30, 100);
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let query = supabase.from("mentor_directory").select(MENTOR_PUBLIC_FIELDS, { count: "exact" });
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  if (q) query = query.or("name.ilike.%" + q + "%,institution_name.ilike.%" + q + "%,department.ilike.%" + q + "%,bio.ilike.%" + q + "%");
+  const { data, error, count } = await query.order("verified_at", { ascending: false, nullsFirst: false }).limit(limit);
+  if (error) {
+    if (missingRelation(error)) return res.json({ mentors: [], total: 0, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ mentors: data || [], total: count || 0, setupRequired: false });
+});
+
+app.get("/api/mentors/me", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("mentor_profiles").select("*").eq("user_id", auth.user.id).maybeSingle();
+  if (error) {
+    if (missingRelation(error)) return res.json({ mentor: null, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ mentor: data || null, setupRequired: false });
+});
+
+app.post("/api/mentors/apply", rateLimit("mentorapply", 10, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const parsed = mentorInput(req.body);
+  if (parsed.error) return bad(res, parsed.error);
+  const input = parsed.data;
+  let institution = null;
+  if (input.institution_id) {
+    const { data, error } = await supabase.from("institutions").select("id,name").eq("id", input.institution_id).single();
+    if (error || !data) return bad(res, "institution_id was not found in the directory");
+    institution = data;
+  } else {
+    const { data } = await supabase.from("institutions").select("id,name").ilike("name", input.school).limit(1);
+    institution = data && data[0] ? data[0] : null;
+  }
+  if (!institution) return bad(res, "Choose an institution from the Fidonect directory.");
+  const row = {
+    user_id: auth.user.id,
+    institution_id: institution.id,
+    institution_name: institution.name,
+    faculty: input.faculty || null,
+    department: input.department || null,
+    programme: input.programme || null,
+    level: input.level || null,
+    bio: input.bio,
+    help_areas: input.help_areas,
+    verification_method: input.verification_method,
+    verification_detail: input.verification_detail,
+    listed: req.body.listed !== false,
+    status: "pending",
+    verified_at: null,
+    verified_by: null,
+    admin_note: null
+  };
+  const { data, error } = await auth.me.from("mentor_profiles")
+    .upsert(row, { onConflict: "user_id" }).select(MENTOR_ADMIN_FIELDS).single();
+  if (error) return phase2DbError(res, error, "Mentorship");
+  res.json({ mentor: data, setupRequired: false });
+});
+
+app.post("/api/mentor-requests", rateLimit("mentorrequest", 20, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const mentorId = req.body && req.body.mentor_id;
+  const topic = req.body && req.body.topic;
+  const message = req.body && req.body.message;
+  if (!isUuid(mentorId)) return bad(res, "mentor_id is required");
+  if (mentorId === auth.user.id) return bad(res, "cannot request mentorship from yourself");
+  if (!isText(topic, 120) || topic.trim().length < 3) return bad(res, "topic must be 3–120 characters");
+  if (!isText(message, 2000) || message.trim().length < 10) return bad(res, "message must be 10–2000 characters");
+  const { data: mentor, error: findError } = await supabase.from("mentor_directory")
+    .select("user_id").eq("user_id", mentorId).maybeSingle();
+  if (findError) return phase2DbError(res, findError, "Mentorship");
+  if (!mentor) return res.status(404).json({ error: "Mentor not found or not verified" });
+  const { data, error } = await auth.me.from("mentor_requests").insert({
+    requester_id: auth.user.id, mentor_id: mentorId, topic: topic.trim(), message: message.trim()
+  }).select().single();
+  if (error) {
+    if (error.code === "23505") return res.status(409).json({ error: "You already have a pending request with this mentor." });
+    return phase2DbError(res, error, "Mentorship requests");
+  }
+  res.json(data);
+});
+
+app.get("/api/mentor-requests/mine", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("mentor_requests").select("*")
+    .or("requester_id.eq." + auth.user.id + ",mentor_id.eq." + auth.user.id)
+    .order("created_at", { ascending: false }).limit(100);
+  if (error) {
+    if (missingRelation(error)) return res.json({ incoming: [], outgoing: [], setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  const ids = [...new Set((data || []).flatMap(r => [r.requester_id, r.mentor_id]).filter(id => id !== auth.user.id))];
+  let profiles = {};
+  if (ids.length) {
+    const pr = await profilesFrom(auth.me, q => q.select("id,name,photo_url,school,dept,user_type").in("id", ids));
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  const shape = r => {
+    const otherId = r.requester_id === auth.user.id ? r.mentor_id : r.requester_id;
+    return { ...r, other: profiles[otherId] || { id: otherId, name: "Student" } };
+  };
+  res.json({
+    incoming: (data || []).filter(r => r.mentor_id === auth.user.id).map(shape),
+    outgoing: (data || []).filter(r => r.requester_id === auth.user.id).map(shape),
+    setupRequired: false
+  });
+});
+
+app.post("/api/mentor-requests/:id/respond", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  const action = req.body && req.body.action;
+  if (!id) return bad(res, "id must be a positive integer");
+  if (!["accept", "decline", "cancel", "complete"].includes(action)) {
+    return bad(res, "action must be accept, decline, cancel, or complete");
+  }
+  const { data: row, error } = await auth.me.from("mentor_requests").select("*").eq("id", id).maybeSingle();
+  if (error) return phase2DbError(res, error, "Mentorship requests");
+  if (!row) return res.status(404).json({ error: "Mentorship request not found" });
+  let next = null;
+  if (action === "accept" || action === "decline") {
+    if (row.mentor_id !== auth.user.id) return res.status(403).json({ error: "Only the mentor can respond to this request" });
+    if (row.status !== "pending") return res.status(409).json({ error: "This request is no longer pending" });
+    next = action === "accept" ? "accepted" : "declined";
+  } else if (action === "cancel") {
+    if (row.requester_id !== auth.user.id) return res.status(403).json({ error: "Only the requester can cancel this request" });
+    if (row.status !== "pending") return res.status(409).json({ error: "Only a pending request can be cancelled" });
+    next = "cancelled";
+  } else {
+    if (row.requester_id !== auth.user.id && row.mentor_id !== auth.user.id) return res.status(403).json({ error: "Not your request" });
+    if (row.status !== "accepted") return res.status(409).json({ error: "Only an accepted request can be completed" });
+    next = "completed";
+  }
+  const { data, error: upErr } = await auth.me.from("mentor_requests")
+    .update({ status: next, responded_at: new Date().toISOString() })
+    .eq("id", id).eq("status", row.status).select().single();
+  if (upErr) return phase2DbError(res, upErr, "Mentorship requests");
+  res.json(data);
+});
+
+app.post("/api/fido/feedback", rateLimit("fidofeedback", 30, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  const body = req.body || {};
+  const question = cleanText(body.question, 500);
+  if (question.length < 3) return bad(res, "question must be 3–500 characters");
+  if (typeof body.helpful !== "boolean") return bad(res, "helpful must be true or false");
+  if (body.correction !== undefined && (typeof body.correction !== "string" || body.correction.length > 2000)) {
+    return bad(res, "correction is invalid (max 2000 chars)");
+  }
+  const row = {
+    user_id: auth ? auth.user.id : null,
+    question,
+    answer_source: cleanText(body.source, 40) || null,
+    school: cleanText(body.school, 160) || null,
+    helpful: body.helpful,
+    correction: cleanText(body.correction, 2000) || null
+  };
+  const client = auth ? auth.me : supabase;
+  if (!client) return res.status(500).json({ error: "Supabase not configured" });
+  const { error } = await client.from("fido_feedback").insert(row);
+  if (error) {
+    if (missingRelation(error)) return res.status(503).json({ error: "Fido feedback is not set up yet.", setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ ok: true, setupRequired: false });
+});
+
+app.get("/api/admin/mentors", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const status = String(req.query.status || "");
+  let query = db.from("mentor_profiles").select(MENTOR_ADMIN_FIELDS, { count: "exact" });
+  if (["pending", "verified", "rejected", "paused"].includes(status)) query = query.eq("status", status);
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase2DbError(res, error, "Mentorship");
+  const ids = [...new Set((data || []).map(m => m.user_id))];
+  let profiles = {};
+  if (ids.length) {
+    const pr = await db.from("profiles").select("id,name,email,school,photo_url,visibility").in("id", ids);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  res.json({ mentors: (data || []).map(m => ({ ...m, profile: profiles[m.user_id] || null })), total: count || 0 });
+});
+
+app.patch("/api/admin/mentors/:userId", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const userId = req.params.userId;
+  if (!isUuid(userId)) return bad(res, "userId must be a valid UUID");
+  const status = req.body && req.body.status;
+  if (!["pending", "verified", "rejected", "paused"].includes(status)) {
+    return bad(res, "status must be pending, verified, rejected, or paused");
+  }
+  if (req.body.admin_note !== undefined && (typeof req.body.admin_note !== "string" || req.body.admin_note.length > 500)) {
+    return bad(res, "admin_note is invalid (max 500 chars)");
+  }
+  if (req.body.listed !== undefined && typeof req.body.listed !== "boolean") return bad(res, "listed must be true or false");
+  const db = adminDb() || auth.me;
+  const patch = { status };
+  if (req.body.admin_note !== undefined) patch.admin_note = req.body.admin_note.trim() || null;
+  if (req.body.listed !== undefined) patch.listed = req.body.listed;
+  if (status === "verified") { patch.verified_at = new Date().toISOString(); patch.verified_by = auth.user.id; }
+  else { patch.verified_at = null; patch.verified_by = null; }
+  const { data, error } = await db.from("mentor_profiles").update(patch)
+    .eq("user_id", userId).select("*").single();
+  if (error) {
+    if (error.code === "PGRST116") return res.status(404).json({ error: "Mentor application not found" });
+    return phase2DbError(res, error, "Mentorship");
+  }
+  await auditAdmin(auth, "mentor." + status, userId, { status, listed: data.listed });
+  res.json(data);
+});
+
+app.get("/api/admin/mentor-requests", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const { data, error, count } = await db.from("mentor_requests").select("*", { count: "exact" })
+    .order("created_at", { ascending: false }).limit(100);
+  if (error) return phase2DbError(res, error, "Mentorship requests");
+  const ids = [...new Set((data || []).flatMap(r => [r.requester_id, r.mentor_id]))];
+  let profiles = {};
+  if (ids.length) {
+    const pr = await db.from("profiles").select("id,name,email,school").in("id", ids);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  res.json({
+    requests: (data || []).map(r => ({ ...r, requester: profiles[r.requester_id] || null, mentor: profiles[r.mentor_id] || null })),
+    total: count || 0
+  });
+});
+
+const HUB_ADMIN_FIELDS = "institution_id,overview,clearance,fees,accommodation,admission,registration,dates,transport,facilities,faq,official_links,source,source_url,verified,verified_at,verified_by,last_reviewed_at,updated_at";
+function arrayOfItems(value, kind) {
+  if (!Array.isArray(value) || value.length > 20) return { error: kind + " must be an array of up to 20 items" };
+  const out = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") return { error: kind + " items must be objects" };
+    if (kind === "faq") {
+      if (!isText(item.question, 200) || item.question.trim().length < 3) return { error: "each FAQ question must be 3–200 chars" };
+      if (!isText(item.answer, 2000) || item.answer.trim().length < 3) return { error: "each FAQ answer must be 3–2000 chars" };
+      out.push({ question: item.question.trim(), answer: item.answer.trim() });
+    } else {
+      if (!isText(item.label, 80)) return { error: "each official link needs a label (max 80 chars)" };
+      if (!isHttpUrl(item.url)) return { error: "each official link needs a valid http(s) URL" };
+      out.push({ label: item.label.trim(), url: item.url.trim() });
+    }
+  }
+  return { value: out };
+}
+function hubInput(body) {
+  const src = body || {};
+  const out = {};
+  for (const [field, max] of Object.entries({
+    overview: 5000, clearance: 5000, fees: 5000, accommodation: 5000,
+    admission: 5000, registration: 5000, dates: 5000, transport: 5000, facilities: 5000
+  })) {
+    if (src[field] === undefined) continue;
+    if (src[field] === null || src[field] === "") { out[field] = null; continue; }
+    if (typeof src[field] !== "string" || src[field].length > max) return { error: field + " is invalid (max " + max + " chars)" };
+    out[field] = src[field].trim();
+  }
+  if (src.faq !== undefined) {
+    const faq = arrayOfItems(src.faq, "faq");
+    if (faq.error) return faq;
+    out.faq = faq.value;
+  }
+  if (src.official_links !== undefined) {
+    const links = arrayOfItems(src.official_links, "official_links");
+    if (links.error) return links;
+    out.official_links = links.value;
+  }
+  if (src.source !== undefined) {
+    if (!isText(src.source, 120) || src.source.trim().length < 2) return { error: "source must be 2–120 chars" };
+    out.source = src.source.trim();
+  }
+  if (src.source_url !== undefined) {
+    if (src.source_url === null || src.source_url === "") out.source_url = null;
+    else if (!isHttpUrl(src.source_url)) return { error: "source_url must be a valid http(s) URL" };
+    else out.source_url = src.source_url.trim();
+  }
+  if (src.verified !== undefined) {
+    if (typeof src.verified !== "boolean") return { error: "verified must be true or false" };
+    out.verified = src.verified;
+  }
+  return { data: out };
+}
+
+app.get("/api/admin/hubs", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const { data, error, count } = await db.from("hub_pages").select(HUB_ADMIN_FIELDS, { count: "exact" })
+    .order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase2DbError(res, error, "Institution information");
+  const ids = [...new Set((data || []).map(h => h.institution_id))];
+  let institutions = {};
+  if (ids.length) {
+    const ir = await supabase.from("institutions").select("id,name,location,ownership,kind").in("id", ids);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  res.json({ hubs: (data || []).map(h => ({ ...h, institution: institutions[h.institution_id] || null })), total: count || 0 });
+});
+
+app.get("/api/admin/hubs/:institutionId", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const institutionId = parsePositiveInt(req.params.institutionId, 0);
+  if (!institutionId) return bad(res, "institutionId must be a positive integer");
+  const { data: institution, error: iErr } = await supabase.from("institutions")
+    .select("id,name,location,ownership,kind").eq("id", institutionId).single();
+  if (iErr || !institution) return res.status(404).json({ error: "Institution not found" });
+  const db = adminDb() || auth.me;
+  const { data, error } = await db.from("hub_pages").select(HUB_ADMIN_FIELDS)
+    .eq("institution_id", institutionId).maybeSingle();
+  if (error) return phase2DbError(res, error, "Institution information");
+  res.json({ institution, hub: data || null });
+});
+
+app.put("/api/admin/hubs/:institutionId", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const institutionId = parsePositiveInt(req.params.institutionId, 0);
+  if (!institutionId) return bad(res, "institutionId must be a positive integer");
+  const parsed = hubInput(req.body);
+  if (parsed.error) return bad(res, parsed.error);
+  const { data: institution, error: iErr } = await supabase.from("institutions")
+    .select("id,name").eq("id", institutionId).single();
+  if (iErr || !institution) return res.status(404).json({ error: "Institution not found" });
+  const db = adminDb() || auth.me;
+  const now = new Date().toISOString();
+  const row = {
+    institution_id: institutionId,
+    source: "Community",
+    faq: [],
+    official_links: [],
+    ...parsed.data,
+    verified: parsed.data.verified === true,
+    last_reviewed_at: now
+  };
+  if (row.verified) { row.verified_at = now; row.verified_by = auth.user.id; }
+  else { row.verified_at = null; row.verified_by = null; }
+  const { data, error } = await db.from("hub_pages")
+    .upsert(row, { onConflict: "institution_id" }).select(HUB_ADMIN_FIELDS).single();
+  if (error) return phase2DbError(res, error, "Institution information");
+  treeCache.delete(institutionId);
+  await auditAdmin(auth, "hub.update", String(institutionId), { verified: data.verified, source: data.source });
+  res.json(data);
+});
+
+app.get("/api/admin/fido-feedback", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const limit = parsePositiveInt(req.query.limit, 50, 100);
+  const { data, error } = await db.from("fido_feedback").select("*")
+    .order("created_at", { ascending: false }).limit(limit);
+  if (error) return phase2DbError(res, error, "Fido feedback");
+  res.json({ feedback: data || [] });
+});
+
 app.post("/api/reports", rateLimit("report", 30, 60 * 1000), async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   if (!auth) return res.status(401).json({ error: "Log in to report" });
@@ -987,14 +1516,17 @@ app.get("/api/admin/stats", async (req, res) => {
   const db = adminDb() || auth.me;
   async function count(table, client) {
     try {
-      const r = await (client || db).from(table).select("id", { count: "exact", head: true });
+      const r = await (client || db).from(table).select("*", { count: "exact", head: true });
       if (r.error) return { status: "pending", detail: String(r.error.message || r.error).slice(0, 120) };
       return { status: "ok", count: r.count };
     } catch (e) { return { status: "pending", detail: String((e && e.message) || e).slice(0, 120) }; }
   }
   // Institutions are public data whose read policy covers the anon role only;
   // count them with the anon client so the admin card matches /api/status.
-  const [users, posts, institutions] = await Promise.all([count("profiles"), count("posts"), count("institutions", supabase)]);
+  const [users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback] = await Promise.all([
+    count("profiles"), count("posts"), count("institutions", supabase),
+    count("mentor_profiles"), count("mentor_requests"), count("hub_pages"), count("fido_feedback")
+  ]);
   let recentUsers = [];
   if (users.status === "ok") {
     const r = await db.from("profiles").select("name,email,school,visibility,created_at").order("created_at", { ascending: false }).limit(20);
@@ -1006,7 +1538,7 @@ app.get("/api/admin/stats", async (req, res) => {
     if (!r.error) recentPosts = r.data || [];
   }
   res.json({
-    users, posts, institutions, recentUsers, recentPosts,
+    users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, recentUsers, recentPosts,
     reports: { status: "dashboard", detail: "Review reports in Supabase dashboard > Table Editor > reports." },
     generatedAt: new Date().toISOString()
   });

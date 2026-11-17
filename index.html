@@ -54,6 +54,7 @@ nav a:hover{text-decoration:underline}
 h2{border-left:4px solid #f59e0b;padding-left:10px}
 .search-row{display:flex;gap:8px;flex-wrap:wrap}
 .input{flex:1;min-width:200px;padding:12px;border:1px solid #d7dee8;border-radius:10px;font:inherit}
+textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #d7dee8;border-radius:10px;font:inherit;min-height:110px;resize:vertical;margin:6px 0}
 .btn{cursor:pointer;border-radius:999px;border:1px solid #0a1f33;padding:12px 22px;background:#0a1f33;color:#fff;font-weight:700}
 .btn:hover{background:#071627;border-color:#071627}
 .btn:focus-visible{outline:3px solid #2dd4bf;outline-offset:2px}
@@ -110,6 +111,24 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 .sheet-grid a,.sheet-item{display:block;border:1px solid #dbe3ed;border-radius:12px;padding:14px;color:#0a1f33;text-decoration:none;font-weight:700;background:#f8fafc}
 .sheet-grid a small,.sheet-item small{display:block;color:#637083;font-weight:500;margin-top:3px}
 .sheet-item.disabled{color:#94a3b8;background:#f1f5f9}
+/* Phase 2: mentorship + verified institution info */
+.mentor-card{display:flex;flex-direction:column;gap:8px;border-top:4px solid #f59e0b}
+.mentor-head{display:flex;align-items:center;gap:10px}
+.mentor-head h3{margin:0;font-size:18px}
+.mentor-areas{display:flex;flex-wrap:wrap;gap:6px}
+.mentor-card p{margin:0;line-height:1.45}
+.mentor-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:8px}
+.mentor-actions .btn{padding:9px 14px;font-size:14px}
+.mentor-status{font-size:12px;border-radius:999px;padding:2px 10px;font-weight:700;background:#e2e8f0;color:#334155}
+.mentor-status.pending{background:#fef3c7;color:#92400e}.mentor-status.verified{background:#dcfce7;color:#166534}
+.mentor-status.rejected{background:#fee2e2;color:#991b1b}.mentor-status.cancelled{background:#e2e8f0;color:#475569}
+.hub-banner{border:1px solid #dbe3ed;border-radius:12px;padding:10px 12px;background:#f8fafc;margin:8px 0}
+.hub-banner .verified{background:#dcfce7;color:#166534}
+.hub-list{margin:4px 0 0;padding-left:20px}.hub-list li{margin:4px 0}
+.faq-item{border-left:3px solid #dbe3ed;padding-left:10px;margin:8px 0}
+.feedback-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.feedback-row .btn{padding:6px 12px;font-size:13px}
+.feedback-row .muted{font-size:12px}
 @media(max-width:700px){
 .hero h1{font-size:28px}.menu-btn{display:inline-block}#mainNav{display:none;width:100%;flex-direction:column}#mainNav.open{display:flex}#mainNav a{padding:8px 0}
 .bottom-nav{display:flex}body{padding-bottom:84px}.wrap{padding-bottom:90px}
@@ -122,7 +141,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <header class="topbar">
 <div class="brand"><a href="/" style="color:#fff;text-decoration:none"><span class="logo">F</span> Fidonect</a></div>
 <button id="menuBtn" class="menu-btn" aria-label="Open menu">☰</button>
-<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/scholarships">Scholarships</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/profile">My Profile</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
+<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/mentors">Mentors</a><a href="/scholarships">Scholarships</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/profile">My Profile</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
 </header>
 
 <div class="wrap" id="home">
@@ -135,6 +154,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <a class="feat" href="/institutions"><b>Institutions</b><span>588 schools — search, filter, open any school page</span></a>
 <a class="feat" href="/scholarships"><b>Scholarships</b><span>Verified opportunities with official links only</span></a>
 <a class="feat" href="/connections"><b>Connections</b><span>Find classmates, connect, message your circle</span></a>
+<a class="feat" href="/mentors"><b>Mentors</b><span>Verified student guides for clearance and resumption</span></a>
 <a class="feat" href="/profile"><b>My Profile</b><span>Your school, visibility, photo and account</span></a>
 <a class="feat" href="/ai-honesty"><b>Ask Fido</b><span>Campus guidance with honest Official / Community / AI labels</span></a>
 <a class="feat" href="/about"><b>About</b><span>What Fidonect is, who it serves, and how it works</span></a>
@@ -239,6 +259,55 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="pager"><button id="scholarshipPrev" class="btn ghost" type="button">← Prev</button><span id="scholarshipPageLabel" class="muted"></span><button id="scholarshipNext" class="btn ghost" type="button">Next →</button></div>
 </div>
 
+<div id="mentors" data-page="mentors">
+<div class="card">
+<h2>Mentors <span id="mentorCount" class="pill"></span></h2>
+<p class="lede">Only mentors reviewed and approved by a Fidonect admin carry a verified badge. Verified mentors are existing students or alumni who chose to help with clearance, resumption, accommodation, study and campus life. Never pay a mentor or share passwords, bank details or ID documents.</p>
+<div class="search-row"><input id="mentorSearch" class="input" placeholder="Search name, school, department or help area" autocomplete="off" /><button id="mentorFind" class="btn">Search</button></div>
+<p id="mentorNotice" class="muted"></p>
+<div class="grid" id="mentorGrid"></div>
+</div>
+
+<div class="card" id="mentorRequestBox" style="display:none">
+<h2>Request mentorship</h2>
+<p class="muted">Send a short, specific request to <b id="mentorRequestName"></b>. They can accept or decline. Accepted requests unlock private messaging.</p>
+<input id="mentorRequestTopic" class="input" maxlength="120" placeholder="Topic e.g. UNILAG clearance documents" />
+<textarea id="mentorRequestMessage" maxlength="2000" placeholder="What do you need help with? Keep it specific and avoid sensitive personal details."></textarea>
+<div class="search-row"><button id="mentorRequestSend" class="btn" type="button">Send request</button><button id="mentorRequestCancel" class="btn ghost" type="button">Cancel</button></div>
+<p id="mentorRequestMsg" class="muted"></p>
+</div>
+
+<div class="card" id="mentorApplyCard">
+<h2>Become a mentor</h2>
+<p class="lede">Existing students and alumni can apply. An admin checks your evidence before your profile appears publicly. Your public listing shows your name, photo, school, department, level, help areas and bio — never your email or private evidence. Do not paste ID numbers, passwords or document images.</p>
+<p id="mentorApplyStatus" class="muted"></p>
+<div class="form-grid">
+<input id="mentorSchool" class="input" list="schoolList" maxlength="160" placeholder="Institution from the directory *" />
+<input id="mentorFaculty" class="input" maxlength="160" placeholder="Faculty (optional)" />
+<input id="mentorDepartment" class="input" maxlength="160" placeholder="Department (optional)" />
+<input id="mentorProgramme" class="input" maxlength="160" placeholder="Programme (optional)" />
+<input id="mentorLevel" class="input" maxlength="80" placeholder="Level e.g. 300-level or Alumni" />
+<input id="mentorAreas" class="input" maxlength="500" placeholder="Help areas, comma separated *" />
+</div>
+<textarea id="mentorBio" maxlength="2000" placeholder="Short bio: what can you help with, and what should a prospective student know? (20–2000 chars) *"></textarea>
+<div class="form-grid">
+<select id="mentorMethod" class="input"><option value="institutional_email">Institutional email</option><option value="student_id">Student ID / portal profile</option><option value="other">Other approved method</option></select>
+<input id="mentorDetail" class="input" maxlength="300" placeholder="Private verification reference (admin-only, optional)" />
+</div>
+<label class="filter-check" style="margin:8px 0"><input id="mentorListed" type="checkbox" checked /> Show my verified mentor profile publicly</label>
+<div class="search-row"><button id="mentorApplyBtn" class="btn" type="button">Submit for review</button></div>
+<p id="mentorApplyMsg" class="muted"></p>
+</div>
+
+<div class="card" id="mentorRequestsCard">
+<h2>Mentorship requests</h2>
+<p class="muted">Mentors see incoming requests here; requesters see their sent requests. Accepted requests unlock private messaging.</p>
+<p id="mentorReqMsg" class="muted"></p>
+<div id="mentorIncoming"></div>
+<div id="mentorOutgoing"></div>
+</div>
+</div>
+
 <div id="students" data-page="connections">
 <h2>Student connections</h2>
 <p class="lede">Discover registered students who share their profile. Connection requests and messages stay private.</p>
@@ -313,7 +382,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 
 <div class="card" id="admin" style="display:none">
 <h2>Admin dashboard</h2>
-<p><a class="btn ghost" href="/admin" style="text-decoration:none">Manage scholarships &amp; content</a></p>
+<p><a class="btn ghost" href="/admin" style="text-decoration:none">Manage scholarships, mentors &amp; institution info</a></p>
 <p class="muted" id="adminStatus">Checking access…</p>
 <div class="grid" id="adminStats"></div>
 <div id="adminUsers"></div>
@@ -334,6 +403,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="sheet-head"><b id="moreTitle">More</b><button type="button" id="moreClose" aria-label="Close menu">✕</button></div>
 <div class="sheet-grid">
 <a href="/messages">Messages<small>Your private chats</small></a>
+<a href="/mentors">Mentors<small>Verified student guides</small></a>
 <a href="/profile">My Profile<small>School, photo and visibility</small></a>
 <a href="/scholarships">Scholarships<small>Verified opportunities</small></a>
 <a href="/ai-honesty">AI Honesty<small>How Fido labels answers</small></a>
@@ -348,7 +418,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 </div>
 
-<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/scholarships">Scholarships</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
+<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/mentors">Mentors</a> • <a href="/scholarships">Scholarships</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
 
 <script>
 var liveSchools=[]; // live rows from the API; never show invented fallback schools
@@ -408,16 +478,36 @@ return list.length;
 // by adding its rows — no new page code needed.
 function schoolProfileHTML(t, page){
 page=!!page;
+var h=t.hub||null, verified=!!(h&&h.verified), facs=t.faculties||[];
 var html=page?'<p><a href="/#schools">← Back to all schools</a></p>':"";
-html+='<div class="card"><h2>'+esc(t.name)+'</h2><p class="muted">'+esc(t.location||"")+((t.state&&t.location.indexOf(t.state)<0)?", "+esc(t.state):"")+(t.ownership?" • "+esc(t.ownership):"")+(t.kind?" • "+esc(t.kind):"")+'</p>';
-html+='<h3>Overview</h3><p>'+esc((t.hub&&t.hub.overview)||"Community-driven page for this institution. Official details are added as they are verified.")+'</p>'+(t.hub?'<p><span class="pill">'+esc(t.hub.source)+'</span></p>':"");
-html+='<h3>Admission information</h3><p>Track JAMB CAPS, accept your offer there, and watch the school portal for merit and supplementary lists. Only trust offers on CAPS or the official portal.</p>';
-html+='<h3>Resumption information</h3><p>Confirm accommodation before travelling, carry originals plus photocopies in a file jacket, and attend orientation week — it is the easiest week to meet classmates and find a mentor.</p>';
-html+='<h3>Clearance requirements</h3><p>'+esc((t.hub&&t.hub.clearance)||"Confirm your name on the admission list, then present originals plus photocopies at the screening venue. Confirm the exact list on the school portal.")+'</p>';
-html+='<h3>Required documents</h3><p>JAMB admission letter and result slip, O-level result(s), birth certificate or age declaration, LGA identification letter, 8–12 passport photographs, acceptance fee receipt, and departmental screening forms. Carry originals plus 3–4 photocopies of each.</p>';
-html+='<h3>School fees</h3><p>'+esc((t.hub&&t.hub.fees)||"Check the official school portal for the current schedule — fees change per session and faculty.")+' <span class="muted">Pay only through official channels; never pay into personal accounts.</span>'+(t.hub?"":' <span class="muted">Have verified figures? Ask in the community.</span>')+'</p>';
-html+='<h3>Accommodation</h3><p>'+esc((t.hub&&t.hub.accommodation)||"Apply for the school hostel immediately after clearance and line up a private hostel nearby as backup. Inspect security, water, light, and distance before paying.")+'</p>';
-html+='<h3>Faculties &amp; departments</h3>'+(t.faculties.map(function(f){return '<p><b>'+esc(f.name)+'</b><br/>'+f.departments.map(function(d){return esc(d.name)+' ('+d.programmes.map(function(p){return esc(p.name);}).join(", ")+')';}).join("<br/>")+'</p>';}).join("")||'<p class="muted">Department details coming soon for this school.</p>');
+html+='<div class="card"><h2>'+esc(t.name)+'</h2><p class="muted">'+esc(t.location||"")+((t.state&&(t.location||"").indexOf(t.state)<0)?", "+esc(t.state):"")+(t.ownership?" • "+esc(t.ownership):"")+(t.kind?" • "+esc(t.kind):"")+'</p>';
+html+='<h3>Overview</h3><p>'+esc((h&&h.overview)||"Community-driven page for this institution. Official details are added only after an admin verifies them.")+'</p>';
+if(h){
+html+='<div class="hub-banner">'+(verified?'<span class="verified">✓ Verified institution info</span>':'<span class="awaiting">Community info — not yet verified</span>')+' <span class="muted small">Source: '+esc(h.source||"Community")+(h.updated_at?' • updated '+esc(new Date(h.updated_at).toLocaleDateString()):"")+'</span>'+(h.source_url?' <a class="muted small" href="'+esc(h.source_url)+'" target="_blank" rel="noopener noreferrer">Open source</a>':"")+'</div>';
+}
+var blocks=[
+["Admission information",h&&h.admission,"Track JAMB CAPS, accept your offer there, and watch the school portal for merit and supplementary lists. Only trust offers on CAPS or the official portal."],
+["Registration",h&&h.registration,"Pay acceptance and school fees first, register inside the portal window, print your forms, and confirm with your level adviser."],
+["Key dates",h&&h.dates,"Dates change per session. Check the official school portal for the current academic calendar."],
+["Clearance requirements",h&&h.clearance,"Confirm your name on the admission list, then present originals plus photocopies at the screening venue. Confirm the exact list on the school portal."],
+["Required documents",h&&h.clearance,"JAMB admission letter and result slip, O-level result(s), birth certificate or age declaration, LGA identification letter, 8–12 passport photographs, acceptance fee receipt, and departmental screening forms. Carry originals plus 3–4 photocopies of each."],
+["School fees",h&&h.fees,"Check the official school portal for the current schedule — fees change per session and faculty. Pay only through official channels; never pay into personal accounts."],
+["Accommodation",h&&h.accommodation,"Apply for the school hostel immediately after clearance and line up a private hostel nearby as backup. Inspect security, water, light, and distance before paying."],
+["Transport",h&&h.transport,"Ask in the student community for current routes, shuttle prices, and safe arrival tips."],
+["Facilities",h&&h.facilities,"Check the school portal or ask connected students about the library, laboratories, health centre, and sports facilities."]
+];
+blocks.forEach(function(b){
+var text=b[1]||b[2];if(!text)return;
+html+='<h3>'+esc(b[0])+'</h3><p>'+esc(text)+'</p>';
+});
+if(!h)html+='<p class="muted small">These are general preparation steps, not verified institution-specific facts.</p>';
+if(h&&Array.isArray(h.faq)&&h.faq.length){
+html+='<h3>Frequently asked questions</h3>'+h.faq.map(function(f){return '<div class="faq-item"><p><b>'+esc(f.question)+'</b></p><p>'+esc(f.answer)+'</p></div>';}).join("");
+}
+if(h&&Array.isArray(h.official_links)&&h.official_links.length){
+html+='<h3>Official links</h3><ul class="hub-list">'+h.official_links.map(function(l){return '<li><a href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer">'+esc(l.label)+'</a></li>';}).join("")+'</ul>';
+}
+html+='<h3>Faculties &amp; departments</h3>'+(facs.map(function(f){return '<p><b>'+esc(f.name)+'</b><br/>'+((f.departments||[]).map(function(d){return esc(d.name)+' ('+((d.programmes||[]).map(function(p){return esc(p.name);}).join(", "))+')';}).join("<br/>")||'<span class="muted">Departments coming soon.</span>')+'</p>';}).join("")||'<p class="muted">Department details coming soon for this school.</p>');
 html+='<div id="commWrap"><h3>Student community</h3><p class="muted small">Stay safe: never share passwords, bank details, ID documents, or your exact home address.</p><div id="postList"></div><div class="search-row" id="postBox" style="display:none"><input id="postInput" class="input" placeholder="Share guidance or ask a question…" /><button class="btn" onclick="sendPost()">Post</button></div><p class="muted" id="postLogin">Log in on the Home or Connections page to join the discussion.</p></div>';
 html+='<div><h3>Ask Fido about '+esc(t.name)+'</h3><div class="search-row"><input id="schoolFidoQ" class="input" placeholder="Ask e.g. clearance, fees, accommodation…" /><button class="btn" onclick="askFidoSchool()">Ask</button></div><div id="schoolFidoAns" style="margin-top:10px"></div></div>';
 html+='</div>';return html;
@@ -431,6 +521,35 @@ if(!r.ok)throw new Error(t.error||("HTTP "+r.status));
 box.innerHTML=schoolProfileHTML(t,false);currentSchool=t.name;loadPosts();
 }catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
+var lastFido={question:"",source:"",school:""};
+function fidoAnswerHTML(j, question){
+lastFido={question:question||"",source:j.source||"",school:j.school||""};
+var cls=j.source==="Official"?"tag-official":j.source==="Community"?"tag-community":"tag-ai";
+var meta=(j.school?'<span class="muted small">'+esc(j.school)+'</span>':"");
+if(j.verified!==undefined)meta+=' <span class="muted small">'+(j.verified?"✓ verified institution page":"not yet verified")+'</span>';
+var links=(j.sources||[]).map(function(s){return '<li><a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.label||"Official source")+'</a></li>';}).join("");
+return '<div class="person"><p><span class="tag '+cls+'">'+esc(j.source)+'</span> '+meta+'</p><p>'+esc(j.answer)+'</p>'+
+(links?'<p class="muted small">Sources:</p><ul class="hub-list">'+links+'</ul>':"")+
+'<p class="muted small">Verify important facts with official school sources. Fido never decides admissions, scholarships, grades or jobs.</p>'+
+'<div class="feedback-row"><span class="muted">Was this helpful?</span><button type="button" class="btn ghost" onclick="sendFidoFeedback(true)">Yes</button><button type="button" class="btn ghost" onclick="sendFidoFeedback(false)">No</button><span class="muted fido-feedback-msg"></span></div></div>';
+}
+async function sendFidoFeedback(helpful){
+var correction="";
+if(!helpful){try{correction=prompt("What should be corrected? (optional — do not include personal data)")||"";}catch(e){}}
+var s=sess();
+var headers={"Content-Type":"application/json"};
+if(s&&s.access_token)headers.Authorization="Bearer "+s.access_token;
+try{
+var r=await fetch(apiBase()+"/api/fido/feedback",{method:"POST",headers:headers,body:JSON.stringify({question:lastFido.question,source:lastFido.source,school:lastFido.school,helpful:helpful,correction:correction})});
+var j=await r.json();
+if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+var boxes=document.querySelectorAll(".fido-feedback-msg");
+for(var i=0;i<boxes.length;i++)boxes[i].textContent="Thanks — feedback recorded.";
+}catch(e){
+var boxes2=document.querySelectorAll(".fido-feedback-msg");
+for(var k=0;k<boxes2.length;k++)boxes2[k].textContent="Could not send feedback: "+e.message;
+}
+}
 async function askFidoSchool(){
 var inp=document.getElementById("schoolFidoQ"),box=document.getElementById("schoolFidoAns");
 if(!inp||!box)return;
@@ -439,8 +558,7 @@ if(!q){box.innerHTML='<p class="muted">Type a question first.</p>';return;}
 box.innerHTML='<p class="muted">Fido is thinking…</p>';
 try{var r=await fetch(apiBase()+"/api/fido/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,context:{school:currentSchool}})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
-var cls=j.source==="Official"?"tag-official":j.source==="Community"?"tag-community":"tag-ai";
-box.innerHTML='<div class="person"><p><span class="tag '+cls+'">'+esc(j.source)+'</span> '+(j.school?'<span class="muted small">'+esc(j.school)+'</span>':"")+'</p><p>'+esc(j.answer)+'</p><p class="muted small">Verify important facts with official school sources.</p></div>';
+box.innerHTML=fidoAnswerHTML(j,q);
 }catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
 // Dedicated school page router: /schools/:id renders the full profile and
@@ -468,8 +586,7 @@ if(!q){box.innerHTML='<p class="muted">Type a question first.</p>';return;}
 box.innerHTML='<p class="muted">Fido is thinking…</p>';
 try{var r=await fetch(apiBase()+"/api/fido/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})});
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
-var cls=j.source==="Official"?"tag-official":j.source==="Community"?"tag-community":"tag-ai";
-box.innerHTML='<div class="person"><p><span class="tag '+cls+'">'+esc(j.source)+'</span> '+(j.school?'<span class="muted small">'+esc(j.school)+'</span>':"")+'</p><p>'+esc(j.answer)+'</p><p class="muted small">Verify important facts with official school sources.</p></div>';
+box.innerHTML=fidoAnswerHTML(j,q);
 }catch(e){box.innerHTML='<p class="muted">Failed: '+esc(e.message)+'</p>';}
 }
 document.getElementById("fidoBtn").onclick=askFido;
@@ -647,6 +764,144 @@ document.getElementById("scholarshipPrev").onclick=function(){if(scholarshipStat
 document.getElementById("scholarshipNext").onclick=function(){if(scholarshipState.offset+scholarshipState.limit<scholarshipState.total){scholarshipState.offset+=scholarshipState.limit;loadScholarships(false);}};
 document.getElementById("scholarshipReset").onclick=function(){document.getElementById("scholarshipSearch").value="";document.getElementById("scholarshipLevel").value="";document.getElementById("scholarshipFunding").value="";document.getElementById("scholarshipVerified").checked=false;loadScholarships(true);};
 
+// ---- Phase 2: Mentorship (verified mentors, applications, requests) ----
+var mentorState={items:[],target:null};
+function mentorDate(d){if(!d)return "";try{return new Date(d).toLocaleDateString();}catch(e){return "";}}
+function mentorCardHTML(m){
+var areas=(m.help_areas||[]).map(function(a){return '<span class="pill">'+esc(a)+'</span>';}).join("");
+return '<article class="card mentor-card">'+
+'<div class="mentor-head">'+avatarHTML(m,52)+'<div><h3>'+esc(m.name)+'</h3>'+
+'<div class="muted">'+esc(m.department||m.faculty||"")+(m.level?" • "+esc(m.level):"")+'</div>'+
+'<div class="muted small">'+esc(m.institution_name||"")+(m.institution_location?" • "+esc(m.institution_location):"")+'</div></div></div>'+
+'<div><span class="verified">✓ Verified mentor</span>'+(m.verified_at?' <span class="muted small">since '+esc(mentorDate(m.verified_at))+'</span>':"")+'</div>'+
+'<p>'+esc(m.bio)+'</p><div class="mentor-areas">'+areas+'</div>'+
+'<div class="mentor-actions"><button type="button" class="btn" onclick="openMentorRequest(\''+esc(m.user_id)+'\')">Request mentorship</button></div></article>';
+}
+function renderMentors(items){
+var grid=document.getElementById("mentorGrid");
+if(!grid)return;
+grid.innerHTML=(items||[]).map(mentorCardHTML).join("")||'<div class="empty-state"><b>No verified mentors yet</b>Mentors appear here only after an admin reviews their application. You can apply to become the first verified mentor for your school.</div>';
+var countEl=document.getElementById("mentorCount");var n=(items||[]).length;if(countEl){countEl.textContent=n?n+" verified":"";countEl.style.display=n?"":"none";}
+}
+async function loadMentors(){
+var notice=document.getElementById("mentorNotice");
+if(!notice)return;
+var q=document.getElementById("mentorSearch").value.trim();
+notice.textContent="Loading mentors…";
+try{
+var r=await fetch(apiBase()+"/api/mentors?limit=100"+(q?"&q="+encodeURIComponent(q):""));
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){mentorState.items=[];renderMentors([]);notice.innerHTML='<div class="empty-state"><b>Mentorship is being set up</b>The Phase 2 database migration has not been applied yet. No placeholder mentors are shown.</div>';return;}
+mentorState.items=j.mentors||[];renderMentors(mentorState.items);
+notice.textContent=mentorState.items.length?("Showing "+mentorState.items.length+" verified mentor"+(mentorState.items.length===1?"":"s")+(q?' matching "'+q+'"':"")+"."):"No verified mentors match yet. This space stays honest — only admin-verified mentors are listed.";
+}catch(e){mentorState.items=[];renderMentors([]);notice.textContent="Could not load mentors: "+e.message;}
+}
+function openMentorRequest(userId){
+var box=document.getElementById("mentorRequestBox");
+if(!sess()){location.href="/profile";return;}
+var m=(mentorState.items||[]).filter(function(x){return String(x.user_id)===String(userId);})[0];
+mentorState.target=m||{user_id:userId,name:"this mentor"};
+document.getElementById("mentorRequestName").textContent=mentorState.target.name||"this mentor";
+document.getElementById("mentorRequestMsg").textContent="";
+document.getElementById("mentorRequestTopic").value="";
+document.getElementById("mentorRequestMessage").value="";
+box.style.display="";
+box.scrollIntoView({behavior:"smooth"});
+}
+async function sendMentorRequest(){
+var s=await ensureSession(),m=document.getElementById("mentorRequestMsg");
+if(!s){m.textContent="Log in to request mentorship.";return;}
+if(!mentorState.target){m.textContent="Choose a mentor first.";return;}
+var topic=document.getElementById("mentorRequestTopic").value.trim();
+var message=document.getElementById("mentorRequestMessage").value.trim();
+if(topic.length<3){m.textContent="Add a topic (at least 3 characters).";return;}
+if(message.length<10){m.textContent="Write a specific request (at least 10 characters).";return;}
+m.textContent="Sending…";
+try{
+var r=await fetch(apiBase()+"/api/mentor-requests",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({mentor_id:mentorState.target.user_id,topic:topic,message:message})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+m.textContent="Request sent. This mentor can accept or decline it.";
+document.getElementById("mentorRequestBox").style.display="none";
+loadMentorRequests();
+}catch(e){m.textContent="Could not send request: "+e.message;}
+}
+function mentorRequestHTML(r,incoming){
+var other=r.other||{},st=r.status||"pending";
+var actions="";
+if(incoming&&st==="pending")actions='<button type="button" class="btn ghost" onclick="respondMentorRequest('+r.id+',\'accept\')">Accept</button> <button type="button" class="btn ghost" onclick="respondMentorRequest('+r.id+',\'decline\')">Decline</button>';
+else if(!incoming&&st==="pending")actions='<button type="button" class="btn ghost" onclick="respondMentorRequest('+r.id+',\'cancel\')">Cancel</button>';
+if(st==="accepted")actions+=' <button type="button" class="btn" onclick="openChatWith(\''+esc(other.id||"")+'\')">Message</button> <button type="button" class="btn ghost" onclick="respondMentorRequest('+r.id+',\'complete\')">Mark complete</button>';
+return '<div class="person"><div style="display:flex;align-items:center;gap:10px">'+avatarHTML(other,40)+'<div><b>'+esc(other.name||"Student")+'</b><div class="muted small">'+esc(other.school||"")+'</div></div><span class="mentor-status '+esc(st)+'" style="margin-left:auto">'+esc(st)+'</span></div>'+
+'<p><b>'+esc(r.topic)+'</b></p><p>'+esc(r.message)+'</p><div class="muted small">'+esc(new Date(r.created_at).toLocaleString())+'</div>'+(actions?'<div class="mentor-actions">'+actions+'</div>':"")+'</div>';
+}
+async function loadMentorRequests(){
+var s=await ensureSession(),box=document.getElementById("mentorReqMsg");
+if(!s){document.getElementById("mentorIncoming").innerHTML="";document.getElementById("mentorOutgoing").innerHTML="";if(box)box.textContent="Log in to see mentorship requests.";return;}
+try{
+var r=await fetch(apiBase()+"/api/mentor-requests/mine",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){if(box)box.textContent="Mentorship requests are being set up.";return;}
+var inc=j.incoming||[],out=j.outgoing||[];
+document.getElementById("mentorIncoming").innerHTML='<h3>Incoming ('+inc.length+')</h3>'+(inc.map(function(x){return mentorRequestHTML(x,true);}).join("")||'<p class="muted">No incoming requests.</p>');
+document.getElementById("mentorOutgoing").innerHTML='<h3>Sent ('+out.length+')</h3>'+(out.map(function(x){return mentorRequestHTML(x,false);}).join("")||'<p class="muted">No sent requests.</p>');
+if(box)box.textContent="";
+}catch(e){if(box)box.textContent="Could not load requests: "+e.message;}
+}
+async function respondMentorRequest(id,action){
+var s=await ensureSession();if(!s)return;
+try{
+var r=await fetch(apiBase()+"/api/mentor-requests/"+id+"/respond",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({action:action})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+loadMentorRequests();
+}catch(e){alert("Failed: "+e.message);}
+}
+async function loadMentorMe(){
+var s=await ensureSession(),status=document.getElementById("mentorApplyStatus");
+if(!status)return;
+if(!s){status.textContent="Log in to apply as a mentor.";return;}
+try{
+var r=await fetch(apiBase()+"/api/mentors/me",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){status.textContent="Mentor applications are being set up.";return;}
+var m=j.mentor;
+if(!m){status.textContent="You have not applied yet. Submit the form below for admin review.";return;}
+status.innerHTML='<span class="mentor-status '+esc(m.status)+'">'+esc(m.status)+'</span> '+(m.status==="verified"?"Your profile is public in the mentor directory.":m.status==="rejected"?"Your application was not approved. Update it and resubmit for review.":"An admin is reviewing your application.")+(m.admin_note?'<br/><span class="muted small">Admin note: '+esc(m.admin_note)+'</span>':"");
+document.getElementById("mentorSchool").value=m.institution_name||"";
+document.getElementById("mentorFaculty").value=m.faculty||"";
+document.getElementById("mentorDepartment").value=m.department||"";
+document.getElementById("mentorProgramme").value=m.programme||"";
+document.getElementById("mentorLevel").value=m.level||"";
+document.getElementById("mentorAreas").value=(m.help_areas||[]).join(", ");
+document.getElementById("mentorBio").value=m.bio||"";
+document.getElementById("mentorMethod").value=m.verification_method||"institutional_email";
+document.getElementById("mentorDetail").value=m.verification_detail||"";
+document.getElementById("mentorListed").checked=m.listed!==false;
+}catch(e){status.textContent="Could not load your mentor profile: "+e.message;}
+}
+async function submitMentorApplication(){
+var s=await ensureSession(),msg=document.getElementById("mentorApplyMsg");
+if(!s){msg.textContent="Log in to apply as a mentor.";return;}
+var areas=document.getElementById("mentorAreas").value.split(",").map(function(a){return a.trim();}).filter(Boolean);
+msg.textContent="Submitting for review…";
+try{
+var body={school:document.getElementById("mentorSchool").value.trim(),faculty:document.getElementById("mentorFaculty").value.trim(),department:document.getElementById("mentorDepartment").value.trim(),programme:document.getElementById("mentorProgramme").value.trim(),level:document.getElementById("mentorLevel").value.trim(),help_areas:areas,bio:document.getElementById("mentorBio").value.trim(),verification_method:document.getElementById("mentorMethod").value,verification_detail:document.getElementById("mentorDetail").value.trim(),listed:document.getElementById("mentorListed").checked};
+var r=await fetch(apiBase()+"/api/mentors/apply",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(body)});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+msg.textContent="Submitted. An admin will review your application. Your profile stays hidden until it is verified.";
+loadMentorMe();
+}catch(e){msg.textContent="Could not submit: "+e.message;}
+}
+async function loadMentorsPage(){
+await loadMentors();
+await loadMentorMe();
+await loadMentorRequests();
+}
+document.getElementById("mentorFind").onclick=loadMentors;
+document.getElementById("mentorSearch").onkeydown=function(e){if(e.key==="Enter")loadMentors();};
+document.getElementById("mentorRequestSend").onclick=sendMentorRequest;
+document.getElementById("mentorRequestCancel").onclick=function(){document.getElementById("mentorRequestBox").style.display="none";};
+document.getElementById("mentorApplyBtn").onclick=submitMentorApplication;
+
 async function fetchProfile(token){
 var r=await fetch(apiBase()+"/api/profile",{headers:{Authorization:"Bearer "+token}});
 return {ok:r.ok,status:r.status,body:await r.json()};
@@ -675,6 +930,7 @@ if(p.body.photo_url){photo.src=p.body.photo_url;photo.style.display="";}else{pho
 var verified=p.body.authMeta&&p.body.authMeta.emailConfirmed;
 document.getElementById("meVerified").textContent=verified?"✓ Verified email":"Unverified email";
 if(typeof refreshStudents==="function"){refreshStudents("");}
+if(routeFromPath()==="mentors"&&typeof loadMentorMe==="function"){loadMentorMe();loadMentorRequests();}
 checkAdmin();
 }
 document.getElementById("signupBtn").onclick=async function(){
@@ -875,7 +1131,7 @@ try{var r=await fetch(apiBase()+"/api/admin/stats",{headers:{Authorization:"Bear
 var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 function card(t,v){return '<div class="card"><h3>'+v+'</h3><p class="muted">'+t+'</p></div>';}
 function statLine(x){return x.status==="ok"?x.count:"pending";}
-document.getElementById("adminStats").innerHTML=card("Registered users",statLine(j.users))+card("Community posts",statLine(j.posts))+card("Institutions",statLine(j.institutions));
+document.getElementById("adminStats").innerHTML=card("Registered users",statLine(j.users))+card("Community posts",statLine(j.posts))+card("Institutions",statLine(j.institutions))+card("Mentors",statLine(j.mentors))+card("Mentor requests",statLine(j.mentorRequests))+card("Hub pages",statLine(j.hubs))+card("Fido feedback",statLine(j.fidoFeedback));
 document.getElementById("adminUsers").innerHTML="<h3>Recent users</h3>"+((j.recentUsers||[]).map(function(u){return '<p><b>'+esc(u.name)+'</b> <span class="muted small">'+esc(u.email)+" — "+esc(u.school||"no school")+" ("+esc(u.visibility)+")</span></p>";}).join("")||'<p class="muted">No user data yet (profiles table pending).</p>');
 document.getElementById("adminPosts").innerHTML="<h3>Recent posts</h3>"+((j.recentPosts||[]).map(function(p){return '<div class="person"><b>'+esc(p.author_name)+'</b> <span class="muted small">'+esc(p.school)+' • '+new Date(p.created_at).toLocaleString()+'</span><p>'+esc(p.text)+'</p></div>';}).join("")||'<p class="muted">No posts yet.</p>');
 st.textContent="Updated "+new Date(j.generatedAt).toLocaleString()+". "+j.reports.detail;
@@ -906,7 +1162,7 @@ if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matc
 setInterval(function(){el.classList.add("fade");setTimeout(function(){i=(i+1)%words.length;el.textContent=words[i];el.classList.remove("fade");},400);},2200);})();
 // ---- Private 1-to-1 messaging (connection-gated; Supabase tables, never local files) ----
 var openChatId=null;
-function avatarHTML(p,size){size=size||40;if(p&&p.photo_url)return '<img src="'+p.photo_url+'" alt="" style="width:'+size+'px;height:'+size+'px;border-radius:50%;object-fit:cover;vertical-align:middle" />';var ch=(p&&p.name?p.name.trim().charAt(0):"?").toUpperCase();return '<span style="display:inline-flex;width:'+size+'px;height:'+size+'px;border-radius:50%;background:#0a1f33;color:#fff;align-items:center;justify-content:center;font-weight:800;vertical-align:middle">'+esc(ch)+'</span>';}
+function avatarHTML(p,size){size=size||40;if(p&&p.photo_url)return '<img src="'+esc(p.photo_url)+'" alt="" style="width:'+size+'px;height:'+size+'px;border-radius:50%;object-fit:cover;vertical-align:middle" />';var ch=(p&&p.name?p.name.trim().charAt(0):"?").toUpperCase();return '<span style="display:inline-flex;width:'+size+'px;height:'+size+'px;border-radius:50%;background:#0a1f33;color:#fff;align-items:center;justify-content:center;font-weight:800;vertical-align:middle">'+esc(ch)+'</span>';}
 async function openChatWith(uid){
 var s=await ensureSession();if(!s){location.href="/connections";return;}
 try{var r=await fetch(apiBase()+"/api/conversations/open",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({otherId:uid})});
@@ -1016,13 +1272,14 @@ else{if(now-lastBadgePoll>=8000){lastBadgePoll=now;await updateMsgBadge();}}
 // connections messages chat ai about" (space-separated); full page loads keep this stateless.
 // Future pages (Map, Events, Communities…): add a server route, a section with
 // data-page="newpage", a nav link, and one line in routeFromPath/PAGE_TITLES.
-var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",scholarships:"Scholarships — Fidonect",profile:"My Profile — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
+var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",mentors:"Mentors — Fidonect",scholarships:"Scholarships — Fidonect",profile:"My Profile — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
 function routeFromPath(){
-var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|scholarships|profile|messages|chat|ai-honesty|about)/);}catch(e){}
+var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|mentors|scholarships|profile|messages|chat|ai-honesty|about)/);}catch(e){}
 if(!m)return "home";
 var seg=m[1];
 if(seg==="schools"||seg==="institutions")return "institutions";
 if(seg==="students"||seg==="connections")return "connections";
+if(seg==="mentors")return "mentors";
 if(seg==="scholarships")return "scholarships";
 if(seg==="profile")return "profile";
 if(seg==="messages")return "messages";
@@ -1040,7 +1297,7 @@ if(title)title.textContent=page==="profile"?(s?"My profile":"Log in to Fidonect"
 var bottom=document.querySelectorAll(".bottom-nav a[data-nav]");
 for(var j=0;j<bottom.length;j++)bottom[j].classList.toggle("active",bottom[j].getAttribute("data-nav")===page);
 var moreBtn=document.getElementById("moreBtn");
-if(moreBtn)moreBtn.classList.toggle("active",["messages","chat","ai","about","profile"].indexOf(page)>-1);
+if(moreBtn)moreBtn.classList.toggle("active",["messages","chat","ai","about","profile","mentors"].indexOf(page)>-1);
 if(PAGE_TITLES[page])document.title=PAGE_TITLES[page];
 }
 function openMore(){
@@ -1066,6 +1323,7 @@ if(m)showSchoolPage(m[1]);
 else if(cm)openChat(cm[1]);
 else if(routeFromPath()==="messages")loadConversations();
 if(routeFromPath()==="scholarships")loadScholarships(true);
+if(routeFromPath()==="mentors")loadMentorsPage();
 if(routeFromPath()==="home")loadHomeScholarships();
 updateMsgBadge();
 // Chat: ~2s while a thread is open, messages list: 3s, badge: 8s. msgTick
