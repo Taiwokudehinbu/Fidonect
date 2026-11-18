@@ -948,7 +948,8 @@ app.post("/api/fido/ask", async (req, res) => {
         if (stHit) query = query.eq("state", stHit);
         const { data, error, count } = await query;
         if (!error && data) {
-          const label = [ownQ, stHit, kindQ ? kindQ + "s" : ""].filter(Boolean).join(" ");
+          const kindLabel = kindQ === "University" ? "universities" : (kindQ === "Polytechnic" ? "polytechnics" : (kindQ === "College of Education" ? "colleges of education" : ""));
+          const label = [ownQ, stHit, kindLabel].filter(Boolean).join(" ");
           const names = data.map(r => r.name).join("; ");
           return res.json({ answer: (count || data.length) + " matching " + (label || "schools") + " (showing " + data.length + "): " + names + ". Open any school in the directory below for departments and campus info.", source: "Official", school: null, verify: true, context: { school: null } });
         }

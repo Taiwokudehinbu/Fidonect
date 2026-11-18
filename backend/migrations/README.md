@@ -100,6 +100,19 @@ select tablename, policyname, cmd from pg_policies
 where schemaname = 'public'
   and tablename in ('mentor_profiles', 'mentor_requests', 'hub_pages', 'fido_feedback')
 order by tablename, policyname;
+
+-- Phase 2 guard triggers/functions must exist
+select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and proname in ('is_verified_mentor','guard_mentor_profile_update',
+                  'lock_mentor_request_participants','open_conversation')
+order by proname;
+
+select event_object_table, trigger_name
+from information_schema.triggers
+where trigger_schema = 'public'
+  and event_object_table in ('mentor_profiles','mentor_requests','hub_pages')
+order by event_object_table, trigger_name;
 ```
 
 Then:
