@@ -32,7 +32,9 @@ test("public listing directory only exposes approved listings and no private evi
 });
 
 test("listing owners cannot self-approve or self-verify", () => {
+  assert.match(phase3Sql, /revoke all on public\.campus_listings from anon, authenticated/);
   assert.match(phase3Sql, /grant select, insert, update on public\.campus_listings to authenticated/);
+  assert.doesNotMatch(phase3Sql, /grant[^;]*delete[^;]*campus_listings/i);
   assert.match(phase3Sql, /"create own campus listing"/);
   assert.match(phase3Sql, /"update own campus listing"/);
   assert.match(phase3Sql, /and status = 'pending'\s+and verified = false/);

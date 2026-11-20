@@ -62,7 +62,7 @@ create index if not exists campus_listings_owner_idx
   on public.campus_listings (owner_id, updated_at desc);
 
 alter table public.campus_listings enable row level security;
-revoke all on public.campus_listings from anon;
+revoke all on public.campus_listings from anon, authenticated;
 grant select, insert, update on public.campus_listings to authenticated;
 
 drop policy if exists "read own campus listings" on public.campus_listings;
@@ -178,7 +178,7 @@ left join public.institutions i on i.id = l.institution_id
 where l.status = 'approved'
   and coalesce(p.visibility, 'public') <> 'private';
 
-revoke all on public.campus_listing_directory from anon;
+revoke all on public.campus_listing_directory from anon, authenticated;
 grant select on public.campus_listing_directory to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ revoke all on function public.public_listing_owner(bigint) from anon;
 grant execute on function public.public_listing_owner(bigint) to authenticated, service_role;
 
 alter table public.listing_requests enable row level security;
-revoke all on public.listing_requests from anon;
+revoke all on public.listing_requests from anon, authenticated;
 grant select, insert, update on public.listing_requests to authenticated;
 
 drop policy if exists "read own listing requests" on public.listing_requests;
