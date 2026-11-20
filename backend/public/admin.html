@@ -33,6 +33,7 @@ textarea{min-height:90px;resize:vertical}
 .badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;margin-right:4px}
 .badge.published{background:#dcfce7;color:#166534}.badge.draft{background:#fef3c7;color:#92400e}.badge.archived{background:#e2e8f0;color:#475569}
 .badge.verified{background:#dbeafe;color:#1e40af}.badge.unverified{background:#fee2e2;color:#991b1b}
+.badge.approved{background:#dcfce7;color:#166534}.badge.pending{background:#fef3c7;color:#92400e}.badge.rejected{background:#fee2e2;color:#991b1b}.badge.paused{background:#e2e8f0;color:#475569}
 .admin-item{border:1px solid #dbe3ed;border-radius:12px;padding:12px;margin:8px 0;background:#fff}
 .admin-item h4{margin:0 0 4px;font-size:16px}
 .admin-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -58,6 +59,7 @@ textarea{min-height:90px;resize:vertical}
 <button class="tab" data-tab="scholarships" type="button">Scholarships</button>
 <button class="tab" data-tab="mentors" type="button">Mentors</button>
 <button class="tab" data-tab="hubs" type="button">Institution info</button>
+<button class="tab" data-tab="listings" type="button">Housing &amp; services</button>
 </div>
 
 <div id="overviewPanel" class="panel active">
@@ -131,6 +133,17 @@ textarea{min-height:90px;resize:vertical}
 <h3>Edited hub pages</h3>
 <div id="aHubList"><p class="muted">Loading…</p></div>
 </div>
+
+<div id="listingsPanel" class="panel">
+<div class="ok" style="display:none" id="aListingOk"></div>
+<div class="deny" style="display:none" id="aListingDeny"></div>
+<h3>Accommodation &amp; campus-service listings</h3>
+<p class="muted small">Approve only after checking the listing and its source. A “source checked” badge requires a real admin verification. Fidonect does not take bookings, hold reservations, or process payments. Public listings never show owner email, exact private addresses, phone numbers, or source URLs.</p>
+<div id="aListingList"><p class="muted">Loading…</p></div>
+<h3>Contact requests</h3>
+<p class="muted small">Accepted requests unlock private messaging between the student and the listing owner.</p>
+<div id="aListingRequests"><p class="muted">Loading…</p></div>
+</div>
 </div>
 
 <script>
@@ -186,13 +199,15 @@ async function loadDash(tok) {
   await loadMentorAdmin();
   await loadHubInstitutions();
   await loadHubsAdmin();
+  await loadListingAdmin();
+  await loadListingRequestsAdmin();
 }
 async function loadStats() {
   try {
     var j = await api("/api/admin/stats");
     function card(t, v) { return '<div class="stat"><b>' + v + '</b><span class="muted small">' + t + '</span></div>'; }
     function n(x) { return x.status === "ok" ? x.count : "pending"; }
-    document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions)) + card("Mentors", n(j.mentors)) + card("Mentor requests", n(j.mentorRequests)) + card("Hub pages", n(j.hubs)) + card("Fido feedback", n(j.fidoFeedback));
+    document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions)) + card("Mentors", n(j.mentors)) + card("Mentor requests", n(j.mentorRequests)) + card("Hub pages", n(j.hubs)) + card("Fido feedback", n(j.fidoFeedback)) + card("Listings", n(j.listings)) + card("Listing requests", n(j.listingRequests));
     document.getElementById("aUsers").innerHTML = "<h3>Recent users</h3>" + ((j.recentUsers || []).map(function (u) {
       return "<div class=\"person\"><b>" + esc(u.name) + "</b> <span class=\"muted small\">" + esc(u.email) + " — " + esc(u.school || "no school") + "</span></div>";
     }).join("") || '<p class="muted">No user data yet.</p>');
@@ -359,6 +374,70 @@ async function loadHubsAdmin() {
     setDeny("aHubDeny", e.message);
   }
 }
+function listingStatusBadge(status) {
+  return '<span class="badge ' + esc(status) + '">' + esc(status) + '</span>';
+}
+async function loadListingAdmin() {
+  var list = document.getElementById("aListingList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/listings");
+    setDeny("aListingDeny", "");
+    list.innerHTML = (j.listings || []).map(function (l) {
+      var owner = l.owner || {};
+      var institution = l.institution || {};
+      var actions = "";
+      if (l.status !== "approved") actions += '<button class="btn ghost" type="button" data-listing-id="' + l.id + '" data-listing-action="approve">Approve</button>';
+      if (l.status !== "rejected") actions += '<button class="btn ghost" type="button" data-listing-id="' + l.id + '" data-listing-action="reject">Reject</button>';
+      if (l.status === "approved" && !l.verified) actions += '<button class="btn ghost" type="button" data-listing-id="' + l.id + '" data-listing-action="verify">Verify source</button>';
+      if (l.verified) actions += '<button class="btn ghost" type="button" data-listing-id="' + l.id + '" data-listing-action="unverify">Remove verification</button>';
+      if (l.status !== "paused") actions += '<button class="btn danger" type="button" data-listing-id="' + l.id + '" data-listing-action="pause">Pause</button>';
+      return '<div class="admin-item"><h4>' + esc(l.title) + ' ' + listingStatusBadge(l.status) +
+        (l.verified ? '<span class="badge verified">source checked</span>' : '<span class="badge draft">community</span>') + '</h4>' +
+        '<div class="muted small">' + esc(l.kind) + ' • ' + esc(l.institution_name) + (institution.location ? ' • ' + esc(institution.location) : '') +
+        (l.area ? ' • ' + esc(l.area) : '') + '</div>' +
+        '<div class="muted small">Owner: ' + esc(owner.name || "Unknown") + ' • ' + esc(owner.email || "no email") + ' • visibility: ' + esc(owner.visibility || "unknown") + '</div>' +
+        '<p>' + esc(l.description) + '</p>' +
+        (l.price_text ? '<p class="muted small">Price: ' + esc(l.price_text) + (l.price_period ? ' • ' + esc(l.price_period) : '') + '</p>' : "") +
+        (l.source_url ? '<p class="muted small">Source: <a href="' + esc(l.source_url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.source_url) + '</a></p>' : '<p class="muted small">No source URL supplied.</p>') +
+        (l.admin_note ? '<p class="muted small">Admin note: ' + esc(l.admin_note) + '</p>' : "") +
+        '<div class="admin-actions">' + actions + '</div></div>';
+    }).join("") || '<p class="muted">No accommodation or service listings yet.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load listings.</p>';
+    setDeny("aListingDeny", e.message);
+  }
+}
+async function loadListingRequestsAdmin() {
+  var box = document.getElementById("aListingRequests");
+  if (!box) return;
+  try {
+    var j = await api("/api/admin/listing-requests");
+    box.innerHTML = (j.requests || []).map(function (r) {
+      var requester = r.requester || {};
+      var owner = r.owner || {};
+      var listing = r.listing || {};
+      return '<div class="person"><b>' + esc(listing.title || ("Listing #" + r.listing_id)) + '</b> ' + listingStatusBadge(r.status) +
+        '<div class="muted small">Requester: ' + esc(requester.name || "Unknown") + ' • ' + esc(requester.email || "no email") + ' • Owner: ' + esc(owner.name || "Unknown") + ' • ' + esc(owner.email || "no email") + '</div>' +
+        '<p>' + esc(r.message) + '</p><div class="muted small">' + esc(new Date(r.created_at).toLocaleString()) + '</div></div>';
+    }).join("") || '<p class="muted">No contact requests yet.</p>';
+  } catch (e) {
+    box.innerHTML = '<p class="muted">Could not load contact requests.</p>';
+  }
+}
+async function patchListingAdmin(id, patch) {
+  try {
+    await api("/api/admin/listings/" + id, { method: "PATCH", body: JSON.stringify(patch) });
+    setDeny("aListingDeny", "");
+    setOk("Listing updated.", "aListingOk");
+    await loadListingAdmin();
+    await loadListingRequestsAdmin();
+    await loadStats();
+  } catch (e) {
+    setOk("", "aListingOk");
+    setDeny("aListingDeny", e.message);
+  }
+}
 function clearHubForm() {
   document.getElementById("aHubInstitution").value = "";
   ["aHubOverview","aHubAdmission","aHubRegistration","aHubDates","aHubClearance","aHubFees","aHubAccommodation","aHubTransport","aHubFacilities","aHubFaq","aHubLinks","aHubSource","aHubSourceUrl"].forEach(function (id) {
@@ -487,6 +566,18 @@ document.getElementById("aHubList").addEventListener("click", function (e) {
 });
 document.getElementById("aHubInstitution").addEventListener("change", function () {
   if (this.value) editHub(this.value); else clearHubForm();
+});
+document.getElementById("aListingList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button[data-listing-action]") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-listing-id");
+  var action = b.getAttribute("data-listing-action");
+  if (!id || !action) return;
+  if (action === "approve") patchListingAdmin(id, { status: "approved" });
+  else if (action === "reject") patchListingAdmin(id, { status: "rejected", verified: false });
+  else if (action === "verify") patchListingAdmin(id, { status: "approved", verified: true });
+  else if (action === "unverify") patchListingAdmin(id, { verified: false });
+  else if (action === "pause") patchListingAdmin(id, { status: "paused", verified: false });
 });
 document.getElementById("aHubSave").onclick = saveHub;
 document.getElementById("aHubClear").onclick = clearHubForm;

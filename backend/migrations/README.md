@@ -7,6 +7,12 @@ drop tables, reseed institutions, or change the official production URL.
 > it used to create a broad profile-read policy. That policy is now safe
 > (own-row only), but this migration remains the source of truth for profile
 > visibility and the `visible_profiles` view.
+>
+> Run the files in the order below. Do not re-run Phase 2 after Phase 3A: Phase 2
+> replaces `open_conversation()` with the older two-gate version. If an older
+> migration is re-run, re-run Phase 3A afterward to restore the listing-request
+> messaging gate. Phase 3A is discovery-only — it does not add bookings,
+> reservations, payments, or marketplace transactions.
 
 ## Order (run in Supabase SQL Editor, one file at a time)
 
@@ -29,7 +35,16 @@ drop tables, reseed institutions, or change the official production URL.
    - extends `open_conversation()` so an accepted mentorship request also
      unlocks private messaging
    - keeps all mentor/hub content empty or unverified until an admin acts
-5. Seed the first admin role using `20261114_seed_admin_role.example.sql`
+5. `20261118_phase3_accommodation_services.sql`
+   - creates `campus_listings` and `listing_requests`
+   - creates the filtered public `campus_listing_directory` view
+   - adds admin approval and optional source verification for accommodation
+     and campus-service listings
+   - extends `open_conversation()` so an accepted listing request also unlocks
+     private messaging
+   - is discovery-only: no bookings, reservations, payments, or marketplace
+     transactions
+6. Seed the first admin role using `20261114_seed_admin_role.example.sql`
    (copy it, replace the placeholder email, run it once).
 
 ## Backup runbook
@@ -112,6 +127,35 @@ select event_object_table, trigger_name
 from information_schema.triggers
 where trigger_schema = 'public'
   and event_object_table in ('mentor_profiles','mentor_requests','hub_pages')
+order by event_object_table, trigger_name;
+
+-- Phase 3 tables start empty; no placeholder listings are seeded
+select count(*) from public.campus_listings;
+select count(*) from public.listing_requests;
+select count(*) from public.campus_listing_directory;
+
+-- Public listing view must expose no email, source URL, admin note, or phone
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'campus_listing_directory'
+order by ordinal_position;
+
+-- Phase 3 policies and helper objects
+select tablename, policyname, cmd from pg_policies
+where schemaname = 'public'
+  and tablename in ('campus_listings', 'listing_requests')
+order by tablename, policyname;
+
+select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and proname in ('guard_campus_listing_update',
+                  'lock_listing_request_participants',
+                  'public_listing_owner', 'open_conversation')
+order by proname;
+
+select event_object_table, trigger_name
+from information_schema.triggers
+where trigger_schema = 'public'
+  and event_object_table in ('campus_listings','listing_requests')
 order by event_object_table, trigger_name;
 ```
 

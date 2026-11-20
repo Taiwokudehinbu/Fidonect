@@ -164,7 +164,7 @@ app.get("/admin", (req, res) => {
 // Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
 app.get(["/schools", "/schools/:id"], sendHome);
 // Feature pages (client-side router in index.html; same shell, no new backend logic).
-app.get(["/institutions", "/connections", "/mentors", "/ai-honesty", "/about", "/messages", "/scholarships", "/profile"], sendHome);
+app.get(["/institutions", "/connections", "/mentors", "/housing", "/accommodation", "/ai-honesty", "/about", "/messages", "/scholarships", "/profile"], sendHome);
 app.get("/chat/:id", sendHome);
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
@@ -589,6 +589,18 @@ async function acceptedMentorRequest(client, uid, otherId) {
       (r.mentor_id === uid && r.requester_id === otherId));
   } catch (e) { return false; }
 }
+// Phase 3: an accepted accommodation/service listing request is also a valid
+// messaging gate. Missing tables fall back to connection/mentor-only messaging.
+async function acceptedListingRequest(client, uid, otherId) {
+  try {
+    const { data, error } = await client.from("listing_requests").select("requester_id,owner_id")
+      .eq("status", "accepted")
+      .or("requester_id.eq." + uid + ",owner_id.eq." + uid).limit(200);
+    if (error || !data) return false;
+    return data.some(r => (r.requester_id === uid && r.owner_id === otherId) ||
+      (r.owner_id === uid && r.requester_id === otherId));
+  } catch (e) { return false; }
+}
 async function myConversationIds(client, uid) {
   const { data, error } = await client.from("participants").select("conversation_id").eq("user_id", uid).limit(200);
   if (error || !data) return null;
@@ -635,12 +647,15 @@ app.post("/api/conversations/open", async (req, res) => {
   if (otherId === auth.user.id) return bad(res, "cannot message yourself");
   if (!supabase && !auth.me) return res.status(500).json({ error: "Supabase not configured" });
   // independent reads — run them together instead of one after the other
-  const [ok, mentorOk, found] = await Promise.all([
+  const [ok, mentorOk, listingOk, found] = await Promise.all([
     acceptedConnection(auth.me, auth.user.id, otherId),
     acceptedMentorRequest(auth.me, auth.user.id, otherId),
+    acceptedListingRequest(auth.me, auth.user.id, otherId),
     findSharedConversation(auth.me, auth.user.id, otherId),
   ]);
-  if (!ok && !mentorOk) return res.status(403).json({ error: "You're not connected with this user." });
+  if (!ok && !mentorOk && !listingOk) {
+    return res.status(403).json({ error: "You need an accepted connection, mentorship, or listing request to message this user." });
+  }
   if (found.error) return res.status(500).json({ error: found.error });
   let convoId = found.id;
   if (!convoId) {
@@ -1265,6 +1280,414 @@ app.post("/api/mentor-requests/:id/respond", async (req, res) => {
   res.json(data);
 });
 
+// ---- Phase 3A: accommodation + campus-service discovery (no bookings/payments) ----
+function phase3DbError(res, error, label) {
+  if (missingRelation(error)) {
+    return res.status(503).json({
+      error: (label || "Accommodation and services") + " are not set up yet. Run backend/migrations/20261118_phase3_accommodation_services.sql in the Supabase SQL Editor.",
+      setupRequired: true
+    });
+  }
+  if (error && (error.code === "42501" || error.code === "PGRST301")) {
+    return res.status(403).json({ error: "Permission denied. Sign in with an admin account or run the Phase 3 migration." });
+  }
+  return res.status(500).json({ error: (error && error.message) || "Database error" });
+}
+
+const LISTING_PUBLIC_FIELDS = "id,kind,owner_id,owner_name,owner_photo_url,owner_user_type,institution_id,institution_name,title,description,area,price_text,price_period,distance_text,amenities,available_from,source,verified,verified_at,updated_at,institution_location,ownership,institution_kind";
+const LISTING_KINDS = ["accommodation", "service"];
+const LISTING_PERIODS = ["year", "month", "semester", "one-off", "negotiable"];
+
+function listingContentInput(src) {
+  const body = src || {};
+  if (!LISTING_KINDS.includes(body.kind)) return { error: "kind must be accommodation or service" };
+  if (!isText(body.school, 160) || body.school.trim().length < 2) return { error: "school is required (2–160 chars)" };
+  if (!isText(body.title, 120) || body.title.trim().length < 3) return { error: "title must be 3–120 characters" };
+  if (!isText(body.description, 2000) || body.description.trim().length < 20) {
+    return { error: "description must be 20–2000 characters" };
+  }
+  const out = {
+    kind: body.kind,
+    school: body.school.trim(),
+    title: body.title.trim(),
+    description: body.description.trim(),
+    area: null,
+    price_text: null,
+    price_period: null,
+    distance_text: null,
+    amenities: [],
+    available_from: null,
+    source_url: null
+  };
+  for (const [field, max] of Object.entries({ area: 120, price_text: 120, distance_text: 120 })) {
+    if (body[field] === undefined || body[field] === null || body[field] === "") continue;
+    if (typeof body[field] !== "string" || body[field].length > max) return { error: field + " is invalid (max " + max + " chars)" };
+    out[field] = body[field].trim() || null;
+  }
+  if (body.price_period !== undefined && body.price_period !== null && body.price_period !== "") {
+    if (!LISTING_PERIODS.includes(body.price_period)) return { error: "price_period must be year, month, semester, one-off, or negotiable" };
+    out.price_period = body.price_period;
+  }
+  let amenities = body.amenities;
+  if (typeof amenities === "string") amenities = amenities.split(",");
+  if (amenities !== undefined && amenities !== null) {
+    if (!Array.isArray(amenities)) return { error: "amenities must be an array of up to 12 short items" };
+    amenities = [...new Set(amenities.map(a => typeof a === "string" ? a.trim() : "").filter(Boolean))];
+    if (amenities.length > 12) return { error: "amenities must contain at most 12 items" };
+    if (amenities.some(a => a.length < 2 || a.length > 80)) return { error: "each amenity must be 2–80 chars" };
+    out.amenities = amenities;
+  }
+  if (body.available_from !== undefined && body.available_from !== null && body.available_from !== "") {
+    if (!isIsoDate(body.available_from)) return { error: "available_from must be YYYY-MM-DD" };
+    out.available_from = body.available_from;
+  }
+  if (body.source_url !== undefined && body.source_url !== null && body.source_url !== "") {
+    if (!isHttpUrl(body.source_url)) return { error: "source_url must be a valid http(s) URL" };
+    out.source_url = body.source_url.trim();
+  }
+  if (body.institution_id !== undefined && body.institution_id !== null && body.institution_id !== "") {
+    const id = parsePositiveInt(body.institution_id, 0);
+    if (!id) return { error: "institution_id must be a positive integer" };
+    out.institution_id = id;
+  }
+  return { data: out };
+}
+
+async function resolveListingInstitution(input) {
+  if (input.institution_id) {
+    const { data, error } = await supabase.from("institutions").select("id,name").eq("id", input.institution_id).maybeSingle();
+    if (error || !data) return null;
+    return data;
+  }
+  const safe = String(input.school || "").replace(/[%_]/g, " ").trim();
+  if (!safe) return null;
+  const { data, error } = await supabase.from("institutions").select("id,name").ilike("name", safe).limit(1);
+  if (error || !data) return null;
+  return data[0] || null;
+}
+
+app.get("/api/listings", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const limit = parsePositiveInt(req.query.limit, 50, 100);
+  const kind = String(req.query.kind || "");
+  if (kind && !LISTING_KINDS.includes(kind)) return bad(res, "kind must be accommodation or service");
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let query = supabase.from("campus_listing_directory").select(LISTING_PUBLIC_FIELDS, { count: "exact" });
+  if (kind) query = query.eq("kind", kind);
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  if (q) query = query.or("title.ilike.%" + q + "%,area.ilike.%" + q + "%,institution_name.ilike.%" + q + "%,description.ilike.%" + q + "%");
+  const { data, error, count } = await query
+    .order("verified", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (missingRelation(error)) return res.json({ listings: [], total: 0, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ listings: data || [], total: count || 0, setupRequired: false });
+});
+
+app.get("/api/listings/me", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("campus_listings").select("*")
+    .eq("owner_id", auth.user.id).order("updated_at", { ascending: false }).limit(100);
+  if (error) {
+    if (missingRelation(error)) return res.json({ listings: [], setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ listings: data || [], setupRequired: false });
+});
+
+app.post("/api/listings", rateLimit("listingcreate", 20, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const parsed = listingContentInput(req.body);
+  if (parsed.error) return bad(res, parsed.error);
+  const institution = await resolveListingInstitution(parsed.data);
+  if (!institution) return bad(res, "Choose an institution from the Fidonect directory.");
+  const { count, error: countError } = await auth.me.from("campus_listings")
+    .select("*", { count: "exact", head: true }).eq("owner_id", auth.user.id);
+  if (countError) return phase3DbError(res, countError, "Accommodation and services");
+  if ((count || 0) >= 20) return res.status(429).json({ error: "You already have 20 listings. Edit an existing listing instead." });
+  const row = {
+    kind: parsed.data.kind,
+    owner_id: auth.user.id,
+    institution_id: institution.id,
+    institution_name: institution.name,
+    title: parsed.data.title,
+    description: parsed.data.description,
+    area: parsed.data.area,
+    price_text: parsed.data.price_text,
+    price_period: parsed.data.price_period,
+    distance_text: parsed.data.distance_text,
+    amenities: parsed.data.amenities,
+    available_from: parsed.data.available_from,
+    source: "Community",
+    source_url: parsed.data.source_url,
+    status: "pending",
+    verified: false,
+    verified_at: null,
+    verified_by: null,
+    admin_note: null
+  };
+  const { data, error } = await auth.me.from("campus_listings").insert(row).select("*").single();
+  if (error) return phase3DbError(res, error, "Accommodation and services");
+  res.status(201).json({ listing: data, setupRequired: false });
+});
+
+app.patch("/api/listings/:id", rateLimit("listingupdate", 30, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const { data: existing, error: findError } = await auth.me.from("campus_listings").select("*")
+    .eq("id", id).eq("owner_id", auth.user.id).maybeSingle();
+  if (findError) return phase3DbError(res, findError, "Accommodation and services");
+  if (!existing) return res.status(404).json({ error: "Listing not found" });
+  const body = req.body || {};
+  const merged = {
+    kind: existing.kind,
+    school: existing.institution_name,
+    institution_id: existing.institution_id,
+    title: existing.title,
+    description: existing.description,
+    area: existing.area,
+    price_text: existing.price_text,
+    price_period: existing.price_period,
+    distance_text: existing.distance_text,
+    amenities: existing.amenities,
+    available_from: existing.available_from,
+    source_url: existing.source_url,
+    ...body
+  };
+  // If the owner edits the school name without supplying an institution ID,
+  // resolve the new name instead of keeping the old institution ID.
+  if (body.school !== undefined && body.institution_id === undefined) delete merged.institution_id;
+  const parsed = listingContentInput(merged);
+  if (parsed.error) return bad(res, parsed.error);
+  const institution = await resolveListingInstitution(parsed.data);
+  if (!institution) return bad(res, "Choose an institution from the Fidonect directory.");
+  const patch = {
+    kind: parsed.data.kind,
+    institution_id: institution.id,
+    institution_name: institution.name,
+    title: parsed.data.title,
+    description: parsed.data.description,
+    area: parsed.data.area,
+    price_text: parsed.data.price_text,
+    price_period: parsed.data.price_period,
+    distance_text: parsed.data.distance_text,
+    amenities: parsed.data.amenities,
+    available_from: parsed.data.available_from,
+    source: "Community",
+    source_url: parsed.data.source_url,
+    status: "pending",
+    verified: false,
+    verified_at: null,
+    verified_by: null,
+    admin_note: null
+  };
+  const { data, error } = await auth.me.from("campus_listings").update(patch)
+    .eq("id", id).eq("owner_id", auth.user.id).select("*").single();
+  if (error) return phase3DbError(res, error, "Accommodation and services");
+  res.json({ listing: data, setupRequired: false });
+});
+
+app.post("/api/listings/:id/requests", rateLimit("listingrequest", 30, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const message = req.body && req.body.message;
+  if (!isText(message, 1000) || message.trim().length < 10) return bad(res, "message must be 10–1000 characters");
+  const { data: listing, error: findError } = await supabase.from("campus_listing_directory")
+    .select("id,owner_id,title").eq("id", id).maybeSingle();
+  if (findError) return phase3DbError(res, findError, "Accommodation and services");
+  if (!listing) return res.status(404).json({ error: "Listing not found or not approved" });
+  if (listing.owner_id === auth.user.id) return bad(res, "You cannot request contact on your own listing");
+  const { data, error } = await auth.me.from("listing_requests").insert({
+    listing_id: id, requester_id: auth.user.id, owner_id: listing.owner_id, message: message.trim()
+  }).select().single();
+  if (error) {
+    if (error.code === "23505") return res.status(409).json({ error: "You already have a pending request for this listing." });
+    return phase3DbError(res, error, "Listing requests");
+  }
+  res.json(data);
+});
+
+app.get("/api/listing-requests/mine", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("listing_requests").select("*")
+    .or("requester_id.eq." + auth.user.id + ",owner_id.eq." + auth.user.id)
+    .order("created_at", { ascending: false }).limit(100);
+  if (error) {
+    if (missingRelation(error)) return res.json({ incoming: [], outgoing: [], setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  const otherIds = [...new Set((data || []).flatMap(r => [r.requester_id, r.owner_id]).filter(id => id !== auth.user.id))];
+  const listingIds = [...new Set((data || []).map(r => r.listing_id))];
+  let profiles = {};
+  if (otherIds.length) {
+    const pr = await profilesFrom(auth.me, q => q.select("id,name,photo_url,school,dept,user_type").in("id", otherIds));
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  let listings = {};
+  if (listingIds.length) {
+    // Both sides of a request can read the public directory, even when the
+    // requester cannot read the owner-only campus_listings row.
+    const lr = await supabase.from("campus_listing_directory").select("id,title,kind,institution_name,owner_id").in("id", listingIds);
+    (lr.data || []).forEach(l => { listings[l.id] = l; });
+  }
+  const shape = r => {
+    const otherId = r.requester_id === auth.user.id ? r.owner_id : r.requester_id;
+    return { ...r, listing: listings[r.listing_id] || null, other: profiles[otherId] || { id: otherId, name: "Student" } };
+  };
+  res.json({
+    incoming: (data || []).filter(r => r.owner_id === auth.user.id).map(shape),
+    outgoing: (data || []).filter(r => r.requester_id === auth.user.id).map(shape),
+    setupRequired: false
+  });
+});
+
+app.post("/api/listing-requests/:id/respond", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  const action = req.body && req.body.action;
+  if (!id) return bad(res, "id must be a positive integer");
+  if (!["accept", "decline", "cancel", "complete"].includes(action)) {
+    return bad(res, "action must be accept, decline, cancel, or complete");
+  }
+  const { data: row, error } = await auth.me.from("listing_requests").select("*").eq("id", id).maybeSingle();
+  if (error) return phase3DbError(res, error, "Listing requests");
+  if (!row) return res.status(404).json({ error: "Listing request not found" });
+  let next = null;
+  if (action === "accept" || action === "decline") {
+    if (row.owner_id !== auth.user.id) return res.status(403).json({ error: "Only the listing owner can respond to this request" });
+    if (row.status !== "pending") return res.status(409).json({ error: "This request is no longer pending" });
+    next = action === "accept" ? "accepted" : "declined";
+  } else if (action === "cancel") {
+    if (row.requester_id !== auth.user.id) return res.status(403).json({ error: "Only the requester can cancel this request" });
+    if (row.status !== "pending") return res.status(409).json({ error: "Only a pending request can be cancelled" });
+    next = "cancelled";
+  } else {
+    if (row.requester_id !== auth.user.id && row.owner_id !== auth.user.id) return res.status(403).json({ error: "Not your request" });
+    if (row.status !== "accepted") return res.status(409).json({ error: "Only an accepted request can be completed" });
+    next = "completed";
+  }
+  const { data, error: upErr } = await auth.me.from("listing_requests")
+    .update({ status: next, responded_at: new Date().toISOString() })
+    .eq("id", id).eq("status", row.status).select().single();
+  if (upErr) return phase3DbError(res, upErr, "Listing requests");
+  res.json(data);
+});
+
+app.get("/api/admin/listings", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const status = String(req.query.status || "");
+  let query = db.from("campus_listings").select("*", { count: "exact" });
+  if (["pending", "approved", "rejected", "paused"].includes(status)) query = query.eq("status", status);
+  if (isText(req.query.q, 80)) {
+    const q = req.query.q.trim().replace(/[%,()]/g, " ");
+    query = query.or("title.ilike.%" + q + "%,institution_name.ilike.%" + q + "%,area.ilike.%" + q + "%");
+  }
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase3DbError(res, error, "Accommodation and services");
+  const ownerIds = [...new Set((data || []).map(l => l.owner_id))];
+  const institutionIds = [...new Set((data || []).map(l => l.institution_id).filter(Boolean))];
+  let profiles = {};
+  let institutions = {};
+  if (ownerIds.length) {
+    const pr = await db.from("profiles").select("id,name,email,school,photo_url,visibility").in("id", ownerIds);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  if (institutionIds.length) {
+    const ir = await db.from("institutions").select("id,name,location,ownership,kind").in("id", institutionIds);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  res.json({
+    listings: (data || []).map(l => ({ ...l, owner: profiles[l.owner_id] || null, institution: institutions[l.institution_id] || null })),
+    total: count || 0
+  });
+});
+
+app.get("/api/admin/listing-requests", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const { data, error, count } = await db.from("listing_requests").select("*", { count: "exact" })
+    .order("created_at", { ascending: false }).limit(100);
+  if (error) return phase3DbError(res, error, "Listing requests");
+  const ids = [...new Set((data || []).flatMap(r => [r.requester_id, r.owner_id]))];
+  const listingIds = [...new Set((data || []).map(r => r.listing_id))];
+  let profiles = {};
+  let listings = {};
+  if (ids.length) {
+    const pr = await db.from("profiles").select("id,name,email,school").in("id", ids);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  if (listingIds.length) {
+    const lr = await db.from("campus_listings").select("id,title,kind,institution_name").in("id", listingIds);
+    (lr.data || []).forEach(l => { listings[l.id] = l; });
+  }
+  res.json({
+    requests: (data || []).map(r => ({
+      ...r,
+      requester: profiles[r.requester_id] || null,
+      owner: profiles[r.owner_id] || null,
+      listing: listings[r.listing_id] || null
+    })),
+    total: count || 0
+  });
+});
+
+app.patch("/api/admin/listings/:id", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const body = req.body || {};
+  if (body.status !== undefined && !["pending", "approved", "rejected", "paused"].includes(body.status)) {
+    return bad(res, "status must be pending, approved, rejected, or paused");
+  }
+  if (body.verified !== undefined && typeof body.verified !== "boolean") return bad(res, "verified must be true or false");
+  if (body.admin_note !== undefined && (typeof body.admin_note !== "string" || body.admin_note.length > 500)) {
+    return bad(res, "admin_note is invalid (max 500 chars)");
+  }
+  const db = adminDb() || auth.me;
+  const { data: existing, error: findError } = await db.from("campus_listings").select("*").eq("id", id).single();
+  if (findError) {
+    if (findError.code === "PGRST116") return res.status(404).json({ error: "Listing not found" });
+    return phase3DbError(res, findError, "Accommodation and services");
+  }
+  const nextStatus = body.status === undefined ? existing.status : body.status;
+  let nextVerified = body.verified === undefined ? existing.verified : body.verified;
+  if (nextStatus !== "approved") nextVerified = false;
+  if (nextVerified && nextStatus !== "approved") return bad(res, "Approve the listing before verifying its source");
+  const patch = { status: nextStatus, verified: nextVerified };
+  if (body.admin_note !== undefined) patch.admin_note = body.admin_note.trim() || null;
+  if (nextVerified) {
+    patch.verified_at = existing.verified_at || new Date().toISOString();
+    patch.verified_by = existing.verified_by || auth.user.id;
+  } else {
+    patch.verified_at = null;
+    patch.verified_by = null;
+  }
+  const { data, error } = await db.from("campus_listings").update(patch).eq("id", id).select("*").single();
+  if (error) return phase3DbError(res, error, "Accommodation and services");
+  await auditAdmin(auth, "listing." + nextStatus + (nextVerified ? ".verified" : ""), String(id), {
+    status: nextStatus, verified: nextVerified, title: data.title
+  });
+  res.json(data);
+});
+
 app.post("/api/fido/feedback", rateLimit("fidofeedback", 30, 60 * 1000), async (req, res) => {
   const auth = await authedUser(req).catch(() => null);
   const body = req.body || {};
@@ -1524,9 +1947,10 @@ app.get("/api/admin/stats", async (req, res) => {
   }
   // Institutions are public data whose read policy covers the anon role only;
   // count them with the anon client so the admin card matches /api/status.
-  const [users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback] = await Promise.all([
+  const [users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, listings, listingRequests] = await Promise.all([
     count("profiles"), count("posts"), count("institutions", supabase),
-    count("mentor_profiles"), count("mentor_requests"), count("hub_pages"), count("fido_feedback")
+    count("mentor_profiles"), count("mentor_requests"), count("hub_pages"), count("fido_feedback"),
+    count("campus_listings"), count("listing_requests")
   ]);
   let recentUsers = [];
   if (users.status === "ok") {
@@ -1539,7 +1963,7 @@ app.get("/api/admin/stats", async (req, res) => {
     if (!r.error) recentPosts = r.data || [];
   }
   res.json({
-    users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, recentUsers, recentPosts,
+    users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, listings, listingRequests, recentUsers, recentPosts,
     reports: { status: "dashboard", detail: "Review reports in Supabase dashboard > Table Editor > reports." },
     generatedAt: new Date().toISOString()
   });

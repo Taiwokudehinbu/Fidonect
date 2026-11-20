@@ -22,10 +22,11 @@ delete the Vercel project; Supabase data is untouched.
 | Required env vars | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
 | Optional env vars | `ADMIN_EMAILS`, `APP_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS` |
 
-The Phase 0.1 security, Phase 1 scholarship, and Phase 2 mentorship/hub/Fido
-schemas are **additive SQL migrations**. Existing auth, profiles, connections,
-messages, institutions, and photo upload continue to work before and after they
-are applied. Phase 2 content stays empty or unverified until an admin reviews it.
+The Phase 0.1 security, Phase 1 scholarship, Phase 2 mentorship/hub/Fido, and
+Phase 3A accommodation/service schemas are **additive SQL migrations**. Existing
+auth, profiles, connections, messages, institutions, and photo upload continue
+to work before and after they are applied. Phase 2 and Phase 3A content stays
+empty or unverified until an admin reviews it.
 
 ---
 
@@ -36,8 +37,8 @@ are applied. Phase 2 content stays empty or unverified until an admin reviews it
 | `api/index.js` | Serverless entry: `module.exports = require("../backend/server.js")` |
 | `backend/server.js` | Express API, static app shell, scholarship/mentor/hub/admin routes |
 | `backend/lib/validation.js` | Query/body validation shared with tests |
-| `backend/public/admin.html` | Protected admin dashboard (overview, scholarships, mentors, institution info) |
-| `backend/public/sw.js` | Service worker (`fidonect-v13`) |
+| `backend/public/admin.html` | Protected admin dashboard (overview, scholarships, mentors, institution info, housing & services) |
+| `backend/public/sw.js` | Service worker (`fidonect-v14`) |
 | `index.html` | Web app shell, navigation, profile, scholarships, mentors, Fido UI |
 | `package.json` (root) | Vercel dependency manifest |
 | `vercel.json` | One function, all routes, includes app shell/public files |
@@ -84,16 +85,18 @@ hardening need SQL applied in Supabase. Follow `backend/migrations/README.md`:
 2. Run `backend/migrations/20261114_phase0_security.sql`.
 3. Run `backend/migrations/20261114_phase1_scholarships.sql`.
 4. Run `backend/migrations/20261116_phase2_mentorship_hubs_fido.sql`.
-5. Seed the first admin with `20261114_seed_admin_role.example.sql`.
-6. Verify login, photo upload, connections, messages, admin access, mentor
-   apply/verify/request, hub verified/community labels, Fido feedback, and all
+5. Run `backend/migrations/20261118_phase3_accommodation_services.sql`.
+6. Seed the first admin with `20261114_seed_admin_role.example.sql`.
+7. Verify login, photo upload, connections, messages, admin access, mentor
+   apply/verify/request, hub verified/community labels, Fido feedback, listing
+   approval/source verification, accepted listing-request messaging, and all
    **588 institutions**.
-7. Redeploy only if you changed environment variables.
+8. Redeploy only if you changed environment variables.
 
-Until these migrations are applied, `/scholarships` and `/mentors` show honest
-empty setup states, admin writes return a setup message, and Fido falls back to
-AI-labelled guidance. Existing features keep working because the API falls back
-to the old profile and hub columns where needed.
+Until these migrations are applied, `/scholarships`, `/mentors`, and `/housing`
+show honest empty setup states, admin writes return a setup message, and Fido
+falls back to AI-labelled guidance. Existing features keep working because the
+API falls back to the old profile and hub columns where needed.
 
 ---
 
@@ -130,20 +133,23 @@ Invoke-WebRequest "$base/" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/messages" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/scholarships" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/mentors" -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest "$base/housing" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/profile" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/admin" -UseBasicParsing | Select-Object StatusCode
 Invoke-RestMethod "$base/api/mentors"
+Invoke-RestMethod "$base/api/listings"
 npm run smoke
 ```
 
 Then in the app: register → login → connections → Message → send/reply →
 unread badge → profile photo upload → scholarships setup state (before
 migrations) or filters/bookmarks (after migrations) → mentor application →
-admin verify → mentor request → accept → Message → admin hub verification
-and Fido feedback → admin login → institution search/pagination.
+admin verify → mentor request → accept → Message → listing submission → admin
+approve → source verification → contact request → accept → Message → admin hub
+verification and Fido feedback → admin login → institution search/pagination.
 
 Expected: **588 institutions**, unchanged existing data, honest empty Phase 2
-states until admins add content, and no console errors.
+and Phase 3A states until admins add content, and no console errors.
 
 ---
 

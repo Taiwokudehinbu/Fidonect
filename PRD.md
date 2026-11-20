@@ -80,7 +80,8 @@ Mobile-first. Android first, iOS next, web/admin. Scalable API, secure DB, auth,
 ## 18. Phases
 - Phase 1 MVP: connection + communities + basic Fido
 - Phase 2: mentorship + verified info + improved AI
-- Phase 3: accommodation + marketplace + services
+- Phase 3A: accommodation + campus-service discovery, admin approval, and in-app contact requests (no bookings or payments)
+- Phase 3B (deferred): marketplace and transaction/payment flows; these remain out of the initial scope per §69
 - Phase 4: institution partnerships + alumni + recruitment
 
 ## 19. Long-Term Vision

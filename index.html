@@ -122,6 +122,16 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 .mentor-status{font-size:12px;border-radius:999px;padding:2px 10px;font-weight:700;background:#e2e8f0;color:#334155}
 .mentor-status.pending{background:#fef3c7;color:#92400e}.mentor-status.verified{background:#dcfce7;color:#166534}
 .mentor-status.rejected{background:#fee2e2;color:#991b1b}.mentor-status.cancelled{background:#e2e8f0;color:#475569}
+/* Phase 3: accommodation + campus services */
+.listing-card{display:flex;flex-direction:column;gap:8px;border-top:4px solid #0ea5e9}
+.listing-card h3{margin:0;font-size:18px}
+.listing-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.listing-card p{margin:0;line-height:1.45}
+.listing-price{font-weight:800;color:#0a1f33}
+.listing-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:8px}
+.listing-actions .btn{padding:9px 14px;font-size:14px}
+.listing-safety{background:#fefce8;border:1px solid #fde68a;border-radius:12px;padding:12px;margin:10px 0;color:#713f12;font-size:14px}
+.listing-form-note{font-size:13px;color:#637083}
 .hub-banner{border:1px solid #dbe3ed;border-radius:12px;padding:10px 12px;background:#f8fafc;margin:8px 0}
 .hub-banner .verified{background:#dcfce7;color:#166534}
 .hub-list{margin:4px 0 0;padding-left:20px}.hub-list li{margin:4px 0}
@@ -141,7 +151,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <header class="topbar">
 <div class="brand"><a href="/" style="color:#fff;text-decoration:none"><span class="logo">F</span> Fidonect</a></div>
 <button id="menuBtn" class="menu-btn" aria-label="Open menu">☰</button>
-<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/mentors">Mentors</a><a href="/scholarships">Scholarships</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/profile">My Profile</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
+<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/mentors">Mentors</a><a href="/housing">Housing</a><a href="/scholarships">Scholarships</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/profile">My Profile</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
 </header>
 
 <div class="wrap" id="home">
@@ -155,6 +165,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <a class="feat" href="/scholarships"><b>Scholarships</b><span>Verified opportunities with official links only</span></a>
 <a class="feat" href="/connections"><b>Connections</b><span>Find classmates, connect, message your circle</span></a>
 <a class="feat" href="/mentors"><b>Mentors</b><span>Verified student guides for clearance and resumption</span></a>
+<a class="feat" href="/housing"><b>Housing &amp; services</b><span>Admin-approved rooms and campus services — no payments</span></a>
 <a class="feat" href="/profile"><b>My Profile</b><span>Your school, visibility, photo and account</span></a>
 <a class="feat" href="/ai-honesty"><b>Ask Fido</b><span>Campus guidance with honest Official / Community / AI labels</span></a>
 <a class="feat" href="/about"><b>About</b><span>What Fidonect is, who it serves, and how it works</span></a>
@@ -308,6 +319,63 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 </div>
 
+<div id="housing" data-page="housing">
+<div class="card">
+<h2>Accommodation &amp; services <span id="listingCount" class="pill"></span></h2>
+<p class="lede">Find admin-approved student housing and campus services near your school. Fidonect does not take bookings, hold reservations, or process payments. Contact happens through an in-app request; an accepted request unlocks private messaging.</p>
+<div class="listing-safety"><b>Safety first:</b> inspect any room or service in person before paying. Never send money to a personal account without verifying the property or provider. Fidonect never asks for bank details, passwords, or ID documents. A <b>source checked</b> badge means an admin reviewed the listing source, not that Fidonect guarantees the room or service.</div>
+<div class="search-row">
+<input id="listingSearch" class="input" placeholder="Search title, area, school or description" autocomplete="off" />
+<select id="listingKind" class="input" aria-label="Listing type"><option value="">All listings</option><option value="accommodation">Accommodation</option><option value="service">Campus services</option></select>
+<button id="listingFind" class="btn" type="button">Search</button>
+</div>
+<p id="listingNotice" class="muted"></p>
+<div class="grid" id="listingGrid"></div>
+</div>
+
+<div class="card" id="listingRequestBox" style="display:none">
+<h2>Request contact</h2>
+<p class="muted">Send a short message to <b id="listingRequestName"></b> about <b id="listingRequestTitle"></b>. The owner can accept or decline. Do not include bank details, passwords, ID numbers, or your exact home address.</p>
+<textarea id="listingRequestMessage" maxlength="1000" placeholder="What would you like to ask? e.g. Is the room still available, and can I inspect it this weekend?"></textarea>
+<div class="search-row"><button id="listingRequestSend" class="btn" type="button">Send request</button><button id="listingRequestCancel" class="btn ghost" type="button">Cancel</button></div>
+<p id="listingRequestMsg" class="muted"></p>
+</div>
+
+<div class="card" id="listingCreateCard">
+<h2 id="listingFormTitle">List a room or campus service</h2>
+<p class="lede">Submit a listing for admin review. Approved listings are labelled <b>Community</b>; a <b>source checked</b> badge is added only when an admin verifies the source. Never post exact private addresses, phone numbers, bank details, or payment links.</p>
+<div class="form-grid">
+<select id="listingKindInput" class="input"><option value="accommodation">Accommodation</option><option value="service">Campus service</option></select>
+<input id="listingSchool" class="input" list="schoolList" maxlength="160" placeholder="Institution from the directory *" />
+<input id="listingTitle" class="input" maxlength="120" placeholder="Title * e.g. Shared hostel room near main gate" />
+<input id="listingArea" class="input" maxlength="120" placeholder="Area / neighbourhood (not exact address)" />
+<input id="listingPrice" class="input" maxlength="120" placeholder="Price range (optional) e.g. ₦150k–₦250k" />
+<select id="listingPricePeriod" class="input"><option value="">Price period (optional)</option><option value="year">Per year</option><option value="month">Per month</option><option value="semester">Per semester</option><option value="one-off">One-off</option><option value="negotiable">Negotiable</option></select>
+<input id="listingDistance" class="input" maxlength="120" placeholder="Distance / transport hint e.g. 10 min walk" />
+<input id="listingAvailable" class="input" type="date" aria-label="Available from" />
+<input id="listingAmenities" class="input" maxlength="500" placeholder="Amenities, comma separated e.g. water, power, security" />
+<input id="listingSourceUrl" class="input" maxlength="2048" placeholder="Source URL (optional, admin-only review evidence)" />
+</div>
+<textarea id="listingDescription" maxlength="2000" placeholder="Describe the room or service honestly. Include what is included, any house rules, and what a student should inspect. (20–2000 chars) *"></textarea>
+<div class="search-row"><button id="listingSubmitBtn" class="btn" type="button">Submit for review</button><button id="listingCancelEdit" class="btn ghost" type="button" style="display:none">Cancel edit</button></div>
+<p id="listingFormMsg" class="muted"></p>
+</div>
+
+<div class="card" id="listingMineCard">
+<h2>My listings</h2>
+<p class="muted">Your listings stay private until an admin approves them. Editing an approved listing sends it back for review.</p>
+<div id="listingMine"></div>
+</div>
+
+<div class="card" id="listingRequestsCard">
+<h2>Contact requests</h2>
+<p class="muted">Listing owners see incoming requests; students see their sent requests. Accepted requests unlock private messaging.</p>
+<p id="listingReqMsg" class="muted"></p>
+<div id="listingIncoming"></div>
+<div id="listingOutgoing"></div>
+</div>
+</div>
+
 <div id="students" data-page="connections">
 <h2>Student connections</h2>
 <p class="lede">Discover registered students who share their profile. Connection requests and messages stay private.</p>
@@ -404,6 +472,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <div class="sheet-grid">
 <a href="/messages">Messages<small>Your private chats</small></a>
 <a href="/mentors">Mentors<small>Verified student guides</small></a>
+<a href="/housing">Housing &amp; services<small>Admin-approved rooms and services</small></a>
 <a href="/profile">My Profile<small>School, photo and visibility</small></a>
 <a href="/scholarships">Scholarships<small>Verified opportunities</small></a>
 <a href="/ai-honesty">AI Honesty<small>How Fido labels answers</small></a>
@@ -418,7 +487,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 </div>
 
-<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/mentors">Mentors</a> • <a href="/scholarships">Scholarships</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
+<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/mentors">Mentors</a> • <a href="/housing">Housing &amp; services</a> • <a href="/scholarships">Scholarships</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
 
 <script>
 var liveSchools=[]; // live rows from the API; never show invented fallback schools
@@ -902,6 +971,197 @@ document.getElementById("mentorRequestSend").onclick=sendMentorRequest;
 document.getElementById("mentorRequestCancel").onclick=function(){document.getElementById("mentorRequestBox").style.display="none";};
 document.getElementById("mentorApplyBtn").onclick=submitMentorApplication;
 
+// ---- Phase 3A: accommodation + campus services (no bookings/payments) ----
+var listingState={items:[],mine:[],target:null,editId:null};
+function listingKindLabel(k){return k==="service"?"Campus service":"Accommodation";}
+function listingPeriodLabel(p){return p==="year"?"per year":p==="month"?"per month":p==="semester"?"per semester":p==="one-off"?"one-off":p==="negotiable"?"negotiable":"";}
+function listingBadge(l){return l.verified?'<span class="verified">✓ Source checked</span>':'<span class="pill">Community</span>';}
+function listingCardHTML(l){
+var amenities=(l.amenities||[]).map(function(a){return '<span class="pill">'+esc(a)+'</span>';}).join("");
+var s=sess();
+var mine=s&&s.user&&String(s.user.id)===String(l.owner_id);
+var action=mine?'<span class="muted small">Your listing</span>':'<button type="button" class="btn" onclick="openListingRequest('+l.id+')">Request contact</button>';
+return '<article class="card listing-card">'+
+'<div class="listing-meta"><span class="pill">'+esc(listingKindLabel(l.kind))+'</span>'+listingBadge(l)+'</div>'+
+'<h3>'+esc(l.title)+'</h3>'+
+'<div class="muted small">'+esc(l.institution_name||"")+(l.institution_location?" • "+esc(l.institution_location):"")+(l.area?" • "+esc(l.area):"")+'</div>'+
+'<p>'+esc(l.description)+'</p>'+
+(l.price_text?'<p class="listing-price">'+esc(l.price_text)+(l.price_period?' <span class="muted small">'+esc(listingPeriodLabel(l.price_period))+'</span>':"")+'</p>':"")+
+(l.distance_text?'<p class="muted small">Route: '+esc(l.distance_text)+'</p>':"")+
+(amenities?'<div class="mentor-areas">'+amenities+'</div>':"")+
+(l.available_from?'<p class="muted small">Available from '+esc(l.available_from)+'</p>':"")+
+'<div class="listing-actions">'+avatarHTML({name:l.owner_name,photo_url:l.owner_photo_url},32)+'<span class="muted small">'+esc(l.owner_name||"Student")+'</span><span style="flex:1"></span>'+action+'</div></article>';
+}
+function renderListings(items){
+var grid=document.getElementById("listingGrid");
+if(!grid)return;
+grid.innerHTML=(items||[]).map(listingCardHTML).join("")||'<div class="empty-state"><b>No approved listings yet</b>Fidonect does not invent rooms, prices, or services. A listing appears here only after an admin approves it.</div>';
+var countEl=document.getElementById("listingCount");var n=(items||[]).length;if(countEl){countEl.textContent=n?n+" approved":"";countEl.style.display=n?"":"none";}
+}
+async function loadListings(){
+var notice=document.getElementById("listingNotice");
+if(!notice)return;
+var q=document.getElementById("listingSearch").value.trim();
+var kind=document.getElementById("listingKind").value;
+notice.textContent="Loading listings…";
+try{
+var r=await fetch(apiBase()+"/api/listings?limit=100"+(q?"&q="+encodeURIComponent(q):"")+(kind?"&kind="+encodeURIComponent(kind):""));
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){listingState.items=[];renderListings([]);notice.innerHTML='<div class="empty-state"><b>Housing and services are being set up</b>The Phase 3 database migration has not been applied yet. No placeholder listings are shown.</div>';return;}
+listingState.items=j.listings||[];renderListings(listingState.items);
+notice.textContent=listingState.items.length?("Showing "+listingState.items.length+" approved listing"+(listingState.items.length===1?"":"s")+(q?' matching "'+q+'"':"")+"."):"No approved listings match yet. This space stays honest — only admin-approved accommodation and services are listed.";
+}catch(e){listingState.items=[];renderListings([]);notice.textContent="Could not load listings: "+e.message;}
+}
+function openListingRequest(id){
+var s=sess();if(!s){location.href="/profile";return;}
+var l=(listingState.items||[]).filter(function(x){return String(x.id)===String(id);})[0];
+listingState.target=l||{id:id,title:"this listing",owner_name:"this owner"};
+document.getElementById("listingRequestName").textContent=listingState.target.owner_name||"this owner";
+document.getElementById("listingRequestTitle").textContent=listingState.target.title||"this listing";
+document.getElementById("listingRequestMsg").textContent="";
+document.getElementById("listingRequestMessage").value="";
+var box=document.getElementById("listingRequestBox");box.style.display="";box.scrollIntoView({behavior:"smooth"});
+}
+async function sendListingRequest(){
+var s=await ensureSession(),m=document.getElementById("listingRequestMsg");
+if(!s){m.textContent="Log in to request contact.";return;}
+if(!listingState.target){m.textContent="Choose a listing first.";return;}
+var message=document.getElementById("listingRequestMessage").value.trim();
+if(message.length<10){m.textContent="Write a specific message (at least 10 characters).";return;}
+m.textContent="Sending…";
+try{
+var r=await fetch(apiBase()+"/api/listings/"+listingState.target.id+"/requests",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({message:message})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+m.textContent="Request sent. The owner can accept or decline it.";
+document.getElementById("listingRequestBox").style.display="none";
+loadListingRequests();
+}catch(e){m.textContent="Could not send request: "+e.message;}
+}
+async function loadListingMine(){
+var box=document.getElementById("listingMine");
+if(!box)return;
+var s=await ensureSession();
+if(!s){box.innerHTML='<p class="muted">Log in to create and manage your listings.</p>';return;}
+try{
+var r=await fetch(apiBase()+"/api/listings/me",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){box.innerHTML='<p class="muted">Listings are being set up.</p>';return;}
+listingState.mine=j.listings||[];
+box.innerHTML=listingState.mine.map(function(l){
+return '<div class="person"><b>'+esc(l.title)+'</b> <span class="mentor-status '+esc(l.status)+'">'+esc(l.status)+'</span> '+listingBadge(l)+
+'<p class="muted small">'+esc(listingKindLabel(l.kind))+' • '+esc(l.institution_name||"")+(l.area?" • "+esc(l.area):"")+'</p>'+
+(l.admin_note?'<p class="muted small">Admin note: '+esc(l.admin_note)+'</p>':"")+
+'<div class="listing-actions"><button type="button" class="btn ghost" data-listing-edit="'+l.id+'">Edit</button></div></div>';
+}).join("")||'<p class="muted">You have no listings yet. Use the form above to submit one for review.</p>';
+}catch(e){box.innerHTML='<p class="muted">Could not load your listings: '+esc(e.message)+'</p>';}
+}
+function resetListingForm(){
+listingState.editId=null;
+["listingSchool","listingTitle","listingArea","listingPrice","listingDistance","listingAmenities","listingSourceUrl","listingDescription","listingAvailable"].forEach(function(id){document.getElementById(id).value="";});
+document.getElementById("listingKindInput").value="accommodation";
+document.getElementById("listingPricePeriod").value="";
+document.getElementById("listingFormTitle").textContent="List a room or campus service";
+document.getElementById("listingSubmitBtn").textContent="Submit for review";
+document.getElementById("listingCancelEdit").style.display="none";
+document.getElementById("listingFormMsg").textContent="";
+}
+function editListing(id){
+var l=(listingState.mine||[]).filter(function(x){return String(x.id)===String(id);})[0];
+if(!l)return;
+listingState.editId=l.id;
+document.getElementById("listingKindInput").value=l.kind||"accommodation";
+document.getElementById("listingSchool").value=l.institution_name||"";
+document.getElementById("listingTitle").value=l.title||"";
+document.getElementById("listingArea").value=l.area||"";
+document.getElementById("listingPrice").value=l.price_text||"";
+document.getElementById("listingPricePeriod").value=l.price_period||"";
+document.getElementById("listingDistance").value=l.distance_text||"";
+document.getElementById("listingAmenities").value=(l.amenities||[]).join(", ");
+document.getElementById("listingSourceUrl").value=l.source_url||"";
+document.getElementById("listingDescription").value=l.description||"";
+document.getElementById("listingAvailable").value=l.available_from||"";
+document.getElementById("listingFormTitle").textContent="Edit listing #"+l.id;
+document.getElementById("listingSubmitBtn").textContent="Update for review";
+document.getElementById("listingCancelEdit").style.display="";
+document.getElementById("listingFormMsg").textContent="Editing sends this listing back to admin review.";
+document.getElementById("listingCreateCard").scrollIntoView({behavior:"smooth"});
+}
+async function submitListing(){
+var s=await ensureSession(),m=document.getElementById("listingFormMsg");
+if(!s){m.textContent="Log in to submit a listing.";return;}
+var amenities=document.getElementById("listingAmenities").value.split(",").map(function(a){return a.trim();}).filter(Boolean);
+var body={
+kind:document.getElementById("listingKindInput").value,
+school:document.getElementById("listingSchool").value.trim(),
+title:document.getElementById("listingTitle").value.trim(),
+description:document.getElementById("listingDescription").value.trim(),
+area:document.getElementById("listingArea").value.trim(),
+price_text:document.getElementById("listingPrice").value.trim(),
+price_period:document.getElementById("listingPricePeriod").value||null,
+distance_text:document.getElementById("listingDistance").value.trim(),
+amenities:amenities,
+available_from:document.getElementById("listingAvailable").value||null,
+source_url:document.getElementById("listingSourceUrl").value.trim()||null
+};
+m.textContent="Submitting for review…";
+try{
+var url=apiBase()+"/api/listings"+(listingState.editId?"/"+listingState.editId:"");
+var r=await fetch(url,{method:listingState.editId?"PATCH":"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(body)});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+resetListingForm();
+document.getElementById("listingFormMsg").textContent="Submitted. An admin will review this listing. It stays private until approved.";
+loadListingMine();
+loadListings();
+}catch(e){m.textContent="Could not submit: "+e.message;}
+}
+function listingRequestHTML(r,incoming){
+var other=r.other||{},st=r.status||"pending",listing=r.listing||{};
+var actions="";
+if(incoming&&st==="pending")actions='<button type="button" class="btn ghost" onclick="respondListingRequest('+r.id+',\'accept\')">Accept</button> <button type="button" class="btn ghost" onclick="respondListingRequest('+r.id+',\'decline\')">Decline</button>';
+else if(!incoming&&st==="pending")actions='<button type="button" class="btn ghost" onclick="respondListingRequest('+r.id+',\'cancel\')">Cancel</button>';
+if(st==="accepted")actions+=' <button type="button" class="btn" onclick="openChatWith(\''+esc(other.id||"")+'\')">Message</button> <button type="button" class="btn ghost" onclick="respondListingRequest('+r.id+',\'complete\')">Mark complete</button>';
+return '<div class="person"><div style="display:flex;align-items:center;gap:10px">'+avatarHTML(other,40)+'<div><b>'+esc(other.name||"Student")+'</b><div class="muted small">'+esc(other.school||"")+'</div></div><span class="mentor-status '+esc(st)+'" style="margin-left:auto">'+esc(st)+'</span></div>'+
+'<p><b>'+esc(listing.title||"Listing")+'</b> <span class="muted small">'+esc(listing.institution_name||"")+'</span></p>'+
+'<p>'+esc(r.message)+'</p><div class="muted small">'+esc(new Date(r.created_at).toLocaleString())+'</div>'+(actions?'<div class="listing-actions">'+actions+'</div>':"")+'</div>';
+}
+async function loadListingRequests(){
+var s=await ensureSession(),box=document.getElementById("listingReqMsg");
+if(!s){document.getElementById("listingIncoming").innerHTML="";document.getElementById("listingOutgoing").innerHTML="";if(box)box.textContent="Log in to see contact requests.";return;}
+try{
+var r=await fetch(apiBase()+"/api/listing-requests/mine",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){if(box)box.textContent="Contact requests are being set up.";return;}
+var inc=j.incoming||[],out=j.outgoing||[];
+document.getElementById("listingIncoming").innerHTML='<h3>Incoming ('+inc.length+')</h3>'+(inc.map(function(x){return listingRequestHTML(x,true);}).join("")||'<p class="muted">No incoming requests.</p>');
+document.getElementById("listingOutgoing").innerHTML='<h3>Sent ('+out.length+')</h3>'+(out.map(function(x){return listingRequestHTML(x,false);}).join("")||'<p class="muted">No sent requests.</p>');
+if(box)box.textContent="";
+}catch(e){if(box)box.textContent="Could not load contact requests: "+e.message;}
+}
+async function respondListingRequest(id,action){
+var s=await ensureSession();if(!s)return;
+try{
+var r=await fetch(apiBase()+"/api/listing-requests/"+id+"/respond",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({action:action})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+loadListingRequests();
+}catch(e){alert("Failed: "+e.message);}
+}
+async function loadHousingPage(){
+await loadListings();
+await loadListingMine();
+await loadListingRequests();
+}
+document.getElementById("listingFind").onclick=loadListings;
+document.getElementById("listingSearch").onkeydown=function(e){if(e.key==="Enter")loadListings();};
+document.getElementById("listingKind").onchange=loadListings;
+document.getElementById("listingSubmitBtn").onclick=submitListing;
+document.getElementById("listingCancelEdit").onclick=resetListingForm;
+document.getElementById("listingRequestSend").onclick=sendListingRequest;
+document.getElementById("listingRequestCancel").onclick=function(){document.getElementById("listingRequestBox").style.display="none";};
+document.getElementById("listingMine").addEventListener("click",function(e){
+var b=e.target.closest?e.target.closest("[data-listing-edit]"):null;
+if(b)editListing(b.getAttribute("data-listing-edit"));
+});
+
 async function fetchProfile(token){
 var r=await fetch(apiBase()+"/api/profile",{headers:{Authorization:"Bearer "+token}});
 return {ok:r.ok,status:r.status,body:await r.json()};
@@ -931,6 +1191,7 @@ var verified=p.body.authMeta&&p.body.authMeta.emailConfirmed;
 document.getElementById("meVerified").textContent=verified?"✓ Verified email":"Unverified email";
 if(typeof refreshStudents==="function"){refreshStudents("");}
 if(routeFromPath()==="mentors"&&typeof loadMentorMe==="function"){loadMentorMe();loadMentorRequests();}
+if(routeFromPath()==="housing"&&typeof loadListingMine==="function"){loadListingMine();loadListingRequests();loadListings();}
 checkAdmin();
 }
 document.getElementById("signupBtn").onclick=async function(){
@@ -1167,7 +1428,7 @@ async function openChatWith(uid){
 var s=await ensureSession();if(!s){location.href="/connections";return;}
 try{var r=await fetch(apiBase()+"/api/conversations/open",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({otherId:uid})});
 var j=await r.json();
-if(r.status===403){alert("You're not connected with this user.");return;}
+if(r.status===403){alert(j.error||"You're not connected with this user.");return;}
 if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
 location.href="/chat/"+j.id;
 }catch(e){alert("Failed: "+e.message);}
@@ -1272,14 +1533,15 @@ else{if(now-lastBadgePoll>=8000){lastBadgePoll=now;await updateMsgBadge();}}
 // connections messages chat ai about" (space-separated); full page loads keep this stateless.
 // Future pages (Map, Events, Communities…): add a server route, a section with
 // data-page="newpage", a nav link, and one line in routeFromPath/PAGE_TITLES.
-var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",mentors:"Mentors — Fidonect",scholarships:"Scholarships — Fidonect",profile:"My Profile — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
+var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",mentors:"Mentors — Fidonect",housing:"Housing & services — Fidonect",scholarships:"Scholarships — Fidonect",profile:"My Profile — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
 function routeFromPath(){
-var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|mentors|scholarships|profile|messages|chat|ai-honesty|about)/);}catch(e){}
+var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|mentors|housing|accommodation|scholarships|profile|messages|chat|ai-honesty|about)/);}catch(e){}
 if(!m)return "home";
 var seg=m[1];
 if(seg==="schools"||seg==="institutions")return "institutions";
 if(seg==="students"||seg==="connections")return "connections";
 if(seg==="mentors")return "mentors";
+if(seg==="housing"||seg==="accommodation")return "housing";
 if(seg==="scholarships")return "scholarships";
 if(seg==="profile")return "profile";
 if(seg==="messages")return "messages";
@@ -1297,7 +1559,7 @@ if(title)title.textContent=page==="profile"?(s?"My profile":"Log in to Fidonect"
 var bottom=document.querySelectorAll(".bottom-nav a[data-nav]");
 for(var j=0;j<bottom.length;j++)bottom[j].classList.toggle("active",bottom[j].getAttribute("data-nav")===page);
 var moreBtn=document.getElementById("moreBtn");
-if(moreBtn)moreBtn.classList.toggle("active",["messages","chat","ai","about","profile","mentors"].indexOf(page)>-1);
+if(moreBtn)moreBtn.classList.toggle("active",["messages","chat","ai","about","profile","mentors","housing"].indexOf(page)>-1);
 if(PAGE_TITLES[page])document.title=PAGE_TITLES[page];
 }
 function openMore(){
@@ -1324,6 +1586,7 @@ else if(cm)openChat(cm[1]);
 else if(routeFromPath()==="messages")loadConversations();
 if(routeFromPath()==="scholarships")loadScholarships(true);
 if(routeFromPath()==="mentors")loadMentorsPage();
+if(routeFromPath()==="housing")loadHousingPage();
 if(routeFromPath()==="home")loadHomeScholarships();
 updateMsgBadge();
 // Chat: ~2s while a thread is open, messages list: 3s, badge: 8s. msgTick

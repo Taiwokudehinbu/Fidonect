@@ -50,7 +50,7 @@ test("mentor requests are participant-scoped and accepted requests unlock messag
   assert.match(phase2Sql, /from mentor_requests r/);
   assert.match(phase2Sql, /r\.status = 'accepted'/);
   assert.match(server, /acceptedMentorRequest/);
-  assert.match(server, /if \(!ok && !mentorOk\)/);
+  assert.match(server, /!ok && !mentorOk && !listingOk/);
 });
 
 test("hub information is verified-only when labelled Official", () => {

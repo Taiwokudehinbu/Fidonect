@@ -28,7 +28,8 @@ const tables = [
   "profiles", "connections", "conversations", "participants", "messages",
   "posts", "reports", "user_roles", "admin_audit_log",
   "scholarships", "scholarship_bookmarks",
-  "mentor_profiles", "mentor_requests", "fido_feedback"
+  "mentor_profiles", "mentor_requests", "fido_feedback",
+  "campus_listings", "listing_requests"
 ];
 const manifest = { createdAt: new Date().toISOString(), tables: {}, storage: {} };
 

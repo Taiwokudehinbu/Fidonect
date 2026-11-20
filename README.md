@@ -23,11 +23,15 @@ admin-reviewed **Mentors** directory for student-to-student guidance.
   official links; only admin-verified pages carry a verified label
 - Improved Fido (Phase 2): verified-hub retrieval, source citations, FAQ hits,
   honest Official/Community/AI labels, and helpful/correction feedback
+- Accommodation & services (Phase 3A): admin-approved community listings,
+  optional source verification, in-app contact requests, and accepted-request
+  messaging — no bookings, reservations, payments, or marketplace transactions
 - Mobile bottom navigation plus a More menu; `/profile` account page
 
-Phase 1 and Phase 2 need the additive SQL migrations in `backend/migrations/`
-applied once. Until then `/scholarships` and `/mentors` deliberately show honest
-setup/empty states instead of placeholder content.
+Phase 1, Phase 2, and Phase 3A need the additive SQL migrations in
+`backend/migrations/` applied once. Until then `/scholarships`, `/mentors`, and
+`/housing` deliberately show honest setup/empty states instead of placeholder
+content.
 
 ## Run locally
 
@@ -70,12 +74,14 @@ Read `backend/migrations/README.md` first. The order is:
 2. `backend/migrations/20261114_phase0_security.sql`
 3. `backend/migrations/20261114_phase1_scholarships.sql`
 4. `backend/migrations/20261116_phase2_mentorship_hubs_fido.sql`
-5. Seed the first admin with `20261114_seed_admin_role.example.sql`.
+5. `backend/migrations/20261118_phase3_accommodation_services.sql`
+6. Seed the first admin with `20261114_seed_admin_role.example.sql`.
 
 The migrations are additive and idempotent: no tables are dropped, no users or
 institutions are deleted, and no content is invented. After applying them,
 verify login, photo upload, connections, messages, admin access, mentor
-application/verification, hub verification labels, Fido feedback, and the
+application/verification, hub verification labels, Fido feedback, listing
+approval/source verification, accepted listing-request messaging, and the
 588-institution directory.
 
 ## Deploy
@@ -96,6 +102,13 @@ application/verification, hub verification labels, Fido feedback, and the
   or private verification evidence.
 - Institution info is labelled `Official` only when an admin checked its source
   and marked the hub verified; otherwise it is labelled `Community`.
+- Accommodation and service listings are admin-approved before publication.
+  A “source checked” badge requires a real admin review. Public listings never
+  expose owner email, exact private addresses, phone numbers, or source URLs;
+  contact happens through in-app requests.
+- Fidonect does not take bookings, reservations, or payments for housing or
+  services. Students must inspect before paying and never send money to a
+  personal account without verifying the property or provider.
 - No copyrighted book/research hosting without permission; link to legitimate sources.
 - No betting, gambling, or cash prizes in future Games modules.
 - Reports and moderation use Supabase RLS; secrets never ship to the browser.
@@ -104,7 +117,11 @@ application/verification, hub verification labels, Fido feedback, and the
 
 - Phase 1 (done): core connection + communities + AI-honesty labels + scholarships
 - Phase 2 (done): verified mentors, verified institution info, improved Fido with citations/feedback
-- Phase 3: accommodation, marketplace, services
+- Phase 3A (implemented; apply its migration before use): admin-approved
+  accommodation + campus-service discovery, source verification, and in-app
+  contact requests; no bookings or payments
+- Phase 3B (deferred): marketplace and any transaction/payment flow (out of the
+  initial scope per PRD §69)
 - Phase 4: institution partnerships, alumni, recruitment
 
 Privacy, safety, and responsible-AI requirements: `PRD.md` §§22–28.

@@ -24,6 +24,8 @@ await check("scholarships API", "/api/scholarships", (b) => b && (Array.isArray(
 await check("scholarships page", "/scholarships", (b) => typeof b === "string" && b.includes("Scholarships"));
 await check("mentors API", "/api/mentors", (b) => b && (Array.isArray(b.mentors) || b.setupRequired === true));
 await check("mentors page", "/mentors", (b) => typeof b === "string" && b.includes("Mentors"));
+await check("listings API", "/api/listings", (b) => b && (Array.isArray(b.listings) || b.setupRequired === true));
+await check("housing page", "/housing", (b) => typeof b === "string" && b.includes("Accommodation"));
 await check("profile page", "/profile", (b) => typeof b === "string" && b.includes("My profile") || typeof b === "string" && b.includes("Join Fidonect"));
 
 for (const c of checks) {
