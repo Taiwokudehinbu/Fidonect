@@ -157,6 +157,16 @@ from information_schema.triggers
 where trigger_schema = 'public'
   and event_object_table in ('campus_listings','listing_requests')
 order by event_object_table, trigger_name;
+
+-- Phase 3 least privilege: anon reads only the filtered view; authenticated
+-- users can insert/update through RLS but cannot delete or truncate.
+select
+  has_table_privilege('anon', 'public.campus_listings', 'SELECT') as anon_table_read,
+  has_table_privilege('anon', 'public.campus_listing_directory', 'SELECT') as anon_view_read,
+  has_table_privilege('authenticated', 'public.campus_listings', 'INSERT') as auth_insert,
+  has_table_privilege('authenticated', 'public.campus_listings', 'UPDATE') as auth_update,
+  has_table_privilege('authenticated', 'public.campus_listings', 'DELETE') as auth_delete,
+  has_table_privilege('authenticated', 'public.campus_listings', 'TRUNCATE') as auth_truncate;
 ```
 
 Then:
