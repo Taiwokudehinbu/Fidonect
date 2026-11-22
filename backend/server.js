@@ -164,7 +164,7 @@ app.get("/admin", (req, res) => {
 // Dedicated school profile pages (client-side route; data via /api/institutions/:id/tree).
 app.get(["/schools", "/schools/:id"], sendHome);
 // Feature pages (client-side router in index.html; same shell, no new backend logic).
-app.get(["/institutions", "/connections", "/mentors", "/housing", "/accommodation", "/ai-honesty", "/about", "/messages", "/scholarships", "/profile"], sendHome);
+app.get(["/institutions", "/connections", "/mentors", "/housing", "/accommodation", "/partners", "/alumni", "/opportunities", "/ai-honesty", "/about", "/messages", "/scholarships", "/profile"], sendHome);
 app.get("/chat/:id", sendHome);
 
 const db = { users: [], connections: [], posts: [], reports: [], mentors: [] };
@@ -333,7 +333,8 @@ async function dbAdminRole(auth) {
     const { data, error } = await auth.me.from("user_roles").select("role").eq("user_id", auth.user.id);
     if (error) return null;
     const roles = (data || []).map(r => r.role);
-    return roles.find(r => ["super_admin", "content_admin", "moderator"].includes(r)) || null;
+    // Prefer the highest privilege when a user has more than one role row.
+    return ["super_admin", "content_admin", "moderator"].find(r => roles.includes(r)) || null;
   } catch (e) {
     return null;
   }
@@ -1609,7 +1610,7 @@ app.get("/api/admin/listings", async (req, res) => {
     (pr.data || []).forEach(p => { profiles[p.id] = p; });
   }
   if (institutionIds.length) {
-    const ir = await db.from("institutions").select("id,name,location,ownership,kind").in("id", institutionIds);
+    const ir = await supabase.from("institutions").select("id,name,location,ownership,kind").in("id", institutionIds);
     (ir.data || []).forEach(i => { institutions[i.id] = i; });
   }
   res.json({
@@ -1947,10 +1948,11 @@ app.get("/api/admin/stats", async (req, res) => {
   }
   // Institutions are public data whose read policy covers the anon role only;
   // count them with the anon client so the admin card matches /api/status.
-  const [users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, listings, listingRequests] = await Promise.all([
+  const [users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, listings, listingRequests, partners, announcements, alumni, opportunities] = await Promise.all([
     count("profiles"), count("posts"), count("institutions", supabase),
     count("mentor_profiles"), count("mentor_requests"), count("hub_pages"), count("fido_feedback"),
-    count("campus_listings"), count("listing_requests")
+    count("campus_listings"), count("listing_requests"),
+    count("institution_partners"), count("partner_announcements"), count("alumni_profiles"), count("recruitment_opportunities")
   ]);
   let recentUsers = [];
   if (users.status === "ok") {
@@ -1963,7 +1965,7 @@ app.get("/api/admin/stats", async (req, res) => {
     if (!r.error) recentPosts = r.data || [];
   }
   res.json({
-    users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, listings, listingRequests, recentUsers, recentPosts,
+    users, posts, institutions, mentors, mentorRequests, hubs, fidoFeedback, listings, listingRequests, partners, announcements, alumni, opportunities, recentUsers, recentPosts,
     reports: { status: "dashboard", detail: "Review reports in Supabase dashboard > Table Editor > reports." },
     generatedAt: new Date().toISOString()
   });
@@ -2199,6 +2201,1183 @@ app.delete("/api/admin/scholarships/:id", async (req, res) => {
   }
   await auditAdmin(auth, "scholarship.archive", String(id), { title: data.title });
   res.json(data);
+});
+
+// ---- Phase 4A: institution partners, alumni, recruitment ----
+function phase4DbError(res, error, label) {
+  if (missingRelation(error)) {
+    return res.status(503).json({
+      error: (label || "Phase 4 content") + " is not set up yet. Run backend/migrations/20261120_phase4_partnerships_alumni_recruitment.sql in the Supabase SQL Editor.",
+      setupRequired: true
+    });
+  }
+  if (error && (error.code === "42501" || error.code === "PGRST301")) {
+    return res.status(403).json({ error: "Permission denied. Sign in with the required account or run the Phase 4 migration." });
+  }
+  return res.status(500).json({ error: (error && error.message) || "Database error" });
+}
+
+async function requireSuperAdmin(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return null;
+  if (adminEmails().includes((auth.user.email || "").toLowerCase())) return auth;
+  const role = await dbAdminRole(auth);
+  if (role !== "super_admin") {
+    res.status(403).json({ error: "Super admin only" });
+    return null;
+  }
+  return auth;
+}
+
+// Content review (announcements, alumni, opportunities) is limited to
+// super admins and content admins. Moderators can read review surfaces but
+// cannot approve content. This mirrors the Phase 4 database policies.
+async function requireContentAdmin(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return null;
+  if (adminEmails().includes((auth.user.email || "").toLowerCase())) return auth;
+  const role = await dbAdminRole(auth);
+  if (role !== "super_admin" && role !== "content_admin") {
+    res.status(403).json({ error: "Content admin only" });
+    return null;
+  }
+  return auth;
+}
+
+const PARTNER_PUBLIC_FIELDS = "institution_id,institution_name,location,ownership,kind,public_summary,official_url,verified_at,updated_at";
+const ANNOUNCEMENT_PUBLIC_FIELDS = "id,institution_id,institution_name,title,body,category,link_url,published_at,expires_at,updated_at,partner_verified_at";
+const ALUMNI_PUBLIC_FIELDS = "user_id,name,photo_url,user_type,institution_id,institution_name,graduation_year,faculty,department,programme,current_role,current_organisation,industry,location,bio,help_areas,open_to_mentoring,open_to_referrals,verified_at,updated_at,institution_location,ownership,kind";
+const ALUMNI_OWN_FIELDS = "user_id,institution_id,institution_name,graduation_year,faculty,department,programme,current_role,current_organisation,industry,location,bio,help_areas,open_to_mentoring,open_to_referrals,verification_method,verification_detail,listed,status,verified_at,created_at,updated_at";
+const OPPORTUNITY_PUBLIC_FIELDS = "id,institution_id,institution_name,title,organisation,description,location,work_mode,role_type,eligibility,deadline,application_url,published_at,updated_at,partner_verified_at";
+
+const PARTNER_STATUSES = ["pending", "verified", "rejected", "paused"];
+const ANNOUNCEMENT_CATEGORIES = ["general", "admission", "registration", "event", "deadline", "opportunity"];
+const ANNOUNCEMENT_STATUSES = ["pending", "approved", "rejected", "paused"];
+const ALUMNI_METHODS = ["institutional_email", "alumni_id", "other"];
+const ALUMNI_STATUSES = ["pending", "verified", "rejected", "paused"];
+const OPPORTUNITY_TYPES = ["internship", "graduate", "job", "volunteer"];
+const OPPORTUNITY_MODES = ["onsite", "hybrid", "remote"];
+const OPPORTUNITY_STATUSES = ["pending", "approved", "rejected", "closed"];
+
+function isUuid(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function p4Text(src, field, min, max, required) {
+  if (src[field] === undefined) {
+    if (required) return { error: field + " is required" };
+    return { present: false };
+  }
+  if (src[field] === null || src[field] === "") {
+    if (required) return { error: field + " is required" };
+    return { present: true, value: null };
+  }
+  if (typeof src[field] !== "string" || src[field].trim().length < min || src[field].length > max) {
+    return { error: field + " must be " + min + "–" + max + " characters" };
+  }
+  return { present: true, value: src[field].trim() };
+}
+
+function p4Array(src, field, maxItems, required) {
+  if (src[field] === undefined) {
+    if (required) return { error: field + " is required" };
+    return { present: false };
+  }
+  let items = src[field];
+  if (typeof items === "string") items = items.split(",");
+  if (!Array.isArray(items)) return { error: field + " must be an array of up to " + maxItems + " short items" };
+  items = [...new Set(items.map(item => typeof item === "string" ? item.trim() : "").filter(Boolean))];
+  if (required && !items.length) return { error: field + " must contain at least 1 item" };
+  if (items.length > maxItems) return { error: field + " must contain at most " + maxItems + " items" };
+  if (items.some(item => item.length < 2 || item.length > 80)) return { error: "each " + field + " item must be 2–80 characters" };
+  return { present: true, value: items };
+}
+
+function p4Bool(src, field) {
+  if (src[field] === undefined) return { present: false };
+  if (typeof src[field] !== "boolean") return { error: field + " must be true or false" };
+  return { present: true, value: src[field] };
+}
+
+function p4Year(src, field, required) {
+  if (src[field] === undefined) {
+    if (required) return { error: field + " is required" };
+    return { present: false };
+  }
+  if (src[field] === null || src[field] === "") {
+    if (required) return { error: field + " is required" };
+    return { present: true, value: null };
+  }
+  const n = Number(src[field]);
+  if (!Number.isInteger(n) || n < 1950 || n > 2100) return { error: field + " must be a year between 1950 and 2100" };
+  return { present: true, value: n };
+}
+
+function p4Date(src, field) {
+  if (src[field] === undefined) return { present: false };
+  if (src[field] === null || src[field] === "") return { present: true, value: null };
+  if (!isIsoDate(src[field])) return { error: field + " must be YYYY-MM-DD" };
+  return { present: true, value: src[field] };
+}
+
+function p4DateTime(src, field) {
+  if (src[field] === undefined) return { present: false };
+  if (src[field] === null || src[field] === "") return { present: true, value: null };
+  if (isIsoDate(src[field])) return { present: true, value: new Date(src[field] + "T23:59:59.999Z").toISOString() };
+  const date = new Date(src[field]);
+  if (Number.isNaN(date.getTime())) return { error: field + " must be a valid date" };
+  return { present: true, value: date.toISOString() };
+}
+
+function p4AnnouncementInput(body, partial) {
+  const src = body || {};
+  const out = {};
+  const title = p4Text(src, "title", 3, 160, !partial);
+  if (title.error) return title;
+  if (title.present) out.title = title.value;
+  const text = p4Text(src, "body", 20, 4000, !partial);
+  if (text.error) return text;
+  if (text.present) out.body = text.value;
+  if (src.category !== undefined) {
+    if (!ANNOUNCEMENT_CATEGORIES.includes(src.category)) return { error: "category must be " + ANNOUNCEMENT_CATEGORIES.join(", ") };
+    out.category = src.category;
+  }
+  const link = p4Text(src, "link_url", 0, 2048, false);
+  if (link.error) return link;
+  if (link.present) {
+    if (link.value !== null && !isHttpUrl(link.value)) return { error: "link_url must be a valid http(s) URL" };
+    out.link_url = link.value;
+  }
+  const expires = p4DateTime(src, "expires_at");
+  if (expires.error) return expires;
+  if (expires.present) out.expires_at = expires.value;
+  return { data: out };
+}
+
+function p4AlumniInput(body, partial) {
+  const src = body || {};
+  const out = {};
+  const schoolValue = src.school !== undefined ? src.school : src.institution_name;
+  const school = p4Text({ school: schoolValue }, "school", 2, 160, !partial);
+  if (school.error) return school;
+  if (school.present) out.school = school.value;
+  if (src.institution_id !== undefined) {
+    if (src.institution_id === null || src.institution_id === "") out.institution_id = null;
+    else {
+      const id = parsePositiveInt(src.institution_id, 0);
+      if (!id) return { error: "institution_id must be a positive integer" };
+      out.institution_id = id;
+    }
+  }
+  const year = p4Year(src, "graduation_year", !partial);
+  if (year.error) return year;
+  if (year.present) out.graduation_year = year.value;
+  for (const [field, max] of Object.entries({ faculty: 160, department: 160, programme: 160, current_role: 160, current_organisation: 160, industry: 120, location: 120 })) {
+    const value = p4Text(src, field, 0, max, false);
+    if (value.error) return value;
+    if (value.present) out[field] = value.value;
+  }
+  const bio = p4Text(src, "bio", 20, 2000, !partial);
+  if (bio.error) return bio;
+  if (bio.present) out.bio = bio.value;
+  const areas = p4Array(src, "help_areas", 8, false);
+  if (areas.error) return areas;
+  if (areas.present) out.help_areas = areas.value;
+  for (const field of ["open_to_mentoring", "open_to_referrals", "listed"]) {
+    const value = p4Bool(src, field);
+    if (value.error) return value;
+    if (value.present) out[field] = value.value;
+  }
+  if (src.verification_method !== undefined || !partial) {
+    if (!ALUMNI_METHODS.includes(src.verification_method)) return { error: "verification_method must be institutional_email, alumni_id, or other" };
+    out.verification_method = src.verification_method;
+  }
+  const detail = p4Text(src, "verification_detail", 0, 300, false);
+  if (detail.error) return detail;
+  if (detail.present) out.verification_detail = detail.value;
+  return { data: out };
+}
+
+function p4OpportunityInput(body, partial) {
+  const src = body || {};
+  const out = {};
+  for (const [field, min, max] of [["title", 3, 160], ["organisation", 2, 160], ["description", 20, 5000]]) {
+    const value = p4Text(src, field, min, max, !partial);
+    if (value.error) return value;
+    if (value.present) out[field] = value.value;
+  }
+  for (const [field, max] of Object.entries({ location: 160, eligibility: 2000 })) {
+    const value = p4Text(src, field, 0, max, false);
+    if (value.error) return value;
+    if (value.present) out[field] = value.value;
+  }
+  if (src.work_mode !== undefined || !partial) {
+    const mode = src.work_mode || "onsite";
+    if (!OPPORTUNITY_MODES.includes(mode)) return { error: "work_mode must be onsite, hybrid, or remote" };
+    out.work_mode = mode;
+  }
+  if (src.role_type !== undefined || !partial) {
+    if (!OPPORTUNITY_TYPES.includes(src.role_type)) return { error: "role_type must be internship, graduate, job, or volunteer" };
+    out.role_type = src.role_type;
+  }
+  if (src.application_url !== undefined || !partial) {
+    if (!isHttpUrl(src.application_url)) return { error: "application_url must be a valid http(s) URL" };
+    out.application_url = src.application_url.trim();
+  }
+  const source = p4Text(src, "source_url", 0, 2048, false);
+  if (source.error) return source;
+  if (source.present) {
+    if (source.value !== null && !isHttpUrl(source.value)) return { error: "source_url must be a valid http(s) URL" };
+    out.source_url = source.value;
+  }
+  const deadline = p4Date(src, "deadline");
+  if (deadline.error) return deadline;
+  if (deadline.present) out.deadline = deadline.value;
+  return { data: out };
+}
+
+function p4PartnerAdminInput(body) {
+  const src = body || {};
+  const out = {};
+  const summary = p4Text(src, "public_summary", 20, 1200, false);
+  if (summary.error) return summary;
+  if (summary.present) out.public_summary = summary.value;
+  const url = p4Text(src, "official_url", 0, 2048, false);
+  if (url.error) return url;
+  if (url.present) {
+    if (url.value !== null && !isHttpUrl(url.value)) return { error: "official_url must be a valid http(s) URL" };
+    out.official_url = url.value;
+  }
+  if (src.verification_method !== undefined) {
+    if (!["official_email", "official_letter", "official_website", "other"].includes(src.verification_method)) {
+      return { error: "verification_method must be official_email, official_letter, official_website, or other" };
+    }
+    out.verification_method = src.verification_method;
+  }
+  for (const [field, max] of Object.entries({ verification_detail: 1000, admin_note: 500 })) {
+    const value = p4Text(src, field, 0, max, false);
+    if (value.error) return value;
+    if (value.present) out[field] = value.value;
+  }
+  const listed = p4Bool(src, "listed");
+  if (listed.error) return listed;
+  if (listed.present) out.listed = listed.value;
+  if (src.status !== undefined) {
+    if (!PARTNER_STATUSES.includes(src.status)) return { error: "status must be pending, verified, rejected, or paused" };
+    out.status = src.status;
+  }
+  return { data: out };
+}
+
+function p4AnnouncementAdminPatch(body) {
+  const base = p4AnnouncementInput(body, true);
+  if (base.error) return base;
+  const out = base.data;
+  if (body && body.status !== undefined) {
+    if (!ANNOUNCEMENT_STATUSES.includes(body.status)) return { error: "status must be pending, approved, rejected, or paused" };
+    out.status = body.status;
+  }
+  const note = p4Text(body || {}, "admin_note", 0, 500, false);
+  if (note.error) return note;
+  if (note.present) out.admin_note = note.value;
+  return { data: out };
+}
+
+function p4OpportunityAdminPatch(body) {
+  const base = p4OpportunityInput(body, true);
+  if (base.error) return base;
+  const out = base.data;
+  if (body && body.status !== undefined) {
+    if (!OPPORTUNITY_STATUSES.includes(body.status)) return { error: "status must be pending, approved, rejected, or closed" };
+    out.status = body.status;
+  }
+  const note = p4Text(body || {}, "admin_note", 0, 500, false);
+  if (note.error) return note;
+  if (note.present) out.admin_note = note.value;
+  return { data: out };
+}
+
+function p4AlumniAdminPatch(body) {
+  const base = p4AlumniInput(body, true);
+  if (base.error) return base;
+  const out = base.data;
+  if (body && body.status !== undefined) {
+    if (!ALUMNI_STATUSES.includes(body.status)) return { error: "status must be pending, verified, rejected, or paused" };
+    out.status = body.status;
+  }
+  const note = p4Text(body || {}, "admin_note", 0, 500, false);
+  if (note.error) return note;
+  if (note.present) out.admin_note = note.value;
+  return { data: out };
+}
+
+async function p4PartnerContext(auth) {
+  const memberships = await auth.me.from("institution_partner_members")
+    .select("*").eq("user_id", auth.user.id).eq("status", "active")
+    .order("created_at", { ascending: true });
+  if (memberships.error) return { dbError: memberships.error };
+  const ids = [...new Set((memberships.data || []).map(m => m.institution_id))];
+  let partners = [];
+  if (ids.length) {
+    const rows = await auth.me.from("institution_partners").select("*").in("institution_id", ids);
+    if (rows.error) return { dbError: rows.error };
+    partners = rows.data || [];
+  }
+  return { memberships: memberships.data || [], partners };
+}
+
+async function p4PartnerAccess(auth, institutionId) {
+  const membership = await auth.me.from("institution_partner_members")
+    .select("*").eq("institution_id", institutionId).eq("user_id", auth.user.id)
+    .eq("status", "active").maybeSingle();
+  if (membership.error) return { dbError: membership.error };
+  if (!membership.data) return { status: 403, error: "Active partner access is required" };
+  const partner = await auth.me.from("institution_partners")
+    .select("*").eq("institution_id", institutionId).maybeSingle();
+  if (partner.error) return { dbError: partner.error };
+  if (!partner.data || partner.data.status !== "verified") {
+    return { status: 403, error: "This partner is not verified yet" };
+  }
+  return { membership: membership.data, partner: partner.data };
+}
+
+// ---- Phase 4A public reads (filtered views only) ----
+app.get("/api/partners", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const limit = parsePositiveInt(req.query.limit, 50, 100);
+  let offset = Number(req.query.offset);
+  if (!Number.isInteger(offset) || offset < 0) offset = 0;
+  if (offset > 5000) offset = 5000;
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let query = supabase.from("institution_partner_directory").select(PARTNER_PUBLIC_FIELDS, { count: "exact" });
+  if (q) query = query.or("institution_name.ilike.%" + q + "%,public_summary.ilike.%" + q + "%,location.ilike.%" + q + "%");
+  const { data, error, count } = await query
+    .order("verified_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) {
+    if (missingRelation(error)) return res.json({ partners: [], total: 0, limit, offset, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ partners: data || [], total: count || 0, limit, offset, setupRequired: false });
+});
+
+app.get("/api/partners/:institutionId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const institutionId = parsePositiveInt(req.params.institutionId, 0);
+  if (!institutionId) return bad(res, "institutionId must be a positive integer");
+  const { data, error } = await supabase.from("institution_partner_directory")
+    .select(PARTNER_PUBLIC_FIELDS).eq("institution_id", institutionId).maybeSingle();
+  if (error) {
+    if (missingRelation(error)) return res.status(503).json({ error: "Partners are not set up yet.", setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  if (!data) return res.status(404).json({ error: "Verified partner not found" });
+  const announcements = await supabase.from("partner_announcement_directory")
+    .select(ANNOUNCEMENT_PUBLIC_FIELDS).eq("institution_id", institutionId)
+    .order("published_at", { ascending: false }).limit(20);
+  if (announcements.error && !missingRelation(announcements.error)) {
+    return res.status(500).json({ error: announcements.error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ partner: data, announcements: announcements.data || [], setupRequired: false });
+});
+
+app.get("/api/partner-announcements", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const limit = parsePositiveInt(req.query.limit, 50, 100);
+  let offset = Number(req.query.offset);
+  if (!Number.isInteger(offset) || offset < 0) offset = 0;
+  if (offset > 5000) offset = 5000;
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  const category = String(req.query.category || "");
+  if (category && !ANNOUNCEMENT_CATEGORIES.includes(category)) return bad(res, "category is invalid");
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let query = supabase.from("partner_announcement_directory").select(ANNOUNCEMENT_PUBLIC_FIELDS, { count: "exact" });
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  if (category) query = query.eq("category", category);
+  if (q) query = query.or("title.ilike.%" + q + "%,body.ilike.%" + q + "%,institution_name.ilike.%" + q + "%");
+  const { data, error, count } = await query
+    .order("published_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) {
+    if (missingRelation(error)) return res.json({ announcements: [], total: 0, limit, offset, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ announcements: data || [], total: count || 0, limit, offset, setupRequired: false });
+});
+
+app.get("/api/alumni", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const limit = parsePositiveInt(req.query.limit, 50, 100);
+  let offset = Number(req.query.offset);
+  if (!Number.isInteger(offset) || offset < 0) offset = 0;
+  if (offset > 5000) offset = 5000;
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  let graduationYear = null;
+  if (req.query.graduation_year !== undefined && req.query.graduation_year !== "") {
+    graduationYear = Number(req.query.graduation_year);
+    if (!Number.isInteger(graduationYear) || graduationYear < 1950 || graduationYear > 2100) {
+      return bad(res, "graduation_year must be a year between 1950 and 2100");
+    }
+  }
+  const industry = cleanText(req.query.industry, 120);
+  const institutionName = cleanText(req.query.institution, 160);
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let query = supabase.from("alumni_directory").select(ALUMNI_PUBLIC_FIELDS, { count: "exact" });
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  if (institutionName) query = query.ilike("institution_name", "%" + institutionName + "%");
+  if (graduationYear) query = query.eq("graduation_year", graduationYear);
+  if (industry) query = query.ilike("industry", "%" + industry + "%");
+  if (req.query.open_to_mentoring === "true") query = query.eq("open_to_mentoring", true);
+  if (req.query.open_to_referrals === "true") query = query.eq("open_to_referrals", true);
+  if (q) query = query.or("name.ilike.%" + q + "%,institution_name.ilike.%" + q + "%,current_role.ilike.%" + q + "%,current_organisation.ilike.%" + q + "%,industry.ilike.%" + q + "%,bio.ilike.%" + q + "%");
+  const { data, error, count } = await query
+    .order("verified_at", { ascending: false })
+    .order("graduation_year", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) {
+    if (missingRelation(error)) return res.json({ alumni: [], total: 0, limit, offset, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ alumni: data || [], total: count || 0, limit, offset, setupRequired: false });
+});
+
+app.get("/api/opportunities", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
+  const limit = parsePositiveInt(req.query.limit, 50, 100);
+  let offset = Number(req.query.offset);
+  if (!Number.isInteger(offset) || offset < 0) offset = 0;
+  if (offset > 5000) offset = 5000;
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  const roleType = String(req.query.role_type || "");
+  if (roleType && !OPPORTUNITY_TYPES.includes(roleType)) return bad(res, "role_type is invalid");
+  const workMode = String(req.query.work_mode || "");
+  if (workMode && !OPPORTUNITY_MODES.includes(workMode)) return bad(res, "work_mode is invalid");
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let query = supabase.from("recruitment_opportunity_directory").select(OPPORTUNITY_PUBLIC_FIELDS, { count: "exact" });
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  if (roleType) query = query.eq("role_type", roleType);
+  if (workMode) query = query.eq("work_mode", workMode);
+  if (q) query = query.or("title.ilike.%" + q + "%,organisation.ilike.%" + q + "%,institution_name.ilike.%" + q + "%,description.ilike.%" + q + "%");
+  const { data, error, count } = await query
+    .order("published_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) {
+    if (missingRelation(error)) return res.json({ opportunities: [], total: 0, limit, offset, setupRequired: true });
+    return res.status(500).json({ error: error.message });
+  }
+  res.setHeader("Cache-Control", PUBLIC_CACHE);
+  res.json({ opportunities: data || [], total: count || 0, limit, offset, setupRequired: false });
+});
+
+// ---- Phase 4A signed-in alumni application ----
+app.get("/api/alumni/me", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const { data, error } = await auth.me.from("alumni_profiles").select(ALUMNI_OWN_FIELDS)
+    .eq("user_id", auth.user.id).maybeSingle();
+  if (error) {
+    if (missingRelation(error)) return res.json({ alumni: null, setupRequired: true });
+    return phase4DbError(res, error, "Alumni");
+  }
+  res.json({ alumni: data || null, setupRequired: false });
+});
+
+app.post("/api/alumni/apply", rateLimit("alumniapply", 20, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const body = { ...(req.body || {}) };
+  if (body.institution_id !== undefined && body.institution_id !== null && body.institution_id !== "") {
+    if (!parsePositiveInt(body.institution_id, 0)) return bad(res, "institution_id must be a positive integer");
+  }
+  if (!body.school && body.institution_id) {
+    const institution = await resolveListingInstitution({ institution_id: parsePositiveInt(body.institution_id, 0) });
+    if (!institution) return bad(res, "Choose an institution from the Fidonect directory.");
+    body.school = institution.name;
+  }
+  const parsed = p4AlumniInput(body, false);
+  if (parsed.error) return bad(res, parsed.error);
+  const institution = await resolveListingInstitution(parsed.data);
+  if (!institution) return bad(res, "Choose an institution from the Fidonect directory.");
+  const row = {
+    user_id: auth.user.id,
+    institution_id: institution.id,
+    institution_name: institution.name,
+    graduation_year: parsed.data.graduation_year,
+    faculty: parsed.data.faculty || null,
+    department: parsed.data.department || null,
+    programme: parsed.data.programme || null,
+    current_role: parsed.data.current_role || null,
+    current_organisation: parsed.data.current_organisation || null,
+    industry: parsed.data.industry || null,
+    location: parsed.data.location || null,
+    bio: parsed.data.bio,
+    help_areas: parsed.data.help_areas || [],
+    open_to_mentoring: parsed.data.open_to_mentoring === true,
+    open_to_referrals: parsed.data.open_to_referrals === true,
+    verification_method: parsed.data.verification_method,
+    verification_detail: parsed.data.verification_detail || null,
+    listed: parsed.data.listed === true,
+    status: "pending",
+    verified_at: null,
+    verified_by: null,
+    admin_note: null
+  };
+  const { data, error } = await auth.me.from("alumni_profiles")
+    .upsert(row, { onConflict: "user_id" }).select(ALUMNI_OWN_FIELDS).single();
+  if (error) return phase4DbError(res, error, "Alumni");
+  res.json({ alumni: data, setupRequired: false });
+});
+
+// ---- Phase 4A partner tools (own institution only) ----
+const PARTNER_OWN_ANNOUNCEMENT_FIELDS = "id,institution_id,author_id,title,body,category,link_url,expires_at,status,published_at,reviewed_at,created_at,updated_at";
+const PARTNER_OWN_OPPORTUNITY_FIELDS = "id,institution_id,posted_by,title,organisation,description,location,work_mode,role_type,eligibility,deadline,application_url,source_url,status,published_at,reviewed_at,created_at,updated_at";
+
+app.get("/api/partner/me", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const context = await p4PartnerContext(auth);
+  if (context.dbError) {
+    if (missingRelation(context.dbError)) return res.json({ memberships: [], setupRequired: true });
+    return phase4DbError(res, context.dbError, "Partner tools");
+  }
+  const ids = context.memberships.map(m => m.institution_id);
+  let institutions = {};
+  if (ids.length) {
+    const ir = await supabase.from("institutions").select("id,name,location,ownership,kind").in("id", ids);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  const partners = {};
+  context.partners.forEach(p => {
+    const safe = { ...p };
+    delete safe.admin_note;
+    delete safe.verification_detail;
+    partners[p.institution_id] = safe;
+  });
+  res.json({
+    memberships: context.memberships.map(m => ({
+      ...m,
+      partner: partners[m.institution_id] || null,
+      institution: institutions[m.institution_id] || null
+    })),
+    setupRequired: false
+  });
+});
+
+app.get("/api/partner/announcements", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const context = await p4PartnerContext(auth);
+  if (context.dbError) {
+    if (missingRelation(context.dbError)) return res.json({ announcements: [], setupRequired: true });
+    return phase4DbError(res, context.dbError, "Partner announcements");
+  }
+  const ids = context.memberships.map(m => m.institution_id);
+  if (!ids.length) return res.json({ announcements: [], setupRequired: false });
+  const { data, error } = await auth.me.from("partner_announcements")
+    .select(PARTNER_OWN_ANNOUNCEMENT_FIELDS).in("institution_id", ids)
+    .order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase4DbError(res, error, "Partner announcements");
+  res.json({ announcements: data || [], setupRequired: false });
+});
+
+app.post("/api/partner/announcements", rateLimit("partnerannouncement", 20, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const institutionId = parsePositiveInt(req.body && req.body.institution_id, 0);
+  if (!institutionId) return bad(res, "institution_id must be a positive integer");
+  const access = await p4PartnerAccess(auth, institutionId);
+  if (access.dbError) return phase4DbError(res, access.dbError, "Partner announcements");
+  if (access.error) return res.status(access.status || 403).json({ error: access.error });
+  const parsed = p4AnnouncementInput(req.body, false);
+  if (parsed.error) return bad(res, parsed.error);
+  const row = {
+    institution_id: institutionId,
+    author_id: auth.user.id,
+    title: parsed.data.title,
+    body: parsed.data.body,
+    category: parsed.data.category || "general",
+    link_url: parsed.data.link_url || null,
+    expires_at: parsed.data.expires_at || null,
+    status: "pending",
+    admin_note: null,
+    published_at: null,
+    reviewed_at: null,
+    reviewed_by: null
+  };
+  const { data, error } = await auth.me.from("partner_announcements")
+    .insert(row).select(PARTNER_OWN_ANNOUNCEMENT_FIELDS).single();
+  if (error) return phase4DbError(res, error, "Partner announcements");
+  res.status(201).json({ announcement: data, setupRequired: false });
+});
+
+app.patch("/api/partner/announcements/:id", rateLimit("partnerannouncementupdate", 30, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const { data: existing, error: findError } = await auth.me.from("partner_announcements")
+    .select("*").eq("id", id).maybeSingle();
+  if (findError) return phase4DbError(res, findError, "Partner announcements");
+  if (!existing) return res.status(404).json({ error: "Announcement not found" });
+  if (existing.author_id !== auth.user.id) return res.status(403).json({ error: "You can only edit your own announcements" });
+  if (existing.status !== "pending") return res.status(409).json({ error: "Only pending announcements can be edited" });
+  const access = await p4PartnerAccess(auth, existing.institution_id);
+  if (access.dbError) return phase4DbError(res, access.dbError, "Partner announcements");
+  if (access.error) return res.status(access.status || 403).json({ error: access.error });
+  const parsed = p4AnnouncementInput(req.body, true);
+  if (parsed.error) return bad(res, parsed.error);
+  if (!Object.keys(parsed.data).length) return bad(res, "nothing to update");
+  const patch = {
+    ...parsed.data,
+    status: "pending",
+    admin_note: null,
+    published_at: null,
+    reviewed_at: null,
+    reviewed_by: null
+  };
+  const { data, error } = await auth.me.from("partner_announcements").update(patch)
+    .eq("id", id).eq("author_id", auth.user.id).eq("status", "pending")
+    .select(PARTNER_OWN_ANNOUNCEMENT_FIELDS).single();
+  if (error) {
+    if (error.code === "PGRST116") return res.status(409).json({ error: "This announcement is no longer pending" });
+    return phase4DbError(res, error, "Partner announcements");
+  }
+  res.json({ announcement: data, setupRequired: false });
+});
+
+app.get("/api/partner/opportunities", async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const context = await p4PartnerContext(auth);
+  if (context.dbError) {
+    if (missingRelation(context.dbError)) return res.json({ opportunities: [], setupRequired: true });
+    return phase4DbError(res, context.dbError, "Partner opportunities");
+  }
+  const ids = context.memberships.map(m => m.institution_id);
+  if (!ids.length) return res.json({ opportunities: [], setupRequired: false });
+  const { data, error } = await auth.me.from("recruitment_opportunities")
+    .select(PARTNER_OWN_OPPORTUNITY_FIELDS).in("institution_id", ids)
+    .order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase4DbError(res, error, "Partner opportunities");
+  res.json({ opportunities: data || [], setupRequired: false });
+});
+
+app.post("/api/partner/opportunities", rateLimit("partneropportunity", 20, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const institutionId = parsePositiveInt(req.body && req.body.institution_id, 0);
+  if (!institutionId) return bad(res, "institution_id must be a positive integer");
+  const access = await p4PartnerAccess(auth, institutionId);
+  if (access.dbError) return phase4DbError(res, access.dbError, "Partner opportunities");
+  if (access.error) return res.status(access.status || 403).json({ error: access.error });
+  const parsed = p4OpportunityInput(req.body, false);
+  if (parsed.error) return bad(res, parsed.error);
+  const row = {
+    institution_id: institutionId,
+    posted_by: auth.user.id,
+    title: parsed.data.title,
+    organisation: parsed.data.organisation,
+    description: parsed.data.description,
+    location: parsed.data.location || null,
+    work_mode: parsed.data.work_mode,
+    role_type: parsed.data.role_type,
+    eligibility: parsed.data.eligibility || null,
+    deadline: parsed.data.deadline || null,
+    application_url: parsed.data.application_url,
+    source_url: parsed.data.source_url || null,
+    status: "pending",
+    admin_note: null,
+    published_at: null,
+    reviewed_at: null,
+    reviewed_by: null
+  };
+  const { data, error } = await auth.me.from("recruitment_opportunities")
+    .insert(row).select(PARTNER_OWN_OPPORTUNITY_FIELDS).single();
+  if (error) return phase4DbError(res, error, "Partner opportunities");
+  res.status(201).json({ opportunity: data, setupRequired: false });
+});
+
+app.patch("/api/partner/opportunities/:id", rateLimit("partneropportunityupdate", 30, 60 * 1000), async (req, res) => {
+  const auth = await authedUser(req).catch(() => null);
+  if (!auth) return res.status(401).json({ error: "Missing or invalid Authorization Bearer token" });
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const { data: existing, error: findError } = await auth.me.from("recruitment_opportunities")
+    .select("*").eq("id", id).maybeSingle();
+  if (findError) return phase4DbError(res, findError, "Partner opportunities");
+  if (!existing) return res.status(404).json({ error: "Opportunity not found" });
+  if (existing.posted_by !== auth.user.id) return res.status(403).json({ error: "You can only edit your own opportunities" });
+  if (existing.status !== "pending") return res.status(409).json({ error: "Only pending opportunities can be edited" });
+  const access = await p4PartnerAccess(auth, existing.institution_id);
+  if (access.dbError) return phase4DbError(res, access.dbError, "Partner opportunities");
+  if (access.error) return res.status(access.status || 403).json({ error: access.error });
+  const parsed = p4OpportunityInput(req.body, true);
+  if (parsed.error) return bad(res, parsed.error);
+  if (!Object.keys(parsed.data).length) return bad(res, "nothing to update");
+  const patch = {
+    ...parsed.data,
+    status: "pending",
+    admin_note: null,
+    published_at: null,
+    reviewed_at: null,
+    reviewed_by: null
+  };
+  const { data, error } = await auth.me.from("recruitment_opportunities").update(patch)
+    .eq("id", id).eq("posted_by", auth.user.id).eq("status", "pending")
+    .select(PARTNER_OWN_OPPORTUNITY_FIELDS).single();
+  if (error) {
+    if (error.code === "PGRST116") return res.status(409).json({ error: "This opportunity is no longer pending" });
+    return phase4DbError(res, error, "Partner opportunities");
+  }
+  res.json({ opportunity: data, setupRequired: false });
+});
+
+// ---- Phase 4A admin: partner accounts and members (super admin) ----
+app.get("/api/admin/partners", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const status = String(req.query.status || "");
+  if (status && !PARTNER_STATUSES.includes(status)) return bad(res, "status is invalid");
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let partnerIds = null;
+  if (q) {
+    const ir = await supabase.from("institutions").select("id").ilike("name", "%" + q + "%").limit(100);
+    if (ir.error) return phase4DbError(res, ir.error, "Institutions");
+    partnerIds = (ir.data || []).map(i => i.id);
+    if (!partnerIds.length) return res.json({ partners: [], total: 0, setupRequired: false });
+  }
+  let query = db.from("institution_partners").select("*", { count: "exact" });
+  if (status) query = query.eq("status", status);
+  if (partnerIds) query = query.in("institution_id", partnerIds);
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase4DbError(res, error, "Partners");
+  const ids = [...new Set((data || []).map(p => p.institution_id))];
+  let institutions = {};
+  if (ids.length) {
+    const ir = await supabase.from("institutions").select("id,name,location,ownership,kind").in("id", ids);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  res.json({
+    partners: (data || []).map(p => ({ ...p, institution: institutions[p.institution_id] || null })),
+    total: count || 0,
+    setupRequired: false
+  });
+});
+
+app.post("/api/admin/partners", async (req, res) => {
+  const auth = await requireSuperAdmin(req, res);
+  if (!auth) return;
+  const institutionId = parsePositiveInt(req.body && req.body.institution_id, 0);
+  if (!institutionId) return bad(res, "institution_id must be a positive integer");
+  const parsed = p4PartnerAdminInput(req.body);
+  if (parsed.error) return bad(res, parsed.error);
+  const db = adminDb() || auth.me;
+  const { data: institution, error: iErr } = await supabase.from("institutions")
+    .select("id,name,location,ownership,kind").eq("id", institutionId).maybeSingle();
+  if (iErr) return phase4DbError(res, iErr, "Institutions");
+  if (!institution) return res.status(404).json({ error: "Institution not found" });
+  const { data: existing, error: findError } = await db.from("institution_partners")
+    .select("institution_id").eq("institution_id", institutionId).maybeSingle();
+  if (findError) return phase4DbError(res, findError, "Partners");
+  if (existing) return res.status(409).json({ error: "This institution already has a partner record" });
+  const status = parsed.data.status || "pending";
+  if (parsed.data.listed === true && status !== "verified") return bad(res, "Verify the partner before listing it publicly");
+  const now = new Date().toISOString();
+  const row = {
+    institution_id: institutionId,
+    status,
+    public_summary: parsed.data.public_summary || null,
+    official_url: parsed.data.official_url || null,
+    verification_method: parsed.data.verification_method || "official_website",
+    verification_detail: parsed.data.verification_detail || null,
+    admin_note: parsed.data.admin_note || null,
+    listed: parsed.data.listed === true,
+    verified_at: status === "verified" ? now : null,
+    verified_by: status === "verified" ? auth.user.id : null
+  };
+  const { data, error } = await db.from("institution_partners").insert(row).select("*").single();
+  if (error) {
+    if (error.code === "23505") return res.status(409).json({ error: "This institution already has a partner record" });
+    return phase4DbError(res, error, "Partners");
+  }
+  await auditAdmin(auth, "partner.create", String(institutionId), { status, listed: row.listed });
+  res.status(201).json({ partner: { ...data, institution }, setupRequired: false });
+});
+
+app.patch("/api/admin/partners/:institutionId", async (req, res) => {
+  const auth = await requireSuperAdmin(req, res);
+  if (!auth) return;
+  const institutionId = parsePositiveInt(req.params.institutionId, 0);
+  if (!institutionId) return bad(res, "institutionId must be a positive integer");
+  const parsed = p4PartnerAdminInput(req.body);
+  if (parsed.error) return bad(res, parsed.error);
+  if (!Object.keys(parsed.data).length) return bad(res, "nothing to update");
+  const db = adminDb() || auth.me;
+  const { data: existing, error: findError } = await db.from("institution_partners")
+    .select("*").eq("institution_id", institutionId).maybeSingle();
+  if (findError) return phase4DbError(res, findError, "Partners");
+  if (!existing) return res.status(404).json({ error: "Partner not found" });
+  const nextStatus = parsed.data.status || existing.status;
+  if (parsed.data.listed === true && nextStatus !== "verified") return bad(res, "Verify the partner before listing it publicly");
+  const patch = { ...parsed.data };
+  if (nextStatus === "verified") {
+    patch.verified_at = existing.verified_at || new Date().toISOString();
+    patch.verified_by = existing.verified_by || auth.user.id;
+  } else {
+    patch.verified_at = null;
+    patch.verified_by = null;
+  }
+  const { data, error } = await db.from("institution_partners").update(patch)
+    .eq("institution_id", institutionId).select("*").single();
+  if (error) return phase4DbError(res, error, "Partners");
+  const { data: institution } = await supabase.from("institutions")
+    .select("id,name,location,ownership,kind").eq("id", institutionId).maybeSingle();
+  await auditAdmin(auth, "partner." + nextStatus, String(institutionId), {
+    status: nextStatus, listed: data.listed, changed: Object.keys(parsed.data)
+  });
+  res.json({ partner: { ...data, institution: institution || null }, setupRequired: false });
+});
+
+app.get("/api/admin/partner-members", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  let query = db.from("institution_partner_members").select("*", { count: "exact" });
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  const { data, error, count } = await query.order("created_at", { ascending: false }).limit(200);
+  if (error) return phase4DbError(res, error, "Partner members");
+  const userIds = [...new Set((data || []).map(m => m.user_id))];
+  const institutionIds = [...new Set((data || []).map(m => m.institution_id))];
+  let profiles = {};
+  let institutions = {};
+  if (userIds.length) {
+    const pr = await db.from("profiles").select("id,name,email,school,photo_url,visibility").in("id", userIds);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  if (institutionIds.length) {
+    const ir = await supabase.from("institutions").select("id,name,location").in("id", institutionIds);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  res.json({
+    members: (data || []).map(m => ({
+      ...m,
+      profile: profiles[m.user_id] || null,
+      institution: institutions[m.institution_id] || null
+    })),
+    total: count || 0,
+    setupRequired: false
+  });
+});
+
+app.post("/api/admin/partner-members", async (req, res) => {
+  const auth = await requireSuperAdmin(req, res);
+  if (!auth) return;
+  const institutionId = parsePositiveInt(req.body && req.body.institution_id, 0);
+  if (!institutionId) return bad(res, "institution_id must be a positive integer");
+  const email = String((req.body && req.body.email) || "").trim().toLowerCase();
+  if (!isEmail(email)) return bad(res, "email is invalid");
+  const memberRole = (req.body && req.body.member_role) || "owner";
+  if (!["owner", "editor"].includes(memberRole)) return bad(res, "member_role must be owner or editor");
+  const db = adminDb() || auth.me;
+  const { data: partner, error: pErr } = await db.from("institution_partners")
+    .select("institution_id").eq("institution_id", institutionId).maybeSingle();
+  if (pErr) return phase4DbError(res, pErr, "Partners");
+  if (!partner) return res.status(404).json({ error: "Partner not found" });
+  const { data: profile, error: uErr } = await db.from("profiles")
+    .select("id,name,email,school").ilike("email", email).maybeSingle();
+  if (uErr) return phase4DbError(res, uErr, "Profiles");
+  if (!profile) return res.status(404).json({ error: "No Fidonect account uses that email" });
+  const row = {
+    institution_id: institutionId,
+    user_id: profile.id,
+    member_role: memberRole,
+    status: "active"
+  };
+  const { data, error } = await db.from("institution_partner_members")
+    .upsert(row, { onConflict: "institution_id,user_id" }).select("*").single();
+  if (error) return phase4DbError(res, error, "Partner members");
+  await auditAdmin(auth, "partner.member.add", String(institutionId), {
+    user_id: profile.id, member_role: memberRole
+  });
+  res.status(201).json({ member: { ...data, profile }, setupRequired: false });
+});
+
+app.patch("/api/admin/partner-members/:institutionId/:userId", async (req, res) => {
+  const auth = await requireSuperAdmin(req, res);
+  if (!auth) return;
+  const institutionId = parsePositiveInt(req.params.institutionId, 0);
+  if (!institutionId) return bad(res, "institutionId must be a positive integer");
+  const userId = String(req.params.userId || "");
+  if (!isUuid(userId)) return bad(res, "userId must be a valid UUID");
+  const body = req.body || {};
+  const patch = {};
+  if (body.member_role !== undefined) {
+    if (!["owner", "editor"].includes(body.member_role)) return bad(res, "member_role must be owner or editor");
+    patch.member_role = body.member_role;
+  }
+  if (body.status !== undefined) {
+    if (!["active", "revoked"].includes(body.status)) return bad(res, "status must be active or revoked");
+    patch.status = body.status;
+  }
+  if (!Object.keys(patch).length) return bad(res, "nothing to update");
+  const db = adminDb() || auth.me;
+  const { data, error } = await db.from("institution_partner_members").update(patch)
+    .eq("institution_id", institutionId).eq("user_id", userId)
+    .select("*").single();
+  if (error) {
+    if (error.code === "PGRST116") return res.status(404).json({ error: "Partner member not found" });
+    return phase4DbError(res, error, "Partner members");
+  }
+  await auditAdmin(auth, "partner.member.update", String(institutionId), { user_id: userId, ...patch });
+  res.json({ member: data, setupRequired: false });
+});
+
+// ---- Phase 4A admin: review queues ----
+app.get("/api/admin/partner-announcements", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const status = String(req.query.status || "");
+  if (status && !ANNOUNCEMENT_STATUSES.includes(status)) return bad(res, "status is invalid");
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  let query = db.from("partner_announcements").select("*", { count: "exact" });
+  if (status) query = query.eq("status", status);
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase4DbError(res, error, "Partner announcements");
+  const ids = [...new Set((data || []).map(a => a.institution_id))];
+  const authorIds = [...new Set((data || []).map(a => a.author_id).filter(Boolean))];
+  let institutions = {};
+  let profiles = {};
+  if (ids.length) {
+    const ir = await supabase.from("institutions").select("id,name,location,ownership,kind").in("id", ids);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  if (authorIds.length) {
+    const pr = await db.from("profiles").select("id,name,email,school").in("id", authorIds);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  res.json({
+    announcements: (data || []).map(a => ({
+      ...a,
+      institution: institutions[a.institution_id] || null,
+      author: profiles[a.author_id] || null
+    })),
+    total: count || 0,
+    setupRequired: false
+  });
+});
+
+app.patch("/api/admin/partner-announcements/:id", async (req, res) => {
+  const auth = await requireContentAdmin(req, res);
+  if (!auth) return;
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const parsed = p4AnnouncementAdminPatch(req.body || {});
+  if (parsed.error) return bad(res, parsed.error);
+  if (!Object.keys(parsed.data).length) return bad(res, "nothing to update");
+  const db = adminDb() || auth.me;
+  const { data: existing, error: findError } = await db.from("partner_announcements")
+    .select("*").eq("id", id).maybeSingle();
+  if (findError) return phase4DbError(res, findError, "Partner announcements");
+  if (!existing) return res.status(404).json({ error: "Announcement not found" });
+  const nextStatus = parsed.data.status || existing.status;
+  const patch = { ...parsed.data };
+  const now = new Date().toISOString();
+  if (patch.status === "pending") {
+    patch.published_at = null;
+    patch.reviewed_at = null;
+    patch.reviewed_by = null;
+  } else if (patch.status !== undefined && patch.status !== existing.status) {
+    patch.reviewed_at = now;
+    patch.reviewed_by = auth.user.id;
+    if (patch.status === "approved") patch.published_at = existing.published_at || now;
+  }
+  if (nextStatus === "approved" && !patch.published_at && !existing.published_at) patch.published_at = now;
+  const { data, error } = await db.from("partner_announcements").update(patch)
+    .eq("id", id).select("*").single();
+  if (error) return phase4DbError(res, error, "Partner announcements");
+  await auditAdmin(auth, "partner_announcement." + nextStatus, String(id), {
+    status: nextStatus, institution_id: data.institution_id, title: data.title
+  });
+  res.json({ announcement: data, setupRequired: false });
+});
+
+app.get("/api/admin/alumni", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const status = String(req.query.status || "");
+  if (status && !ALUMNI_STATUSES.includes(status)) return bad(res, "status is invalid");
+  const q = cleanText(req.query.q, 80).replace(/[%,()]/g, " ").trim();
+  let userIds = null;
+  if (q) {
+    const pr = await db.from("profiles").select("id")
+      .or("name.ilike.%" + q + "%,email.ilike.%" + q + "%,school.ilike.%" + q + "%").limit(100);
+    if (pr.error) return phase4DbError(res, pr.error, "Profiles");
+    userIds = (pr.data || []).map(p => p.id);
+    if (!userIds.length) return res.json({ alumni: [], total: 0, setupRequired: false });
+  }
+  let query = db.from("alumni_profiles").select("*", { count: "exact" });
+  if (status) query = query.eq("status", status);
+  if (userIds) query = query.in("user_id", userIds);
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase4DbError(res, error, "Alumni");
+  const ids = [...new Set((data || []).map(a => a.user_id))];
+  const institutionIds = [...new Set((data || []).map(a => a.institution_id).filter(Boolean))];
+  let profiles = {};
+  let institutions = {};
+  if (ids.length) {
+    const pr = await db.from("profiles").select("id,name,email,school,photo_url,visibility,user_type").in("id", ids);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  if (institutionIds.length) {
+    const ir = await supabase.from("institutions").select("id,name,location,ownership,kind").in("id", institutionIds);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  res.json({
+    alumni: (data || []).map(a => ({
+      ...a,
+      profile: profiles[a.user_id] || null,
+      institution: institutions[a.institution_id] || null
+    })),
+    total: count || 0,
+    setupRequired: false
+  });
+});
+
+app.patch("/api/admin/alumni/:userId", async (req, res) => {
+  const auth = await requireContentAdmin(req, res);
+  if (!auth) return;
+  const userId = String(req.params.userId || "");
+  if (!isUuid(userId)) return bad(res, "userId must be a valid UUID");
+  const parsed = p4AlumniAdminPatch(req.body || {});
+  if (parsed.error) return bad(res, parsed.error);
+  if (!Object.keys(parsed.data).length) return bad(res, "nothing to update");
+  const db = adminDb() || auth.me;
+  const { data: existing, error: findError } = await db.from("alumni_profiles")
+    .select("*").eq("user_id", userId).maybeSingle();
+  if (findError) return phase4DbError(res, findError, "Alumni");
+  if (!existing) return res.status(404).json({ error: "Alumni application not found" });
+  const patch = { ...parsed.data };
+  const school = patch.school;
+  delete patch.school;
+  if (school !== undefined) {
+    const institution = await resolveListingInstitution({
+      school,
+      institution_id: patch.institution_id === undefined ? undefined : patch.institution_id
+    });
+    if (!institution) return bad(res, "Choose an institution from the Fidonect directory.");
+    patch.institution_id = institution.id;
+    patch.institution_name = institution.name;
+  } else if (patch.institution_id !== undefined) {
+    if (patch.institution_id === null) {
+      patch.institution_id = null;
+    } else {
+      const institution = await resolveListingInstitution({ institution_id: patch.institution_id });
+      if (!institution) return bad(res, "Choose an institution from the Fidonect directory.");
+      patch.institution_id = institution.id;
+      patch.institution_name = institution.name;
+    }
+  }
+  const nextStatus = patch.status || existing.status;
+  if (patch.listed === true && nextStatus !== "verified") return bad(res, "Verify the alumni profile before listing it publicly");
+  if (nextStatus === "verified") {
+    patch.verified_at = existing.verified_at || new Date().toISOString();
+    patch.verified_by = existing.verified_by || auth.user.id;
+  } else {
+    patch.verified_at = null;
+    patch.verified_by = null;
+  }
+  const { data, error } = await db.from("alumni_profiles").update(patch)
+    .eq("user_id", userId).select("*").single();
+  if (error) return phase4DbError(res, error, "Alumni");
+  await auditAdmin(auth, "alumni." + nextStatus, userId, {
+    status: nextStatus, listed: data.listed, institution_id: data.institution_id
+  });
+  res.json({ alumni: data, setupRequired: false });
+});
+
+app.get("/api/admin/opportunities", async (req, res) => {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const db = adminDb() || auth.me;
+  const status = String(req.query.status || "");
+  if (status && !OPPORTUNITY_STATUSES.includes(status)) return bad(res, "status is invalid");
+  const institutionId = req.query.institution_id === undefined ? null : parsePositiveInt(req.query.institution_id, 0);
+  if (req.query.institution_id !== undefined && !institutionId) return bad(res, "institution_id must be a positive integer");
+  let query = db.from("recruitment_opportunities").select("*", { count: "exact" });
+  if (status) query = query.eq("status", status);
+  if (institutionId) query = query.eq("institution_id", institutionId);
+  const { data, error, count } = await query.order("updated_at", { ascending: false }).limit(100);
+  if (error) return phase4DbError(res, error, "Opportunities");
+  const ids = [...new Set((data || []).map(o => o.institution_id))];
+  const posterIds = [...new Set((data || []).map(o => o.posted_by).filter(Boolean))];
+  let institutions = {};
+  let profiles = {};
+  if (ids.length) {
+    const ir = await supabase.from("institutions").select("id,name,location,ownership,kind").in("id", ids);
+    (ir.data || []).forEach(i => { institutions[i.id] = i; });
+  }
+  if (posterIds.length) {
+    const pr = await db.from("profiles").select("id,name,email,school").in("id", posterIds);
+    (pr.data || []).forEach(p => { profiles[p.id] = p; });
+  }
+  res.json({
+    opportunities: (data || []).map(o => ({
+      ...o,
+      institution: institutions[o.institution_id] || null,
+      poster: profiles[o.posted_by] || null
+    })),
+    total: count || 0,
+    setupRequired: false
+  });
+});
+
+app.patch("/api/admin/opportunities/:id", async (req, res) => {
+  const auth = await requireContentAdmin(req, res);
+  if (!auth) return;
+  const id = parsePositiveInt(req.params.id, 0);
+  if (!id) return bad(res, "id must be a positive integer");
+  const parsed = p4OpportunityAdminPatch(req.body || {});
+  if (parsed.error) return bad(res, parsed.error);
+  if (!Object.keys(parsed.data).length) return bad(res, "nothing to update");
+  const db = adminDb() || auth.me;
+  const { data: existing, error: findError } = await db.from("recruitment_opportunities")
+    .select("*").eq("id", id).maybeSingle();
+  if (findError) return phase4DbError(res, findError, "Opportunities");
+  if (!existing) return res.status(404).json({ error: "Opportunity not found" });
+  const nextStatus = parsed.data.status || existing.status;
+  const patch = { ...parsed.data };
+  const now = new Date().toISOString();
+  if (patch.status === "pending") {
+    patch.published_at = null;
+    patch.reviewed_at = null;
+    patch.reviewed_by = null;
+  } else if (patch.status !== undefined && patch.status !== existing.status) {
+    patch.reviewed_at = now;
+    patch.reviewed_by = auth.user.id;
+    if (patch.status === "approved") patch.published_at = existing.published_at || now;
+  }
+  if (nextStatus === "approved" && !patch.published_at && !existing.published_at) patch.published_at = now;
+  const { data, error } = await db.from("recruitment_opportunities").update(patch)
+    .eq("id", id).select("*").single();
+  if (error) return phase4DbError(res, error, "Opportunities");
+  await auditAdmin(auth, "opportunity." + nextStatus, String(id), {
+    status: nextStatus, institution_id: data.institution_id, title: data.title
+  });
+  res.json({ opportunity: data, setupRequired: false });
 });
 
 // JSON 404 for unknown API routes, then a final error handler so async

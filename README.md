@@ -5,8 +5,10 @@
 Fidonect helps Nigerian students connect before resumption. It combines a
 searchable directory of **588 institutions**, student profiles and connections,
 private messaging, community posts, honest AI-labelled campus guidance, a
-public **Scholarships** directory that only links to official sources, and an
-admin-reviewed **Mentors** directory for student-to-student guidance.
+public **Scholarships** directory that only links to official sources, an
+admin-reviewed **Mentors** directory, admin-approved housing/services, verified
+institution **Partners**, opt-in **Alumni**, and an admin-approved
+**Opportunities** board.
 
 ## What is live
 
@@ -26,12 +28,19 @@ admin-reviewed **Mentors** directory for student-to-student guidance.
 - Accommodation & services (Phase 3A): admin-approved community listings,
   optional source verification, in-app contact requests, and accepted-request
   messaging — no bookings, reservations, payments, or marketplace transactions
+- Institution partners (Phase 4A): admin-initiated partner accounts, verified
+  public partner pages, and admin-approved partner announcements
+- Alumni (Phase 4A): opt-in, admin-reviewed alumni profiles with a public
+  directory and connection-request contact; no public email or private evidence
+- Opportunities (Phase 4A): admin-approved roles from verified institution
+  partners with external official application links only — no CV uploads,
+  in-app applications, automated screening, or recruitment fees
 - Mobile bottom navigation plus a More menu; `/profile` account page
 
-Phase 1, Phase 2, and Phase 3A need the additive SQL migrations in
-`backend/migrations/` applied once. Until then `/scholarships`, `/mentors`, and
-`/housing` deliberately show honest setup/empty states instead of placeholder
-content.
+Phase 1, Phase 2, Phase 3A, and Phase 4A need the additive SQL migrations in
+`backend/migrations/` applied once. Until then `/scholarships`, `/mentors`,
+`/housing`, `/partners`, `/alumni`, and `/opportunities` deliberately show
+honest setup/empty states instead of placeholder content.
 
 ## Run locally
 
@@ -75,14 +84,17 @@ Read `backend/migrations/README.md` first. The order is:
 3. `backend/migrations/20261114_phase1_scholarships.sql`
 4. `backend/migrations/20261116_phase2_mentorship_hubs_fido.sql`
 5. `backend/migrations/20261118_phase3_accommodation_services.sql`
-6. Seed the first admin with `20261114_seed_admin_role.example.sql`.
+6. `backend/migrations/20261120_phase4_partnerships_alumni_recruitment.sql`
+7. Seed the first admin with `20261114_seed_admin_role.example.sql`.
 
 The migrations are additive and idempotent: no tables are dropped, no users or
 institutions are deleted, and no content is invented. After applying them,
 verify login, photo upload, connections, messages, admin access, mentor
 application/verification, hub verification labels, Fido feedback, listing
-approval/source verification, accepted listing-request messaging, and the
-588-institution directory.
+approval/source verification, accepted listing-request messaging, partner
+onboarding/membership/announcement review, alumni application/verification,
+opportunity approval, the public-view privacy checks, and the 588-institution
+directory.
 
 ## Deploy
 
@@ -106,6 +118,17 @@ approval/source verification, accepted listing-request messaging, and the
   A “source checked” badge requires a real admin review. Public listings never
   expose owner email, exact private addresses, phone numbers, or source URLs;
   contact happens through in-app requests.
+- Partner onboarding is admin-initiated. An “Official partner” badge requires a
+  real admin verification and a listed partner; announcements are admin-approved
+  before publication. Partners cannot verify themselves, act for another
+  institution, or access student data.
+- Alumni profiles are opt-in and admin-reviewed. Public alumni views never expose
+  email, private verification evidence, admin notes, or exact private addresses;
+  contact uses the existing connection-request flow.
+- Opportunities are submitted only by verified institution partners and are
+  admin-approved. Applications happen on the organisation's official external
+  page. Fidonect does not process applications, rank candidates, accept CVs, or
+  charge recruitment fees.
 - Fidonect does not take bookings, reservations, or payments for housing or
   services. Students must inspect before paying and never send money to a
   personal account without verifying the property or provider.
@@ -122,6 +145,11 @@ approval/source verification, accepted listing-request messaging, and the
   contact requests; no bookings or payments
 - Phase 3B (deferred): marketplace and any transaction/payment flow (out of the
   initial scope per PRD §69)
-- Phase 4: institution partnerships, alumni, recruitment
+- Phase 4A (implemented; apply its migration before use): admin-verified
+  institution partners, admin-approved partner announcements, opt-in
+  admin-reviewed alumni profiles, and an admin-approved opportunity board with
+  external official application links
+- Phase 4B (deferred): billing, partner analytics, general recruiter
+  self-service, CV uploads, in-app applications, and automated screening
 
 Privacy, safety, and responsible-AI requirements: `PRD.md` §§22–28.

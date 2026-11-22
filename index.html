@@ -123,6 +123,21 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 .mentor-status{font-size:12px;border-radius:999px;padding:2px 10px;font-weight:700;background:#e2e8f0;color:#334155}
 .mentor-status.pending{background:#fef3c7;color:#92400e}.mentor-status.verified{background:#dcfce7;color:#166534}
 .mentor-status.rejected{background:#fee2e2;color:#991b1b}.mentor-status.cancelled{background:#e2e8f0;color:#475569}
+/* Phase 4: partners, alumni, opportunities */
+.partner-card{display:flex;flex-direction:column;gap:8px;border-top:4px solid #2dd4bf}
+.partner-card h3,.opportunity-card h3,.announcement-card h3{margin:0;font-size:18px}
+.partner-card p,.opportunity-card p,.announcement-card p{margin:0;line-height:1.45}
+.announcement-card{border-left:4px solid #f59e0b}
+.opportunity-card{display:flex;flex-direction:column;gap:8px;border-top:4px solid #7c3aed}
+.alumni-card{display:flex;flex-direction:column;gap:8px;border-top:4px solid #f59e0b}
+.alumni-card h3{margin:0;font-size:18px}
+.alumni-card p{margin:0;line-height:1.45}
+.alumni-status{font-size:12px;border-radius:999px;padding:2px 10px;font-weight:700;background:#e2e8f0;color:#334155}
+.alumni-status.pending{background:#fef3c7;color:#92400e}.alumni-status.verified{background:#dcfce7;color:#166534}
+.alumni-status.rejected{background:#fee2e2;color:#991b1b}.alumni-status.paused{background:#e2e8f0;color:#475569}
+.phase4-list{display:grid;gap:8px}
+.phase4-row{background:#f8fafc;border:1px solid #dbe3ed;border-radius:12px;padding:10px 12px}
+.phase4-row .listing-actions{padding-top:6px}
 /* Phase 3: accommodation + campus services */
 .listing-card{display:flex;flex-direction:column;gap:8px;border-top:4px solid #0ea5e9}
 .listing-card h3{margin:0;font-size:18px}
@@ -152,7 +167,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <header class="topbar">
 <div class="brand"><a href="/" style="color:#fff;text-decoration:none"><span class="logo">F</span> Fidonect</a></div>
 <button id="menuBtn" class="menu-btn" aria-label="Open menu">☰</button>
-<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/mentors">Mentors</a><a href="/housing">Housing</a><a href="/scholarships">Scholarships</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/profile">My Profile</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
+<nav id="mainNav"><a href="/">Home</a><a href="/institutions">Institutions</a><a href="/connections">Connections</a><a href="/mentors">Mentors</a><a href="/housing">Housing</a><a href="/scholarships">Scholarships</a><a href="/partners">Partners</a><a href="/alumni">Alumni</a><a href="/opportunities">Opportunities</a><a href="/messages">Messages<span id="msgBadge" class="badge" style="display:none"></span></a><a href="/profile">My Profile</a><a href="/ai-honesty">AI Honesty</a><a href="/about">About</a><a href="/admin" id="navAdmin" style="display:none">Admin</a></nav>
 </header>
 
 <div class="wrap" id="home">
@@ -167,6 +182,9 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <a class="feat" href="/connections"><b>Connections</b><span>Find classmates, connect, message your circle</span></a>
 <a class="feat" href="/mentors"><b>Mentors</b><span>Verified student guides for clearance and resumption</span></a>
 <a class="feat" href="/housing"><b>Housing &amp; services</b><span>Admin-approved rooms and campus services — no payments</span></a>
+<a class="feat" href="/partners"><b>Institution partners</b><span>Official partner pages and admin-approved updates</span></a>
+<a class="feat" href="/alumni"><b>Alumni</b><span>Opt-in, admin-reviewed alumni who offer guidance</span></a>
+<a class="feat" href="/opportunities"><b>Opportunities</b><span>Verified partner opportunities with official application links</span></a>
 <a class="feat" href="/profile"><b>My Profile</b><span>Your school, visibility, photo and account</span></a>
 <a class="feat" href="/ai-honesty"><b>Ask Fido</b><span>Campus guidance with honest Official / Community / AI labels</span></a>
 <a class="feat" href="/about"><b>About</b><span>What Fidonect is, who it serves, and how it works</span></a>
@@ -377,6 +395,152 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 </div>
 
+<div id="partners" data-page="partners">
+<div class="card">
+<h2>Institution partners <span id="partnerCount" class="pill"></span></h2>
+<p class="lede">Only institutions reviewed and verified by a Fidonect admin appear here. The <b>Official partner</b> badge is a real admin action — never a paid placement. Fidonect does not accept partner payments or give partners access to student data.</p>
+<div class="listing-safety"><b>What this means:</b> a verified partner has confirmed its relationship with Fidonect. Announcements are still reviewed and approved by a Fidonect admin before publication. Always confirm admission, fees, deadlines and registration details with the institution's official website.</div>
+<div class="search-row">
+<input id="partnerSearch" class="input" placeholder="Search institution, location or summary" autocomplete="off" />
+<button id="partnerFind" class="btn" type="button">Search</button>
+<button id="partnerReset" class="btn ghost" type="button">Reset</button>
+</div>
+<p id="partnerNotice" class="muted"></p>
+<div class="grid" id="partnerGrid"></div>
+</div>
+
+<div class="card" id="partnerDetailCard" style="display:none">
+<h2 id="partnerDetailName">Official partner</h2>
+<div id="partnerDetailBody"></div>
+<h3>Approved announcements</h3>
+<div id="partnerDetailAnnouncements"></div>
+<div class="search-row"><button id="partnerDetailClose" class="btn ghost" type="button">Back to directory</button></div>
+</div>
+
+<div class="card">
+<h2>Partner announcements</h2>
+<p class="lede">Time-sensitive updates from verified institution partners. Each announcement below was approved by a Fidonect admin. Announcements do not replace the institution's official website or the Fidonect institution page.</p>
+<p id="announcementNotice" class="muted"></p>
+<div id="announcementList"></div>
+</div>
+
+<div class="card" id="partnerToolsCard">
+<h2>Partner tools</h2>
+<p class="lede">Partner accounts are created and verified by Fidonect admins. A partner member can submit announcements for review, but cannot publish directly or act for another institution.</p>
+<p id="partnerToolsStatus" class="muted"></p>
+<div id="partnerMembershipList"></div>
+<div id="partnerAnnouncementForm" style="display:none">
+<h3>Submit an announcement</h3>
+<div class="form-grid">
+<select id="partnerAnnouncementInstitution" class="input" aria-label="Institution"></select>
+<select id="partnerAnnouncementCategory" class="input" aria-label="Announcement category">
+<option value="general">General update</option><option value="admission">Admission</option><option value="registration">Registration</option><option value="event">Event</option><option value="deadline">Deadline</option><option value="opportunity">Opportunity</option>
+</select>
+<input id="partnerAnnouncementTitle" class="input" maxlength="160" placeholder="Announcement title *" />
+<input id="partnerAnnouncementExpires" class="input" type="date" aria-label="Expires on (optional)" />
+<input id="partnerAnnouncementLink" class="input" maxlength="2048" placeholder="Official link (optional, http/https)" />
+</div>
+<textarea id="partnerAnnouncementBody" maxlength="4000" placeholder="What should students know? Be specific and avoid promises you cannot verify. (20–4000 chars) *"></textarea>
+<div class="search-row"><button id="partnerAnnouncementSubmit" class="btn" type="button">Submit for review</button><button id="partnerAnnouncementCancel" class="btn ghost" type="button" style="display:none">Cancel edit</button></div>
+<p id="partnerAnnouncementMsg" class="muted"></p>
+</div>
+<h3>Your institution's announcements</h3>
+<div id="partnerAnnouncementList"></div>
+</div>
+</div>
+
+<div id="alumni" data-page="alumni">
+<div class="card">
+<h2>Alumni directory <span id="alumniCount" class="pill"></span></h2>
+<p class="lede">Verified, opt-in alumni who chose to help students. <b>Admin-reviewed alumni</b> means a Fidonect admin reviewed the evidence supplied by the alumnus. It is not a degree verification guarantee. Contact happens through a connection request; public profiles never show email addresses or private evidence.</p>
+<div class="search-row">
+<input id="alumniSearch" class="input" placeholder="Search name, institution, role, organisation or bio" autocomplete="off" />
+<button id="alumniFind" class="btn" type="button">Search</button>
+<button id="alumniReset" class="btn ghost" type="button">Reset</button>
+</div>
+<div class="filter-grid" style="margin-top:10px">
+<input id="alumniInstitution" class="input" list="schoolList" maxlength="160" placeholder="Institution name" />
+<input id="alumniYear" class="input" type="number" min="1950" max="2100" placeholder="Graduation year" />
+<input id="alumniIndustry" class="input" maxlength="120" placeholder="Industry e.g. Technology" />
+<label class="filter-check"><input type="checkbox" id="alumniMentoring" /> Open to mentoring</label>
+<label class="filter-check"><input type="checkbox" id="alumniReferrals" /> Open to referrals</label>
+</div>
+<p id="alumniNotice" class="muted"></p>
+<div class="grid" id="alumniGrid"></div>
+</div>
+
+<div class="card" id="alumniApplyCard">
+<h2>Apply for the alumni directory</h2>
+<p class="lede">Alumni profiles are opt-in and reviewed by a Fidonect admin. Your public profile never shows your email, private verification reference, admin notes, or exact private address. Editing a verified profile sends it back for review.</p>
+<p id="alumniApplyStatus" class="muted"></p>
+<div class="form-grid">
+<input id="alumniSchool" class="input" list="schoolList" maxlength="160" placeholder="Institution from the directory *" />
+<input id="alumniGraduationYear" class="input" type="number" min="1950" max="2100" placeholder="Graduation year *" />
+<input id="alumniFaculty" class="input" maxlength="160" placeholder="Faculty (optional)" />
+<input id="alumniDepartment" class="input" maxlength="160" placeholder="Department (optional)" />
+<input id="alumniProgramme" class="input" maxlength="160" placeholder="Programme (optional)" />
+<input id="alumniCurrentRole" class="input" maxlength="160" placeholder="Current role (optional)" />
+<input id="alumniCurrentOrganisation" class="input" maxlength="160" placeholder="Current organisation (optional)" />
+<input id="alumniIndustryInput" class="input" maxlength="120" placeholder="Industry (optional)" />
+<input id="alumniLocation" class="input" maxlength="120" placeholder="City / region (optional, not exact address)" />
+<input id="alumniHelpAreas" class="input" maxlength="500" placeholder="Help areas, comma separated e.g. CV advice, career switch" />
+</div>
+<textarea id="alumniBio" maxlength="2000" placeholder="Short bio: what can you help with, and what should students know? (20–2000 chars) *"></textarea>
+<div class="form-grid">
+<select id="alumniMethod" class="input"><option value="institutional_email">Institutional email</option><option value="alumni_id">Alumni ID / alumni portal</option><option value="other">Other approved method</option></select>
+<input id="alumniDetail" class="input" maxlength="300" placeholder="Private verification reference (admin-only, optional)" />
+</div>
+<label class="filter-check" style="margin:8px 0"><input id="alumniMentoringOptIn" type="checkbox" /> I am open to mentoring students</label>
+<label class="filter-check" style="margin:8px 0"><input id="alumniReferralsOptIn" type="checkbox" /> I am open to referral conversations</label>
+<label class="filter-check" style="margin:8px 0"><input id="alumniListed" type="checkbox" /> List my verified profile publicly</label>
+<div class="search-row"><button id="alumniApplyBtn" class="btn" type="button">Submit for review</button></div>
+<p id="alumniApplyMsg" class="muted"></p>
+</div>
+</div>
+
+<div id="opportunities" data-page="opportunities">
+<div class="card">
+<h2>Opportunities <span id="opportunityCount" class="pill"></span></h2>
+<p class="lede">A small board of opportunities submitted by verified institution partners and approved by a Fidonect admin. Every application happens on the organisation's official external page. Fidonect does not process applications, rank candidates, or accept recruitment fees.</p>
+<div class="listing-safety"><b>Protect yourself:</b> never pay a fee to get a job, internship or graduate placement. Verify the employer and the application link independently. A <b>Verified partner opportunity</b> badge means an admin approved this listing, not that the employer guarantees a role.</div>
+<div class="search-row">
+<input id="opportunitySearch" class="input" placeholder="Search role, organisation, institution or description" autocomplete="off" />
+<select id="opportunityRole" class="input" aria-label="Opportunity type"><option value="">All types</option><option value="internship">Internship</option><option value="graduate">Graduate role</option><option value="job">Job</option><option value="volunteer">Volunteer</option></select>
+<select id="opportunityMode" class="input" aria-label="Work mode"><option value="">All work modes</option><option value="onsite">On-site</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option></select>
+<button id="opportunityFind" class="btn" type="button">Search</button>
+<button id="opportunityReset" class="btn ghost" type="button">Reset</button>
+</div>
+<p id="opportunityNotice" class="muted"></p>
+<div class="grid" id="opportunityGrid"></div>
+</div>
+
+<div class="card" id="partnerOpportunityToolsCard">
+<h2>Partner opportunity tools</h2>
+<p class="lede">Only active members of a verified institution partner can submit opportunities. Every opportunity needs admin approval before it appears publicly. External application links only — no CVs or in-app applications.</p>
+<p id="partnerOpportunityStatus" class="muted"></p>
+<div id="partnerOpportunityForm" style="display:none">
+<h3>Submit an opportunity</h3>
+<div class="form-grid">
+<select id="partnerOpportunityInstitution" class="input" aria-label="Institution"></select>
+<input id="partnerOpportunityTitle" class="input" maxlength="160" placeholder="Role title *" />
+<input id="partnerOpportunityOrganisation" class="input" maxlength="160" placeholder="Organisation *" />
+<input id="partnerOpportunityLocation" class="input" maxlength="160" placeholder="Location (optional)" />
+<select id="partnerOpportunityRoleType" class="input" aria-label="Opportunity type"><option value="internship">Internship</option><option value="graduate">Graduate role</option><option value="job">Job</option><option value="volunteer">Volunteer</option></select>
+<select id="partnerOpportunityWorkMode" class="input" aria-label="Work mode"><option value="onsite">On-site</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option></select>
+<input id="partnerOpportunityDeadline" class="input" type="date" aria-label="Application deadline (optional)" />
+<input id="partnerOpportunityApplicationUrl" class="input" maxlength="2048" placeholder="Official application URL *" />
+<input id="partnerOpportunitySourceUrl" class="input" maxlength="2048" placeholder="Private source URL (admin-only, optional)" />
+</div>
+<textarea id="partnerOpportunityDescription" maxlength="5000" placeholder="Describe the opportunity honestly: role, requirements, duration and how to apply. (20–5000 chars) *"></textarea>
+<textarea id="partnerOpportunityEligibility" maxlength="2000" placeholder="Eligibility, e.g. final-year students or graduates (optional)"></textarea>
+<div class="search-row"><button id="partnerOpportunitySubmit" class="btn" type="button">Submit for review</button><button id="partnerOpportunityCancel" class="btn ghost" type="button" style="display:none">Cancel edit</button></div>
+<p id="partnerOpportunityMsg" class="muted"></p>
+</div>
+<h3>Your institution's opportunities</h3>
+<div id="partnerOpportunityList"></div>
+</div>
+</div>
+
 <div id="students" data-page="connections">
 <h2>Student connections</h2>
 <p class="lede">Discover registered students who share their profile. Connection requests and messages stay private.</p>
@@ -474,6 +638,9 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 <a href="/messages">Messages<small>Your private chats</small></a>
 <a href="/mentors">Mentors<small>Verified student guides</small></a>
 <a href="/housing">Housing &amp; services<small>Admin-approved rooms and services</small></a>
+<a href="/partners">Partners<small>Official institution pages</small></a>
+<a href="/alumni">Alumni<small>Opt-in, admin-reviewed directory</small></a>
+<a href="/opportunities">Opportunities<small>Verified partner roles</small></a>
 <a href="/profile">My Profile<small>School, photo and visibility</small></a>
 <a href="/scholarships">Scholarships<small>Verified opportunities</small></a>
 <a href="/ai-honesty">AI Honesty<small>How Fido labels answers</small></a>
@@ -488,7 +655,7 @@ footer{text-align:center;padding:20px;color:#637083;font-size:13px}
 </div>
 </div>
 
-<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/mentors">Mentors</a> • <a href="/housing">Housing &amp; services</a> • <a href="/scholarships">Scholarships</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
+<footer><a href="/">Home</a> • <a href="/institutions">Institutions</a> • <a href="/connections">Connections</a> • <a href="/mentors">Mentors</a> • <a href="/housing">Housing &amp; services</a> • <a href="/partners">Partners</a> • <a href="/alumni">Alumni</a> • <a href="/opportunities">Opportunities</a> • <a href="/scholarships">Scholarships</a> • <a href="/ai-honesty">AI Honesty</a> • <a href="/about">About</a> • <a href="/admin">Admin</a><br/>© 2026 Fidonect. Built by Taiwo Kudehinbu | Fidence Technologies.</footer>
 
 <script>
 var liveSchools=[]; // live rows from the API; never show invented fallback schools
@@ -1163,6 +1330,380 @@ var b=e.target.closest?e.target.closest("[data-listing-edit]"):null;
 if(b)editListing(b.getAttribute("data-listing-edit"));
 });
 
+// ---- Phase 4: institution partners, alumni, opportunities ----
+var phase4State={partners:[],announcements:[],alumni:[],opportunities:[],memberships:[],partnerAnnouncements:[],partnerOpportunities:[],partnerAnnouncementEditId:null,partnerOpportunityEditId:null};
+function phase4Date(v){try{return v?new Date(v).toLocaleDateString():"—";}catch(e){return "—";}}
+function phase4RoleLabel(v){return v==="graduate"?"Graduate role":v==="internship"?"Internship":v==="volunteer"?"Volunteer":v==="job"?"Job":(v||"");}
+function phase4ModeLabel(v){return v==="remote"?"Remote":v==="hybrid"?"Hybrid":v==="onsite"?"On-site":(v||"");}
+function phase4MembershipFor(id){var list=phase4State.memberships||[];for(var i=0;i<list.length;i++){if(String(list[i].institution_id)===String(id))return list[i];}return null;}
+function phase4InstitutionName(id){var m=phase4MembershipFor(id);return m&&m.institution?m.institution.name:"Institution #"+id;}
+
+function partnerCardHTML(p){
+return '<article class="card partner-card">'+
+'<div class="listing-meta"><span class="verified">✓ Official partner</span>'+(p.kind?'<span class="pill">'+esc(p.kind)+'</span>':"")+'</div>'+
+'<h3>'+esc(p.institution_name)+'</h3>'+
+'<div class="muted small">'+esc(p.location||"Location not listed")+(p.ownership?" • "+esc(p.ownership):"")+'</div>'+
+'<p>'+esc(p.public_summary||"This verified partner has not published a public summary yet.")+'</p>'+
+'<div class="listing-actions"><button type="button" class="btn" onclick="showPartnerDetail('+p.institution_id+')">Open partner page</button>'+(p.official_url?'<a class="btn ghost" style="text-decoration:none" href="'+esc(p.official_url)+'" target="_blank" rel="noopener noreferrer">Official website ↗</a>':"")+'</div>'+
+'</article>';
+}
+function renderPartners(items){
+var grid=document.getElementById("partnerGrid");if(!grid)return;
+grid.innerHTML=(items||[]).map(partnerCardHTML).join("")||'<div class="empty-state"><b>No verified partners yet</b>Fidonect does not invent partner relationships or badges. A partner appears here only after an admin verifies the institution and the partner opts in to a public listing.</div>';
+var count=document.getElementById("partnerCount");var n=(items||[]).length;if(count){count.textContent=n?n+" verified":"";count.style.display=n?"":"none";}
+}
+async function loadPartners(){
+var notice=document.getElementById("partnerNotice");if(!notice)return;
+var q=document.getElementById("partnerSearch").value.trim();
+notice.textContent="Loading verified partners…";
+try{
+var r=await fetch(apiBase()+"/api/partners?limit=100"+(q?"&q="+encodeURIComponent(q):""));
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){phase4State.partners=[];renderPartners([]);notice.innerHTML='<div class="empty-state"><b>Partnerships are being set up</b>The Phase 4 database migration has not been applied yet. No placeholder partners are shown.</div>';return;}
+phase4State.partners=j.partners||[];renderPartners(phase4State.partners);
+notice.textContent=phase4State.partners.length?("Showing "+phase4State.partners.length+" verified partner"+(phase4State.partners.length===1?"":"s")+(q?' matching "'+q+'"':"")+"."):"No verified partners match yet. This space stays honest — only institutions verified by a Fidonect admin are listed.";
+}catch(e){phase4State.partners=[];renderPartners([]);notice.textContent="Could not load partners: "+e.message;}
+}
+function announcementCardHTML(a,showInstitution){
+return '<article class="card announcement-card">'+
+'<div class="listing-meta"><span class="verified">✓ Official partner announcement</span><span class="pill">'+esc(a.category||"general")+'</span></div>'+
+'<h3>'+esc(a.title)+'</h3>'+
+'<div class="muted small">'+(showInstitution?esc(a.institution_name)+" • ":"")+'Published '+esc(phase4Date(a.published_at))+(a.expires_at?" • Expires "+esc(phase4Date(a.expires_at)):"")+'</div>'+
+'<p>'+esc(a.body)+'</p>'+
+(a.link_url?'<div class="listing-actions"><a class="btn ghost" style="text-decoration:none" href="'+esc(a.link_url)+'" target="_blank" rel="noopener noreferrer">Open official link ↗</a></div>':"")+
+'</article>';
+}
+async function loadAnnouncements(){
+var notice=document.getElementById("announcementNotice"),list=document.getElementById("announcementList");if(!notice||!list)return;
+notice.textContent="Loading approved announcements…";
+try{
+var r=await fetch(apiBase()+"/api/partner-announcements?limit=50");
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){phase4State.announcements=[];list.innerHTML='<div class="empty-state"><b>Partner announcements are being set up</b>No placeholder announcements are shown.</div>';notice.textContent="";return;}
+phase4State.announcements=j.announcements||[];
+list.innerHTML=phase4State.announcements.map(function(a){return announcementCardHTML(a,true);}).join("")||'<div class="empty-state"><b>No approved partner announcements yet</b>Announcements appear only after a verified partner submits one and a Fidonect admin approves it.</div>';
+notice.textContent=phase4State.announcements.length?("Showing "+phase4State.announcements.length+" approved announcement"+(phase4State.announcements.length===1?"":"s")+"."):"";
+}catch(e){list.innerHTML='<p class="muted">Could not load announcements: '+esc(e.message)+'</p>';notice.textContent="";}
+}
+async function showPartnerDetail(id){
+var card=document.getElementById("partnerDetailCard"),body=document.getElementById("partnerDetailBody"),name=document.getElementById("partnerDetailName"),list=document.getElementById("partnerDetailAnnouncements");
+if(!card||!body||!name||!list)return;
+body.innerHTML='<p class="muted">Loading partner page…</p>';card.style.display="";
+try{
+var r=await fetch(apiBase()+"/api/partners/"+encodeURIComponent(id));
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+var p=j.partner;
+name.textContent=p.institution_name+" — Official partner";
+body.innerHTML='<div class="listing-meta"><span class="verified">✓ Official partner</span>'+(p.kind?'<span class="pill">'+esc(p.kind)+'</span>':"")+(p.ownership?'<span class="pill">'+esc(p.ownership)+'</span>':"")+'</div>'+
+'<p class="muted">'+esc(p.location||"Location not listed")+'</p>'+
+'<p>'+esc(p.public_summary||"This verified partner has not published a public summary yet.")+'</p>'+
+(p.official_url?'<p><a class="btn ghost" style="text-decoration:none" href="'+esc(p.official_url)+'" target="_blank" rel="noopener noreferrer">Visit official website ↗</a></p>':"")+
+'<p class="muted small">Verified '+esc(phase4Date(p.verified_at))+' • Last updated '+esc(phase4Date(p.updated_at))+'</p>';
+list.innerHTML=(j.announcements||[]).map(function(a){return announcementCardHTML(a,false);}).join("")||'<p class="muted">No approved announcements from this partner yet.</p>';
+card.scrollIntoView({behavior:"smooth"});
+}catch(e){body.innerHTML='<p class="muted">Could not load partner page: '+esc(e.message)+'</p>';list.innerHTML="";}
+}
+function fillPartnerInstitutionSelect(id){
+var select=document.getElementById(id);if(!select)return false;
+var verified=(phase4State.memberships||[]).filter(function(m){return m.partner&&m.partner.status==="verified";});
+select.innerHTML=verified.map(function(m){return '<option value="'+m.institution_id+'">'+esc(m.institution?m.institution.name:"Institution #"+m.institution_id)+'</option>';}).join("")||'<option value="">No verified partner institution</option>';
+return verified.length>0;
+}
+async function loadPartnerAnnouncementTools(){
+var statusEl=document.getElementById("partnerToolsStatus"),list=document.getElementById("partnerMembershipList"),form=document.getElementById("partnerAnnouncementForm");
+if(!statusEl||!list||!form)return;
+var s=await ensureSession();
+if(!s){statusEl.textContent="Log in to see partner tools. Partner onboarding is admin-initiated.";list.innerHTML='<p class="muted">No partner membership is attached to a logged-out session.</p>';form.style.display="none";document.getElementById("partnerAnnouncementList").innerHTML="";return;}
+statusEl.textContent="Checking partner access…";
+try{
+var r=await fetch(apiBase()+"/api/partner/me",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){statusEl.textContent="Partner tools are being set up.";list.innerHTML="";form.style.display="none";return;}
+phase4State.memberships=j.memberships||[];
+list.innerHTML=phase4State.memberships.map(function(m){
+var p=m.partner||{},status=p.status||"not created";
+return '<div class="person"><b>'+esc(m.institution?m.institution.name:"Institution #"+m.institution_id)+'</b> <span class="mentor-status '+esc(status)+'">'+esc(status)+'</span> <span class="pill">'+esc(m.member_role||"member")+'</span>'+
+'<p class="muted small">'+(status==="verified"?"Verified partner. You can submit announcements for admin review.":status==="pending"?"Waiting for Fidonect admin verification. Submissions are disabled until then.":status==="paused"?"Partner access is paused. Contact Fidonect to review it.":"Partner access is not active.")+'</p></div>';
+}).join("")||'<p class="muted">No partner membership is attached to your account. Partner onboarding is admin-initiated; there is no self-serve application in Phase 4A.</p>';
+var canSubmit=fillPartnerInstitutionSelect("partnerAnnouncementInstitution");
+form.style.display=canSubmit?"":"none";
+statusEl.textContent=phase4State.memberships.length?"Partner access loaded. Only verified partner members can submit.":"No partner membership is attached to your account.";
+await loadPartnerAnnouncements();
+}catch(e){statusEl.textContent="Could not load partner tools: "+e.message;list.innerHTML="";form.style.display="none";}
+}
+async function loadPartnerAnnouncements(){
+var list=document.getElementById("partnerAnnouncementList");if(!list)return;
+var s=await ensureSession();if(!s){list.innerHTML="";return;}
+try{
+var r=await fetch(apiBase()+"/api/partner/announcements",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){list.innerHTML='<p class="muted">Partner announcements are being set up.</p>';return;}
+phase4State.partnerAnnouncements=j.announcements||[];
+list.innerHTML=phase4State.partnerAnnouncements.map(function(a){
+return '<div class="phase4-row"><b>'+esc(a.title)+'</b> <span class="mentor-status '+esc(a.status)+'">'+esc(a.status)+'</span>'+
+'<p class="muted small">'+esc(phase4InstitutionName(a.institution_id))+' • '+esc(a.category||"general")+' • updated '+esc(phase4Date(a.updated_at))+'</p>'+
+'<p>'+esc(a.body)+'</p>'+
+(a.status==="pending"?'<div class="listing-actions"><button type="button" class="btn ghost" onclick="editPartnerAnnouncement('+a.id+')">Edit pending announcement</button></div>':"")+'</div>';
+}).join("")||'<p class="muted">No announcements submitted yet.</p>';
+}catch(e){list.innerHTML='<p class="muted">Could not load your announcements: '+esc(e.message)+'</p>';}
+}
+function resetPartnerAnnouncementForm(){
+phase4State.partnerAnnouncementEditId=null;
+["partnerAnnouncementTitle","partnerAnnouncementLink","partnerAnnouncementBody","partnerAnnouncementExpires"].forEach(function(id){var el=document.getElementById(id);if(el)el.value="";});
+var cat=document.getElementById("partnerAnnouncementCategory");if(cat)cat.value="general";
+var btn=document.getElementById("partnerAnnouncementSubmit"),cancel=document.getElementById("partnerAnnouncementCancel"),msg=document.getElementById("partnerAnnouncementMsg");
+if(btn)btn.textContent="Submit for review";if(cancel)cancel.style.display="none";if(msg)msg.textContent="";
+}
+function editPartnerAnnouncement(id){
+var a=(phase4State.partnerAnnouncements||[]).filter(function(x){return String(x.id)===String(id);})[0];if(!a||a.status!=="pending")return;
+phase4State.partnerAnnouncementEditId=a.id;
+document.getElementById("partnerAnnouncementInstitution").value=String(a.institution_id);
+document.getElementById("partnerAnnouncementCategory").value=a.category||"general";
+document.getElementById("partnerAnnouncementTitle").value=a.title||"";
+document.getElementById("partnerAnnouncementBody").value=a.body||"";
+document.getElementById("partnerAnnouncementLink").value=a.link_url||"";
+document.getElementById("partnerAnnouncementExpires").value=a.expires_at?String(a.expires_at).slice(0,10):"";
+document.getElementById("partnerAnnouncementSubmit").textContent="Update for review";
+document.getElementById("partnerAnnouncementCancel").style.display="";
+document.getElementById("partnerAnnouncementMsg").textContent="Editing sends this announcement back to admin review.";
+document.getElementById("partnerAnnouncementForm").scrollIntoView({behavior:"smooth"});
+}
+async function submitPartnerAnnouncement(){
+var s=await ensureSession(),msg=document.getElementById("partnerAnnouncementMsg");
+if(!s){msg.textContent="Log in to submit an announcement.";return;}
+var body={institution_id:Number(document.getElementById("partnerAnnouncementInstitution").value),title:document.getElementById("partnerAnnouncementTitle").value.trim(),category:document.getElementById("partnerAnnouncementCategory").value,body:document.getElementById("partnerAnnouncementBody").value.trim(),link_url:document.getElementById("partnerAnnouncementLink").value.trim()||null,expires_at:document.getElementById("partnerAnnouncementExpires").value||null};
+if(!body.institution_id){msg.textContent="No verified partner institution is available.";return;}
+msg.textContent="Submitting for review…";
+try{
+var url=apiBase()+"/api/partner/announcements"+(phase4State.partnerAnnouncementEditId?"/"+phase4State.partnerAnnouncementEditId:"");
+var r=await fetch(url,{method:phase4State.partnerAnnouncementEditId?"PATCH":"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(body)});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+resetPartnerAnnouncementForm();msg.textContent="Submitted. A Fidonect admin will review it; it is not public yet.";
+await loadPartnerAnnouncements();
+}catch(e){msg.textContent="Could not submit: "+e.message;}
+}
+async function loadPartnersPage(){await loadPartners();await loadAnnouncements();await loadPartnerAnnouncementTools();}
+
+function alumniCardHTML(a){
+var flags="";
+if(a.open_to_mentoring)flags+='<span class="verified">Open to mentoring</span>';
+if(a.open_to_referrals)flags+='<span class="verified">Open to referrals</span>';
+var role=[a.current_role,a.current_organisation].filter(Boolean).join(" at ");
+var areas=(a.help_areas||[]).map(function(x){return '<span class="pill">'+esc(x)+'</span>';}).join("");
+return '<article class="card alumni-card">'+
+'<div class="mentor-head">'+avatarHTML({name:a.name,photo_url:a.photo_url},44)+'<div><h3>'+esc(a.name)+'</h3><div class="muted small">'+esc(a.institution_name)+' • Class of '+esc(a.graduation_year)+'</div></div></div>'+
+'<div class="listing-meta"><span class="verified">✓ Admin-reviewed alumni</span>'+(a.industry?'<span class="pill">'+esc(a.industry)+'</span>':"")+flags+'</div>'+
+(role?'<p><b>'+esc(role)+'</b></p>':"")+
+'<p>'+esc(a.bio)+'</p>'+
+(areas?'<div class="mentor-areas">'+areas+'</div>':"")+
+'<div class="listing-actions"><button type="button" class="btn" onclick="requestAlumniConnection(\''+esc(a.user_id)+'\')">Request connection</button></div>'+
+'</article>';
+}
+function renderAlumni(items){
+var grid=document.getElementById("alumniGrid");if(!grid)return;
+grid.innerHTML=(items||[]).map(alumniCardHTML).join("")||'<div class="empty-state"><b>No verified alumni yet</b>Alumni appear here only after they opt in and a Fidonect admin reviews their evidence. No profiles are invented.</div>';
+var count=document.getElementById("alumniCount");var n=(items||[]).length;if(count){count.textContent=n?n+" verified":"";count.style.display=n?"":"none";}
+}
+async function loadAlumni(){
+var notice=document.getElementById("alumniNotice");if(!notice)return;
+var params=["limit=100"];
+var q=document.getElementById("alumniSearch").value.trim();
+var inst=document.getElementById("alumniInstitution").value.trim();
+var year=document.getElementById("alumniYear").value.trim();
+var industry=document.getElementById("alumniIndustry").value.trim();
+if(q)params.push("q="+encodeURIComponent(q));
+if(inst)params.push("institution="+encodeURIComponent(inst));
+if(year)params.push("graduation_year="+encodeURIComponent(year));
+if(industry)params.push("industry="+encodeURIComponent(industry));
+if(document.getElementById("alumniMentoring").checked)params.push("open_to_mentoring=true");
+if(document.getElementById("alumniReferrals").checked)params.push("open_to_referrals=true");
+notice.textContent="Loading verified alumni…";
+try{
+var r=await fetch(apiBase()+"/api/alumni?"+params.join("&"));
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){phase4State.alumni=[];renderAlumni([]);notice.innerHTML='<div class="empty-state"><b>Alumni are being set up</b>The Phase 4 database migration has not been applied yet. No placeholder alumni are shown.</div>';return;}
+phase4State.alumni=j.alumni||[];renderAlumni(phase4State.alumni);
+notice.textContent=phase4State.alumni.length?("Showing "+phase4State.alumni.length+" verified alumni profile"+(phase4State.alumni.length===1?"":"s")+"."):"No verified alumni match these filters yet. This space stays honest — only opt-in, admin-reviewed profiles are listed.";
+}catch(e){phase4State.alumni=[];renderAlumni([]);notice.textContent="Could not load alumni: "+e.message;}
+}
+async function requestAlumniConnection(uid){
+var s=await ensureSession();if(!s){location.href="/profile";return;}
+try{
+var r=await fetch(apiBase()+"/api/connections/request",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify({toId:uid})});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+alert("Connection request sent. If they accept, you can message each other.");
+}catch(e){alert("Could not send connection request: "+e.message);}
+}
+async function loadAlumniMe(){
+var status=document.getElementById("alumniApplyStatus");if(!status)return;
+var s=await ensureSession();
+if(!s){status.textContent="Log in to apply for the alumni directory.";return;}
+try{
+var r=await fetch(apiBase()+"/api/alumni/me",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){status.textContent="Alumni applications are being set up.";return;}
+var a=j.alumni;
+if(!a){status.textContent="You have not applied yet. Submit the form below for admin review.";return;}
+document.getElementById("alumniSchool").value=a.institution_name||"";
+document.getElementById("alumniGraduationYear").value=a.graduation_year||"";
+document.getElementById("alumniFaculty").value=a.faculty||"";
+document.getElementById("alumniDepartment").value=a.department||"";
+document.getElementById("alumniProgramme").value=a.programme||"";
+document.getElementById("alumniCurrentRole").value=a.current_role||"";
+document.getElementById("alumniCurrentOrganisation").value=a.current_organisation||"";
+document.getElementById("alumniIndustryInput").value=a.industry||"";
+document.getElementById("alumniLocation").value=a.location||"";
+document.getElementById("alumniHelpAreas").value=(a.help_areas||[]).join(", ");
+document.getElementById("alumniBio").value=a.bio||"";
+document.getElementById("alumniMethod").value=a.verification_method||"institutional_email";
+document.getElementById("alumniDetail").value=a.verification_detail||"";
+document.getElementById("alumniMentoringOptIn").checked=!!a.open_to_mentoring;
+document.getElementById("alumniReferralsOptIn").checked=!!a.open_to_referrals;
+document.getElementById("alumniListed").checked=a.listed===true;
+status.innerHTML='<span class="alumni-status '+esc(a.status)+'">'+esc(a.status)+'</span> '+(a.status==="verified"?(a.listed?"Your profile is verified and listed publicly.":"Your profile is verified but not publicly listed. Tick the listing box and resubmit if you want it public."):a.status==="rejected"?"Your application was not approved. Update it and resubmit for review.":a.status==="paused"?"Your listing is paused. Contact Fidonect if you want it reviewed again.":"An admin is reviewing your application.");
+}catch(e){status.textContent="Could not load your alumni application: "+e.message;}
+}
+async function submitAlumniApplication(){
+var s=await ensureSession(),msg=document.getElementById("alumniApplyMsg");
+if(!s){msg.textContent="Log in to apply for the alumni directory.";return;}
+var body={school:document.getElementById("alumniSchool").value.trim(),institution_name:document.getElementById("alumniSchool").value.trim(),graduation_year:Number(document.getElementById("alumniGraduationYear").value),faculty:document.getElementById("alumniFaculty").value.trim(),department:document.getElementById("alumniDepartment").value.trim(),programme:document.getElementById("alumniProgramme").value.trim(),current_role:document.getElementById("alumniCurrentRole").value.trim(),current_organisation:document.getElementById("alumniCurrentOrganisation").value.trim(),industry:document.getElementById("alumniIndustryInput").value.trim(),location:document.getElementById("alumniLocation").value.trim(),help_areas:document.getElementById("alumniHelpAreas").value.split(",").map(function(x){return x.trim();}).filter(Boolean),bio:document.getElementById("alumniBio").value.trim(),verification_method:document.getElementById("alumniMethod").value,verification_detail:document.getElementById("alumniDetail").value.trim(),open_to_mentoring:document.getElementById("alumniMentoringOptIn").checked,open_to_referrals:document.getElementById("alumniReferralsOptIn").checked,listed:document.getElementById("alumniListed").checked};
+msg.textContent="Submitting for review…";
+try{
+var r=await fetch(apiBase()+"/api/alumni/apply",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(body)});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+msg.textContent="Submitted. An admin will review your application. It stays private until it is verified and you opt in to a public listing.";
+await loadAlumniMe();await loadAlumni();
+}catch(e){msg.textContent="Could not submit: "+e.message;}
+}
+async function loadAlumniPage(){await loadAlumni();await loadAlumniMe();}
+
+function opportunityCardHTML(o){
+return '<article class="card opportunity-card">'+
+'<div class="listing-meta"><span class="verified">✓ Verified partner opportunity</span><span class="pill">'+esc(phase4RoleLabel(o.role_type))+'</span><span class="pill">'+esc(phase4ModeLabel(o.work_mode))+'</span></div>'+
+'<h3>'+esc(o.title)+'</h3>'+
+'<div class="muted small">'+esc(o.organisation)+' • '+esc(o.institution_name)+(o.location?" • "+esc(o.location):"")+'</div>'+
+'<p>'+esc(o.description)+'</p>'+
+(o.eligibility?'<p class="muted small"><b>Eligibility:</b> '+esc(o.eligibility)+'</p>':"")+
+(o.deadline?'<p class="deadline">Apply by '+esc(o.deadline)+'</p>':"")+
+'<div class="listing-actions"><a class="btn" style="text-decoration:none" href="'+esc(o.application_url)+'" target="_blank" rel="noopener noreferrer">Apply on official page ↗</a></div>'+
+'</article>';
+}
+function renderOpportunities(items){
+var grid=document.getElementById("opportunityGrid");if(!grid)return;
+grid.innerHTML=(items||[]).map(opportunityCardHTML).join("")||'<div class="empty-state"><b>No approved opportunities yet</b>Opportunities appear only after a verified partner submits one and a Fidonect admin approves it. Fidonect does not invent roles or employers.</div>';
+var count=document.getElementById("opportunityCount");var n=(items||[]).length;if(count){count.textContent=n?n+" approved":"";count.style.display=n?"":"none";}
+}
+async function loadOpportunities(){
+var notice=document.getElementById("opportunityNotice");if(!notice)return;
+var params=["limit=100"];
+var q=document.getElementById("opportunitySearch").value.trim();
+var role=document.getElementById("opportunityRole").value;
+var mode=document.getElementById("opportunityMode").value;
+if(q)params.push("q="+encodeURIComponent(q));
+if(role)params.push("role_type="+encodeURIComponent(role));
+if(mode)params.push("work_mode="+encodeURIComponent(mode));
+notice.textContent="Loading approved opportunities…";
+try{
+var r=await fetch(apiBase()+"/api/opportunities?"+params.join("&"));
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){phase4State.opportunities=[];renderOpportunities([]);notice.innerHTML='<div class="empty-state"><b>Opportunities are being set up</b>The Phase 4 database migration has not been applied yet. No placeholder opportunities are shown.</div>';return;}
+phase4State.opportunities=j.opportunities||[];renderOpportunities(phase4State.opportunities);
+notice.textContent=phase4State.opportunities.length?("Showing "+phase4State.opportunities.length+" approved opportunity"+(phase4State.opportunities.length===1?"":"s")+"."):"No approved opportunities match these filters yet. This space stays honest — only verified partners and admin-approved roles are listed.";
+}catch(e){phase4State.opportunities=[];renderOpportunities([]);notice.textContent="Could not load opportunities: "+e.message;}
+}
+async function loadPartnerOpportunityTools(){
+var statusEl=document.getElementById("partnerOpportunityStatus"),form=document.getElementById("partnerOpportunityForm");
+if(!statusEl||!form)return;
+var s=await ensureSession();
+if(!s){statusEl.textContent="Log in to see partner opportunity tools. Partner onboarding is admin-initiated.";form.style.display="none";document.getElementById("partnerOpportunityList").innerHTML="";return;}
+try{
+var r=await fetch(apiBase()+"/api/partner/me",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){statusEl.textContent="Partner tools are being set up.";form.style.display="none";return;}
+phase4State.memberships=j.memberships||[];
+var canSubmit=fillPartnerInstitutionSelect("partnerOpportunityInstitution");
+form.style.display=canSubmit?"":"none";
+statusEl.textContent=canSubmit?"Verified partner access found. Submissions need admin approval before publication.":"No verified partner membership is attached to your account, so opportunity submission is disabled.";
+await loadPartnerOpportunities();
+}catch(e){statusEl.textContent="Could not load partner tools: "+e.message;form.style.display="none";}
+}
+async function loadPartnerOpportunities(){
+var list=document.getElementById("partnerOpportunityList");if(!list)return;
+var s=await ensureSession();if(!s){list.innerHTML="";return;}
+try{
+var r=await fetch(apiBase()+"/api/partner/opportunities",{headers:{Authorization:"Bearer "+s.access_token}});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+if(j.setupRequired){list.innerHTML='<p class="muted">Partner opportunities are being set up.</p>';return;}
+phase4State.partnerOpportunities=j.opportunities||[];
+list.innerHTML=phase4State.partnerOpportunities.map(function(o){
+return '<div class="phase4-row"><b>'+esc(o.title)+'</b> <span class="mentor-status '+esc(o.status)+'">'+esc(o.status)+'</span>'+
+'<p class="muted small">'+esc(o.organisation)+' • '+esc(phase4InstitutionName(o.institution_id))+' • updated '+esc(phase4Date(o.updated_at))+'</p>'+
+'<p>'+esc(o.description)+'</p>'+
+(o.status==="pending"?'<div class="listing-actions"><button type="button" class="btn ghost" onclick="editPartnerOpportunity('+o.id+')">Edit pending opportunity</button></div>':"")+'</div>';
+}).join("")||'<p class="muted">No opportunities submitted yet.</p>';
+}catch(e){list.innerHTML='<p class="muted">Could not load your opportunities: '+esc(e.message)+'</p>';}
+}
+function resetPartnerOpportunityForm(){
+phase4State.partnerOpportunityEditId=null;
+["partnerOpportunityTitle","partnerOpportunityOrganisation","partnerOpportunityLocation","partnerOpportunityDeadline","partnerOpportunityApplicationUrl","partnerOpportunitySourceUrl","partnerOpportunityDescription","partnerOpportunityEligibility"].forEach(function(id){var el=document.getElementById(id);if(el)el.value="";});
+var role=document.getElementById("partnerOpportunityRoleType");if(role)role.value="internship";
+var mode=document.getElementById("partnerOpportunityWorkMode");if(mode)mode.value="onsite";
+var btn=document.getElementById("partnerOpportunitySubmit"),cancel=document.getElementById("partnerOpportunityCancel"),msg=document.getElementById("partnerOpportunityMsg");
+if(btn)btn.textContent="Submit for review";if(cancel)cancel.style.display="none";if(msg)msg.textContent="";
+}
+function editPartnerOpportunity(id){
+var o=(phase4State.partnerOpportunities||[]).filter(function(x){return String(x.id)===String(id);})[0];if(!o||o.status!=="pending")return;
+phase4State.partnerOpportunityEditId=o.id;
+document.getElementById("partnerOpportunityInstitution").value=String(o.institution_id);
+document.getElementById("partnerOpportunityTitle").value=o.title||"";
+document.getElementById("partnerOpportunityOrganisation").value=o.organisation||"";
+document.getElementById("partnerOpportunityLocation").value=o.location||"";
+document.getElementById("partnerOpportunityRoleType").value=o.role_type||"internship";
+document.getElementById("partnerOpportunityWorkMode").value=o.work_mode||"onsite";
+document.getElementById("partnerOpportunityDeadline").value=o.deadline||"";
+document.getElementById("partnerOpportunityApplicationUrl").value=o.application_url||"";
+document.getElementById("partnerOpportunitySourceUrl").value=o.source_url||"";
+document.getElementById("partnerOpportunityDescription").value=o.description||"";
+document.getElementById("partnerOpportunityEligibility").value=o.eligibility||"";
+document.getElementById("partnerOpportunitySubmit").textContent="Update for review";
+document.getElementById("partnerOpportunityCancel").style.display="";
+document.getElementById("partnerOpportunityMsg").textContent="Editing sends this opportunity back to admin review.";
+document.getElementById("partnerOpportunityForm").scrollIntoView({behavior:"smooth"});
+}
+async function submitPartnerOpportunity(){
+var s=await ensureSession(),msg=document.getElementById("partnerOpportunityMsg");
+if(!s){msg.textContent="Log in to submit an opportunity.";return;}
+var body={institution_id:Number(document.getElementById("partnerOpportunityInstitution").value),title:document.getElementById("partnerOpportunityTitle").value.trim(),organisation:document.getElementById("partnerOpportunityOrganisation").value.trim(),description:document.getElementById("partnerOpportunityDescription").value.trim(),location:document.getElementById("partnerOpportunityLocation").value.trim(),work_mode:document.getElementById("partnerOpportunityWorkMode").value,role_type:document.getElementById("partnerOpportunityRoleType").value,eligibility:document.getElementById("partnerOpportunityEligibility").value.trim(),deadline:document.getElementById("partnerOpportunityDeadline").value||null,application_url:document.getElementById("partnerOpportunityApplicationUrl").value.trim(),source_url:document.getElementById("partnerOpportunitySourceUrl").value.trim()||null};
+if(!body.institution_id){msg.textContent="No verified partner institution is available.";return;}
+msg.textContent="Submitting for review…";
+try{
+var url=apiBase()+"/api/partner/opportunities"+(phase4State.partnerOpportunityEditId?"/"+phase4State.partnerOpportunityEditId:"");
+var r=await fetch(url,{method:phase4State.partnerOpportunityEditId?"PATCH":"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(body)});
+var j=await r.json();if(!r.ok)throw new Error(j.error||("HTTP "+r.status));
+resetPartnerOpportunityForm();msg.textContent="Submitted. A Fidonect admin will review it; it is not public yet.";
+await loadPartnerOpportunities();
+}catch(e){msg.textContent="Could not submit: "+e.message;}
+}
+async function loadOpportunitiesPage(){await loadOpportunities();await loadPartnerOpportunityTools();}
+
+document.getElementById("partnerFind").onclick=loadPartners;
+document.getElementById("partnerSearch").onkeydown=function(e){if(e.key==="Enter")loadPartners();};
+document.getElementById("partnerReset").onclick=function(){document.getElementById("partnerSearch").value="";loadPartners();};
+document.getElementById("partnerDetailClose").onclick=function(){document.getElementById("partnerDetailCard").style.display="none";};
+document.getElementById("partnerAnnouncementSubmit").onclick=submitPartnerAnnouncement;
+document.getElementById("partnerAnnouncementCancel").onclick=resetPartnerAnnouncementForm;
+document.getElementById("alumniFind").onclick=loadAlumni;
+document.getElementById("alumniSearch").onkeydown=function(e){if(e.key==="Enter")loadAlumni();};
+document.getElementById("alumniReset").onclick=function(){["alumniSearch","alumniInstitution","alumniYear","alumniIndustry"].forEach(function(id){document.getElementById(id).value="";});document.getElementById("alumniMentoring").checked=false;document.getElementById("alumniReferrals").checked=false;loadAlumni();};
+document.getElementById("alumniApplyBtn").onclick=submitAlumniApplication;
+document.getElementById("opportunityFind").onclick=loadOpportunities;
+document.getElementById("opportunitySearch").onkeydown=function(e){if(e.key==="Enter")loadOpportunities();};
+document.getElementById("opportunityRole").onchange=loadOpportunities;
+document.getElementById("opportunityMode").onchange=loadOpportunities;
+document.getElementById("opportunityReset").onclick=function(){["opportunitySearch","opportunityRole","opportunityMode"].forEach(function(id){document.getElementById(id).value="";});loadOpportunities();};
+document.getElementById("partnerOpportunitySubmit").onclick=submitPartnerOpportunity;
+document.getElementById("partnerOpportunityCancel").onclick=resetPartnerOpportunityForm;
+
 async function fetchProfile(token){
 var r=await fetch(apiBase()+"/api/profile",{headers:{Authorization:"Bearer "+token}});
 return {ok:r.ok,status:r.status,body:await r.json()};
@@ -1534,15 +2075,18 @@ else{if(now-lastBadgePoll>=8000){lastBadgePoll=now;await updateMsgBadge();}}
 // connections messages chat ai about" (space-separated); full page loads keep this stateless.
 // Future pages (Map, Events, Communities…): add a server route, a section with
 // data-page="newpage", a nav link, and one line in routeFromPath/PAGE_TITLES.
-var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",mentors:"Mentors — Fidonect",housing:"Housing & services — Fidonect",scholarships:"Scholarships — Fidonect",profile:"My Profile — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
+var PAGE_TITLES={home:"Fidonect — Connect. Know. Prepare. Belong.",institutions:"Institutions — Fidonect",connections:"Connections — Fidonect",mentors:"Mentors — Fidonect",housing:"Housing & services — Fidonect",partners:"Institution partners — Fidonect",alumni:"Alumni — Fidonect",opportunities:"Opportunities — Fidonect",scholarships:"Scholarships — Fidonect",profile:"My Profile — Fidonect",messages:"Messages — Fidonect",chat:"Chat — Fidonect",ai:"AI Honesty — Fidonect",about:"About — Fidonect"};
 function routeFromPath(){
-var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|mentors|housing|accommodation|scholarships|profile|messages|chat|ai-honesty|about)/);}catch(e){}
+var m=null;try{m=location.pathname.match(/^\/(institutions|schools|connections|students|mentors|housing|accommodation|partners|alumni|opportunities|scholarships|profile|messages|chat|ai-honesty|about)/);}catch(e){}
 if(!m)return "home";
 var seg=m[1];
 if(seg==="schools"||seg==="institutions")return "institutions";
 if(seg==="students"||seg==="connections")return "connections";
 if(seg==="mentors")return "mentors";
 if(seg==="housing"||seg==="accommodation")return "housing";
+if(seg==="partners")return "partners";
+if(seg==="alumni")return "alumni";
+if(seg==="opportunities")return "opportunities";
 if(seg==="scholarships")return "scholarships";
 if(seg==="profile")return "profile";
 if(seg==="messages")return "messages";
@@ -1560,7 +2104,7 @@ if(title)title.textContent=page==="profile"?(s?"My profile":"Log in to Fidonect"
 var bottom=document.querySelectorAll(".bottom-nav a[data-nav]");
 for(var j=0;j<bottom.length;j++)bottom[j].classList.toggle("active",bottom[j].getAttribute("data-nav")===page);
 var moreBtn=document.getElementById("moreBtn");
-if(moreBtn)moreBtn.classList.toggle("active",["messages","chat","ai","about","profile","mentors","housing"].indexOf(page)>-1);
+if(moreBtn)moreBtn.classList.toggle("active",["messages","chat","ai","about","profile","mentors","housing","partners","alumni","opportunities"].indexOf(page)>-1);
 if(PAGE_TITLES[page])document.title=PAGE_TITLES[page];
 }
 function openMore(){
@@ -1588,6 +2132,9 @@ else if(routeFromPath()==="messages")loadConversations();
 if(routeFromPath()==="scholarships")loadScholarships(true);
 if(routeFromPath()==="mentors")loadMentorsPage();
 if(routeFromPath()==="housing")loadHousingPage();
+if(routeFromPath()==="partners")loadPartnersPage();
+if(routeFromPath()==="alumni")loadAlumniPage();
+if(routeFromPath()==="opportunities")loadOpportunitiesPage();
 if(routeFromPath()==="home")loadHomeScholarships();
 updateMsgBadge();
 // Chat: ~2s while a thread is open, messages list: 3s, badge: 8s. msgTick

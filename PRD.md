@@ -66,10 +66,10 @@ Download → create account → select institution/faculty/dept/programme/sessio
 ## 14. MVP Scope
 Hypothesis: will prospective students actively use Fidonect to connect + get guidance before resumption?
 In: registration, profiles, institution selection, discovery, connections, messaging, communities, basic Fido, mentor profiles, search, notifications, report/block, admin.
-Out: marketplace, accommodation booking, payments, advanced tutor, institution subscriptions, ads, alumni marketplace.
+Out: marketplace, accommodation booking, payments, advanced tutor, institution subscriptions, ads, alumni marketplace, partner analytics, CV uploads, in-app job applications, and automated recruitment screening.
 
 ## 15. Business Model
-Free core connection. Later: premium Fido, verified accommodation, marketplace commission, education ads, institution partnerships, premium mentorship, recruitment, sponsored content. Avoid undermining trust.
+Free core connection. Later: premium Fido, verified accommodation, marketplace commission, education ads, institution partnerships, premium mentorship, recruitment, sponsored content. Avoid undermining trust. Phase 4A partnerships and recruitment are non-monetized and do not create paid badges, billing, partner analytics, or paid placement.
 
 ## 16. Success Metrics
 Growth (registered/active/weekly), engagement (connections/messages/community/AI/mentor), retention (7-day/30-day/post-resumption), network (institutions/departments/verified mentors), quality (reports/AI feedback/satisfaction).
@@ -82,7 +82,15 @@ Mobile-first. Android first, iOS next, web/admin. Scalable API, secure DB, auth,
 - Phase 2: mentorship + verified info + improved AI
 - Phase 3A: accommodation + campus-service discovery, admin approval, and in-app contact requests (no bookings or payments)
 - Phase 3B (deferred): marketplace and transaction/payment flows; these remain out of the initial scope per §69
-- Phase 4: institution partnerships + alumni + recruitment
+- Phase 4A: admin-verified institution partners, admin-approved partner announcements, opt-in admin-reviewed alumni profiles, and an admin-approved opportunity board with external official application links only
+- Phase 4B (deferred): billing, partner analytics, general recruiter self-service, CV uploads, in-app applications, automated screening, and raw student-data access
+
+Phase 4A guardrails: partner onboarding is admin-initiated and institution-scoped;
+a verified partner badge requires a real admin verification; partner content is
+admin-approved; alumni profiles are opt-in and admin-reviewed; public views hide
+email, phone, private verification evidence, and admin notes; recruitment uses
+external official application links only and never creates an in-app application,
+CV store, automated screen, payment, or student-data feed.
 
 ## 19. Long-Term Vision
 Prospective → Admission → Connection → Mentorship → Resumption → Academic Life → Graduation → Alumni → Career.

@@ -12,7 +12,10 @@ drop tables, reseed institutions, or change the official production URL.
 > replaces `open_conversation()` with the older two-gate version. If an older
 > migration is re-run, re-run Phase 3A afterward to restore the listing-request
 > messaging gate. Phase 3A is discovery-only — it does not add bookings,
-> reservations, payments, or marketplace transactions.
+> reservations, payments, or marketplace transactions. Phase 4A adds institution
+> partners, opt-in alumni profiles, and an admin-approved recruitment board. It
+> does not add payments, billing, bookings, CV uploads, in-app applications,
+> automated screening, partner analytics, or raw student-data access.
 
 ## Order (run in Supabase SQL Editor, one file at a time)
 
@@ -44,7 +47,22 @@ drop tables, reseed institutions, or change the official production URL.
      private messaging
    - is discovery-only: no bookings, reservations, payments, or marketplace
      transactions
-6. Seed the first admin role using `20261114_seed_admin_role.example.sql`
+6. `20261120_phase4_partnerships_alumni_recruitment.sql`
+   - creates `institution_partners`, `institution_partner_members`,
+     `partner_announcements`, `alumni_profiles`, and `recruitment_opportunities`
+   - creates the filtered public views `institution_partner_directory`,
+     `partner_announcement_directory`, `alumni_directory`, and
+     `recruitment_opportunity_directory`
+   - adds admin-only partner onboarding, scoped partner membership, admin
+     content review, and opt-in alumni profiles
+   - requires verified, listed partners for public partner content and verified,
+     listed alumni for public alumni profiles
+   - allows external opportunity application links only; no CV uploads,
+     in-app applications, payments, billing, bookings, automated screening,
+     partner analytics, or raw student-data access
+   - every new table starts empty and no existing institution/user data is
+     rewritten
+7. Seed the first admin role using `20261114_seed_admin_role.example.sql`
    (copy it, replace the placeholder email, run it once).
 
 ## Backup runbook
@@ -167,17 +185,102 @@ select
   has_table_privilege('authenticated', 'public.campus_listings', 'UPDATE') as auth_update,
   has_table_privilege('authenticated', 'public.campus_listings', 'DELETE') as auth_delete,
   has_table_privilege('authenticated', 'public.campus_listings', 'TRUNCATE') as auth_truncate;
+
+-- Phase 4A tables start empty; no partners, alumni, announcements, or
+-- opportunities are seeded.
+select count(*) from public.institution_partners;
+select count(*) from public.institution_partner_members;
+select count(*) from public.partner_announcements;
+select count(*) from public.alumni_profiles;
+select count(*) from public.recruitment_opportunities;
+
+-- Public views must expose no email, phone, verification_detail, admin_note,
+-- source_url, or CV columns.
+select table_name, column_name
+from information_schema.columns
+where table_schema = 'public'
+  and table_name in ('institution_partner_directory',
+                     'partner_announcement_directory',
+                     'alumni_directory',
+                     'recruitment_opportunity_directory')
+  and column_name in ('email', 'phone', 'verification_detail', 'admin_note',
+                      'source_url', 'cv_url', 'cv')
+order by table_name, column_name;
+
+-- Phase 4A policies and helper objects.
+select tablename, policyname, cmd from pg_policies
+where schemaname = 'public'
+  and tablename in ('institution_partners', 'institution_partner_members',
+                    'partner_announcements', 'alumni_profiles',
+                    'recruitment_opportunities')
+order by tablename, policyname;
+
+select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and proname in ('is_partner_member', 'is_verified_partner',
+                  'guard_partner_announcement_update',
+                  'guard_alumni_profile_update',
+                  'guard_recruitment_opportunity_update')
+order by proname;
+
+select event_object_table, trigger_name
+from information_schema.triggers
+where trigger_schema = 'public'
+  and event_object_table in ('institution_partners',
+                             'institution_partner_members',
+                             'partner_announcements',
+                             'alumni_profiles',
+                             'recruitment_opportunities')
+order by event_object_table, trigger_name;
+
+-- Phase 4A least privilege: anon reads only the filtered public views;
+-- authenticated users can insert/update through RLS but cannot delete or
+-- truncate partner, alumni, or opportunity records.
+select
+  has_table_privilege('anon', 'public.institution_partners', 'SELECT') as anon_partner_table_read,
+  has_table_privilege('anon', 'public.institution_partner_directory', 'SELECT') as anon_partner_view_read,
+  has_table_privilege('anon', 'public.alumni_profiles', 'SELECT') as anon_alumni_table_read,
+  has_table_privilege('anon', 'public.alumni_directory', 'SELECT') as anon_alumni_view_read,
+  has_table_privilege('authenticated', 'public.institution_partners', 'DELETE') as auth_partner_delete,
+  has_table_privilege('authenticated', 'public.alumni_profiles', 'DELETE') as auth_alumni_delete,
+  has_table_privilege('authenticated', 'public.recruitment_opportunities', 'TRUNCATE') as auth_opportunity_truncate;
 ```
+
+### Phase 4A rolled-back flow test
+
+After the verification queries pass, run
+`backend/migrations/tests/phase4_rollback_test.sql` in the Supabase SQL Editor
+(as the `postgres` role). It opens a transaction, exercises partner
+self-verification, partner content submission, self-approval reset, alumni
+self-verification reset, admin approval, public-view visibility, RLS, and
+least-privilege grants, then ends with `ROLLBACK`.
+
+The script picks unused existing rows, inserts test rows only inside the
+transaction, and leaves no data behind. If an assertion fails, the transaction
+aborts and rolls back automatically. Do not remove the final `ROLLBACK` and do
+not run the file as part of the migration order.
 
 Then:
 - Log in as the seeded admin and open `/admin` to manage scholarships, mentor
-  verification, institution information, and Fido feedback.
-- Open `/scholarships` and `/mentors` and confirm honest empty states before
-  adding content.
+  verification, institution information, Fido feedback, housing/services,
+  partners, partner announcements, alumni, and opportunities.
+- Open `/scholarships`, `/mentors`, `/housing`, `/partners`, `/alumni`, and
+  `/opportunities` and confirm honest empty states before adding content.
 - Verify login, profile photo upload, connections, messages, mentor request
   acceptance/messaging, and the 588-institution directory still work.
 - Confirm Fido labels hub content `Community` until an admin marks that hub
   verified, and that sources appear when an official URL exists.
+- Confirm Phase 4A starts empty. Create a test partner only after confirming the
+  institution relationship, attach a test partner member by account email,
+  submit a partner announcement, confirm it is not public while pending, approve
+  it as an admin, and confirm it appears on `/partners`. Then revoke or pause the
+  test partner and confirm it disappears from public views.
+- Submit an alumni application, confirm it is private while pending and that a
+  self-edit resets it to pending, verify it as an admin, opt in to listing, and
+  confirm the public card exposes no email, verification evidence, or admin note.
+- Submit an opportunity as a verified partner member, confirm a pending record
+  is not public, approve it as an admin, and confirm the public card links to the
+  official external application page. Confirm a non-partner cannot submit one.
 
 ## Rollback
 
@@ -193,3 +296,7 @@ you investigate**, then remove it again:
 Do not drop the new tables/columns to roll back; they are additive and harmless.
 To hide Phase 2 mentor listings without losing applications, set
 `mentor_profiles.status = 'paused'` (or `listed = false`) instead of deleting rows.
+To hide Phase 4A partner, announcement, alumni, or opportunity content without
+losing review history, set `status = 'paused'` or `listed = false` on the relevant
+row instead of deleting it. Revoke partner members (`status = 'revoked'`) rather
+than deleting their membership when access must be withdrawn.

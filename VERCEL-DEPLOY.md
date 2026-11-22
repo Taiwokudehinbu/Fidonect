@@ -22,11 +22,12 @@ delete the Vercel project; Supabase data is untouched.
 | Required env vars | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
 | Optional env vars | `ADMIN_EMAILS`, `APP_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS` |
 
-The Phase 0.1 security, Phase 1 scholarship, Phase 2 mentorship/hub/Fido, and
-Phase 3A accommodation/service schemas are **additive SQL migrations**. Existing
-auth, profiles, connections, messages, institutions, and photo upload continue
-to work before and after they are applied. Phase 2 and Phase 3A content stays
-empty or unverified until an admin reviews it.
+The Phase 0.1 security, Phase 1 scholarship, Phase 2 mentorship/hub/Fido,
+Phase 3A accommodation/service, and Phase 4A partnership/alumni/recruitment
+schemas are **additive SQL migrations**. Existing auth, profiles, connections,
+messages, institutions, and photo upload continue to work before and after they
+are applied. Phase 2, Phase 3A, and Phase 4A content stays empty, pending, or
+unverified until an admin reviews it.
 
 ---
 
@@ -35,11 +36,11 @@ empty or unverified until an admin reviews it.
 | File | Purpose |
 |---|---|
 | `api/index.js` | Serverless entry: `module.exports = require("../backend/server.js")` |
-| `backend/server.js` | Express API, static app shell, scholarship/mentor/hub/admin routes |
+| `backend/server.js` | Express API, static app shell, scholarship/mentor/hub/listing/partner/alumni/opportunity/admin routes |
 | `backend/lib/validation.js` | Query/body validation shared with tests |
-| `backend/public/admin.html` | Protected admin dashboard (overview, scholarships, mentors, institution info, housing & services) |
-| `backend/public/sw.js` | Service worker (`fidonect-v14`) |
-| `index.html` | Web app shell, navigation, profile, scholarships, mentors, Fido UI |
+| `backend/public/admin.html` | Protected admin dashboard (overview, scholarships, mentors, institution info, housing & services, partners, announcements, alumni, opportunities) |
+| `backend/public/sw.js` | Service worker (`fidonect-v15`) |
+| `index.html` | Web app shell, navigation, profile, scholarships, mentors, housing, partners, alumni, opportunities, Fido UI |
 | `package.json` (root) | Vercel dependency manifest |
 | `vercel.json` | One function, all routes, includes app shell/public files |
 | `.vercelignore` | Keeps Android/APK/backups/prisma/seed out of the upload |
@@ -75,10 +76,11 @@ otherwise the verified admin JWT plus database RLS.
 CORS is an explicit allowlist. Arbitrary `*.vercel.app` origins are not trusted;
 add preview origins through `CORS_ORIGINS` if needed.
 
-### Phase 1 / Phase 2 database migrations (required once)
+### Phase 1–4 database migrations (required once)
 
-Scholarships, mentors, verified institution info, Fido feedback, and the security
-hardening need SQL applied in Supabase. Follow `backend/migrations/README.md`:
+Scholarships, mentors, verified institution info, Fido feedback, housing/services,
+partners, alumni, recruitment, and the security hardening need SQL applied in
+Supabase. Follow `backend/migrations/README.md`:
 
 1. Take a verified backup first (`node scripts/backup-supabase.mjs` after
    setting `SUPABASE_SERVICE_ROLE_KEY` locally, or use a dashboard backup).
@@ -86,17 +88,29 @@ hardening need SQL applied in Supabase. Follow `backend/migrations/README.md`:
 3. Run `backend/migrations/20261114_phase1_scholarships.sql`.
 4. Run `backend/migrations/20261116_phase2_mentorship_hubs_fido.sql`.
 5. Run `backend/migrations/20261118_phase3_accommodation_services.sql`.
-6. Seed the first admin with `20261114_seed_admin_role.example.sql`.
-7. Verify login, photo upload, connections, messages, admin access, mentor
+6. Run `backend/migrations/20261120_phase4_partnerships_alumni_recruitment.sql`.
+6a. Run `backend/migrations/tests/phase4_rollback_test.sql` in the SQL Editor.
+   It exercises the Phase 4 guards and public views, then ends with `ROLLBACK`.
+   Confirm the five Phase 4 count queries still match the pre-test counts.
+7. Seed the first admin with `20261114_seed_admin_role.example.sql`.
+8. Verify login, photo upload, connections, messages, admin access, mentor
    apply/verify/request, hub verified/community labels, Fido feedback, listing
-   approval/source verification, accepted listing-request messaging, and all
-   **588 institutions**.
-8. Redeploy only if you changed environment variables.
+   approval/source verification, accepted listing-request messaging, partner
+   onboarding/membership/announcement review, alumni application/verification,
+   opportunity approval, the public-view privacy checks, and all **588
+   institutions**.
+9. Redeploy only if you changed environment variables.
 
-Until these migrations are applied, `/scholarships`, `/mentors`, and `/housing`
-show honest empty setup states, admin writes return a setup message, and Fido
-falls back to AI-labelled guidance. Existing features keep working because the
-API falls back to the old profile and hub columns where needed.
+Until these migrations are applied, `/scholarships`, `/mentors`, `/housing`,
+`/partners`, `/alumni`, and `/opportunities` show honest empty setup states,
+admin writes return a setup message, and Fido falls back to AI-labelled guidance.
+Existing features keep working because the API falls back to the old profile and
+hub columns where needed.
+
+Phase 4A is non-monetized. Do not add payment keys, billing, partner analytics,
+CV storage, in-app applications, or automated screening as part of this deploy.
+Partner onboarding and partner membership are admin-only; alumni and opportunity
+records stay private until an admin review and explicit listing/approval.
 
 ---
 
@@ -134,10 +148,17 @@ Invoke-WebRequest "$base/messages" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/scholarships" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/mentors" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/housing" -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest "$base/partners" -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest "$base/alumni" -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest "$base/opportunities" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/profile" -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest "$base/admin" -UseBasicParsing | Select-Object StatusCode
 Invoke-RestMethod "$base/api/mentors"
 Invoke-RestMethod "$base/api/listings"
+Invoke-RestMethod "$base/api/partners"
+Invoke-RestMethod "$base/api/partner-announcements"
+Invoke-RestMethod "$base/api/alumni"
+Invoke-RestMethod "$base/api/opportunities"
 npm run smoke
 ```
 
@@ -146,10 +167,16 @@ unread badge → profile photo upload → scholarships setup state (before
 migrations) or filters/bookmarks (after migrations) → mentor application →
 admin verify → mentor request → accept → Message → listing submission → admin
 approve → source verification → contact request → accept → Message → admin hub
-verification and Fido feedback → admin login → institution search/pagination.
+verification and Fido feedback → admin partner creation → attach partner member
+→ partner announcement submission → admin approval → public partner page →
+alumni application → admin verification and listing → public alumni card →
+connection request → partner opportunity submission → admin approval → external
+application link → admin login → institution search/pagination.
 
-Expected: **588 institutions**, unchanged existing data, honest empty Phase 2
-and Phase 3A states until admins add content, and no console errors.
+Expected: **588 institutions**, unchanged existing data, honest empty Phase 2,
+Phase 3A, and Phase 4A states until admins add content, no public email/private
+evidence on Phase 4A views, no pending Phase 4A content visible publicly, and no
+console errors.
 
 ---
 

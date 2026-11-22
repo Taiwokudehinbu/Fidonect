@@ -17,6 +17,16 @@ async function check(name, path, validate) {
   }
 }
 
+async function checkDenied(name, path) {
+  try {
+    const r = await fetch(base + path, { headers: { Accept: "application/json" } });
+    const ok = r.status === 401 || r.status === 403;
+    checks.push({ name, ok, status: r.status, detail: ok ? "" : "expected 401/403 without an admin token" });
+  } catch (e) {
+    checks.push({ name, ok: false, status: 0, detail: e.message });
+  }
+}
+
 await check("health", "/health", (b) => b && b.ok === true);
 await check("status", "/api/status", (b) => b && b.ok === true);
 await check("institutions", "/api/institutions", (b) => Array.isArray(b) && b.length > 0);
@@ -26,7 +36,17 @@ await check("mentors API", "/api/mentors", (b) => b && (Array.isArray(b.mentors)
 await check("mentors page", "/mentors", (b) => typeof b === "string" && b.includes("Mentors"));
 await check("listings API", "/api/listings", (b) => b && (Array.isArray(b.listings) || b.setupRequired === true));
 await check("housing page", "/housing", (b) => typeof b === "string" && b.includes("Accommodation"));
+await check("partners API", "/api/partners", (b) => b && (Array.isArray(b.partners) || b.setupRequired === true));
+await check("partner announcements API", "/api/partner-announcements", (b) => b && (Array.isArray(b.announcements) || b.setupRequired === true));
+await check("alumni API", "/api/alumni", (b) => b && (Array.isArray(b.alumni) || b.setupRequired === true));
+await check("opportunities API", "/api/opportunities", (b) => b && (Array.isArray(b.opportunities) || b.setupRequired === true));
+await check("partners page", "/partners", (b) => typeof b === "string" && b.includes("Institution partners"));
+await check("alumni page", "/alumni", (b) => typeof b === "string" && b.includes("Alumni directory"));
+await check("opportunities page", "/opportunities", (b) => typeof b === "string" && b.includes("Opportunities"));
 await check("profile page", "/profile", (b) => typeof b === "string" && b.includes("My profile") || typeof b === "string" && b.includes("Join Fidonect"));
+await checkDenied("admin partners protected", "/api/admin/partners");
+await checkDenied("admin alumni protected", "/api/admin/alumni");
+await checkDenied("admin opportunities protected", "/api/admin/opportunities");
 
 for (const c of checks) {
   console.log((c.ok ? "PASS" : "FAIL") + "  " + c.name + (c.status ? "  HTTP " + c.status : "") + (c.detail ? "\n      " + c.detail : ""));

@@ -1,5 +1,5 @@
 /* Fidonect service worker: offline-capable app shell, fresh API data. */
-const CACHE = "fidonect-v14"; // bump to force clients off stale cached pages
+const CACHE = "fidonect-v15"; // bump to force clients off stale cached pages
 const SHELL = ["/", "/hero.jpg", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

@@ -60,6 +60,10 @@ textarea{min-height:90px;resize:vertical}
 <button class="tab" data-tab="mentors" type="button">Mentors</button>
 <button class="tab" data-tab="hubs" type="button">Institution info</button>
 <button class="tab" data-tab="listings" type="button">Housing &amp; services</button>
+<button class="tab" data-tab="partners" type="button">Partners</button>
+<button class="tab" data-tab="partnerannouncements" type="button">Partner announcements</button>
+<button class="tab" data-tab="alumni" type="button">Alumni</button>
+<button class="tab" data-tab="opportunities" type="button">Opportunities</button>
 </div>
 
 <div id="overviewPanel" class="panel active">
@@ -144,6 +148,60 @@ textarea{min-height:90px;resize:vertical}
 <p class="muted small">Accepted requests unlock private messaging between the student and the listing owner.</p>
 <div id="aListingRequests"><p class="muted">Loading…</p></div>
 </div>
+
+<div id="partnersPanel" class="panel">
+<div class="ok" style="display:none" id="aPartnerOk"></div>
+<div class="deny" style="display:none" id="aPartnerDeny"></div>
+<h3>Create partner account</h3>
+<p class="muted small">Partner onboarding is admin-initiated. Create a partner only after confirming the institution relationship. The public “Official partner” badge appears only when the status is verified and the partner is listed. Only a super admin can manage partners and members.</p>
+<div class="form-grid">
+<select id="aPartnerInstitution" class="input"><option value="">Choose an institution…</option></select>
+<select id="aPartnerStatus" class="input"><option value="pending">Pending review</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="paused">Paused</option></select>
+<select id="aPartnerMethod" class="input"><option value="official_website">Official website</option><option value="official_email">Official email</option><option value="official_letter">Official letter</option><option value="other">Other</option></select>
+<input id="aPartnerUrl" class="input" maxlength="2048" placeholder="Official https:// URL (public)" />
+<input id="aPartnerSummary" class="input" maxlength="1200" placeholder="Public summary (20–1200 chars, optional)" />
+<input id="aPartnerDetail" class="input" maxlength="1000" placeholder="Private verification evidence (admin-only)" />
+<input id="aPartnerNote" class="input" maxlength="500" placeholder="Private admin note (optional)" />
+</div>
+<label class="muted small" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input id="aPartnerListed" type="checkbox" style="width:auto" /> List this partner publicly (requires verified status)</label>
+<div class="admin-actions"><button id="aPartnerCreate" class="btn" type="button">Create partner</button><button id="aPartnerClear" class="btn ghost" type="button">Clear form</button></div>
+<h3>Partner accounts</h3>
+<div id="aPartnerList"><p class="muted">Loading…</p></div>
+<h3>Attach a partner member</h3>
+<p class="muted small">Members are existing Fidonect accounts scoped to one institution. Partners cannot add members themselves.</p>
+<div class="form-grid">
+<select id="aPartnerMemberInstitution" class="input"><option value="">Choose a partner institution…</option></select>
+<input id="aPartnerMemberEmail" class="input" type="email" placeholder="Fidonect account email *" />
+<select id="aPartnerMemberRole" class="input"><option value="owner">Owner</option><option value="editor">Editor</option></select>
+</div>
+<div class="admin-actions"><button id="aPartnerMemberAdd" class="btn" type="button">Attach member</button></div>
+<h3>Partner members</h3>
+<div id="aPartnerMemberList"><p class="muted">Loading…</p></div>
+</div>
+
+<div id="partnerannouncementsPanel" class="panel">
+<div class="ok" style="display:none" id="aPAnnouncementOk"></div>
+<div class="deny" style="display:none" id="aPAnnouncementDeny"></div>
+<h3>Partner announcements</h3>
+<p class="muted small">Approving publishes the announcement only while the partner is verified and listed. The public page never shows admin notes or the author's email.</p>
+<div id="aPAnnouncementList"><p class="muted">Loading…</p></div>
+</div>
+
+<div id="alumniPanel" class="panel">
+<div class="ok" style="display:none" id="aAlumniOk"></div>
+<div class="deny" style="display:none" id="aAlumniDeny"></div>
+<h3>Alumni applications</h3>
+<p class="muted small">Review evidence privately. A verified badge requires a real admin action. Public profiles never show email, private verification evidence, or admin notes. Self-edits reset the profile to pending automatically.</p>
+<div id="aAlumniList"><p class="muted">Loading…</p></div>
+</div>
+
+<div id="opportunitiesPanel" class="panel">
+<div class="ok" style="display:none" id="aOpportunityOk"></div>
+<div class="deny" style="display:none" id="aOpportunityDeny"></div>
+<h3>Recruitment opportunities</h3>
+<p class="muted small">Only verified institution partners can submit. Approve only real opportunities with an official external application link. Fidonect does not process applications, rank candidates, or accept recruitment fees.</p>
+<div id="aOpportunityList"><p class="muted">Loading…</p></div>
+</div>
 </div>
 
 <script>
@@ -201,13 +259,19 @@ async function loadDash(tok) {
   await loadHubsAdmin();
   await loadListingAdmin();
   await loadListingRequestsAdmin();
+  await loadPartnerInstitutionOptions();
+  await loadPartnersAdmin();
+  await loadPartnerMembersAdmin();
+  await loadPartnerAnnouncementsAdmin();
+  await loadAlumniAdmin();
+  await loadOpportunityAdmin();
 }
 async function loadStats() {
   try {
     var j = await api("/api/admin/stats");
     function card(t, v) { return '<div class="stat"><b>' + v + '</b><span class="muted small">' + t + '</span></div>'; }
     function n(x) { return x.status === "ok" ? x.count : "pending"; }
-    document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions)) + card("Mentors", n(j.mentors)) + card("Mentor requests", n(j.mentorRequests)) + card("Hub pages", n(j.hubs)) + card("Fido feedback", n(j.fidoFeedback)) + card("Listings", n(j.listings)) + card("Listing requests", n(j.listingRequests));
+    document.getElementById("aStats").innerHTML = card("Users", n(j.users)) + card("Posts", n(j.posts)) + card("Institutions", n(j.institutions)) + card("Mentors", n(j.mentors)) + card("Mentor requests", n(j.mentorRequests)) + card("Hub pages", n(j.hubs)) + card("Fido feedback", n(j.fidoFeedback)) + card("Listings", n(j.listings)) + card("Listing requests", n(j.listingRequests)) + card("Partners", n(j.partners)) + card("Partner announcements", n(j.announcements)) + card("Alumni", n(j.alumni)) + card("Opportunities", n(j.opportunities));
     document.getElementById("aUsers").innerHTML = "<h3>Recent users</h3>" + ((j.recentUsers || []).map(function (u) {
       return "<div class=\"person\"><b>" + esc(u.name) + "</b> <span class=\"muted small\">" + esc(u.email) + " — " + esc(u.school || "no school") + "</span></div>";
     }).join("") || '<p class="muted">No user data yet.</p>');
@@ -584,6 +648,330 @@ document.getElementById("aHubClear").onclick = clearHubForm;
 document.getElementById("aSave").onclick = function () { saveScholarship(false); };
 document.getElementById("aPublish").onclick = function () { saveScholarship(true); };
 document.getElementById("aClear").onclick = clearForm;
+// ---- Phase 4A: partners, members, announcements, alumni, opportunities ----
+var phase4Institutions = [];
+function phase4AdminDate(v) { try { return v ? new Date(v).toLocaleString() : "—"; } catch (e) { return "—"; } }
+function phase4AdminNotePrompt() {
+  var note = prompt("Optional private admin note (max 500 chars). Leave blank to clear it.");
+  return note === null ? undefined : note.trim() || null;
+}
+async function loadPartnerInstitutionOptions() {
+  var sel = document.getElementById("aPartnerInstitution");
+  if (!sel) return;
+  try {
+    var r = await fetch(API + "/api/institutions");
+    var rows = await r.json();
+    if (!Array.isArray(rows)) return;
+    phase4Institutions = rows;
+    fillPartnerCreateInstitutionOptions([]);
+  } catch (e) { /* partner actions still work with existing records */ }
+}
+function fillPartnerCreateInstitutionOptions(partners) {
+  var sel = document.getElementById("aPartnerInstitution");
+  if (!sel) return;
+  var taken = {};
+  (partners || []).forEach(function (p) { taken[String(p.institution_id)] = true; });
+  var options = phase4Institutions.filter(function (i) { return !taken[String(i.id)]; }).map(function (i) {
+    return '<option value="' + esc(i.id) + '">' + esc(i.name) + (i.location ? " — " + esc(i.location) : "") + '</option>';
+  }).join("");
+  sel.innerHTML = '<option value="">Choose an institution…</option>' + options;
+}
+function clearPartnerForm() {
+  ["aPartnerInstitution","aPartnerSummary","aPartnerUrl","aPartnerDetail","aPartnerNote"].forEach(function (id) { document.getElementById(id).value = ""; });
+  document.getElementById("aPartnerStatus").value = "pending";
+  document.getElementById("aPartnerMethod").value = "official_website";
+  document.getElementById("aPartnerListed").checked = false;
+  setDeny("aPartnerDeny", "");
+  setOk("", "aPartnerOk");
+}
+async function createPartnerAccount() {
+  var institutionId = document.getElementById("aPartnerInstitution").value;
+  if (!institutionId) { setDeny("aPartnerDeny", "Choose an institution first."); return; }
+  var body = {
+    institution_id: Number(institutionId),
+    status: document.getElementById("aPartnerStatus").value,
+    public_summary: document.getElementById("aPartnerSummary").value.trim() || null,
+    official_url: document.getElementById("aPartnerUrl").value.trim() || null,
+    verification_method: document.getElementById("aPartnerMethod").value,
+    verification_detail: document.getElementById("aPartnerDetail").value.trim() || null,
+    admin_note: document.getElementById("aPartnerNote").value.trim() || null,
+    listed: document.getElementById("aPartnerListed").checked
+  };
+  try {
+    await api("/api/admin/partners", { method: "POST", body: JSON.stringify(body) });
+    clearPartnerForm();
+    setOk("Partner created. Only verified + listed partners appear publicly.", "aPartnerOk");
+    await loadPartnersAdmin();
+    await loadPartnerMembersAdmin();
+    await loadStats();
+  } catch (e) { setOk("", "aPartnerOk"); setDeny("aPartnerDeny", e.message); }
+}
+function partnerAdminBadge(status) {
+  return '<span class="badge ' + esc(status) + '">' + esc(status) + '</span>';
+}
+async function loadPartnersAdmin() {
+  var list = document.getElementById("aPartnerList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/partners");
+    setDeny("aPartnerDeny", "");
+    var partners = j.partners || [];
+    fillPartnerCreateInstitutionOptions(partners);
+    var memberSel = document.getElementById("aPartnerMemberInstitution");
+    if (memberSel) {
+      memberSel.innerHTML = '<option value="">Choose a partner institution…</option>' + partners.map(function (p) {
+        var i = p.institution || {};
+        return '<option value="' + esc(p.institution_id) + '">' + esc(i.name || ("Institution #" + p.institution_id)) + '</option>';
+      }).join("");
+    }
+    list.innerHTML = partners.map(function (p) {
+      var i = p.institution || {};
+      return '<div class="admin-item"><h4>' + esc(i.name || ("Institution #" + p.institution_id)) + ' ' + partnerAdminBadge(p.status) +
+        (p.listed ? '<span class="badge verified">listed publicly</span>' : '<span class="badge draft">not listed</span>') + '</h4>' +
+        '<div class="muted small">' + esc(i.location || "no location") + ' • ' + esc(i.ownership || "") + ' • ' + esc(i.kind || "") + ' • updated ' + esc(phase4AdminDate(p.updated_at)) + '</div>' +
+        '<p>' + esc(p.public_summary || "No public summary.") + '</p>' +
+        (p.official_url ? '<p class="muted small">Official: <a href="' + esc(p.official_url) + '" target="_blank" rel="noopener noreferrer">' + esc(p.official_url) + '</a></p>' : "") +
+        '<p class="muted small">Private verification: ' + esc(p.verification_method || "—") + (p.verification_detail ? ' • ' + esc(p.verification_detail) : "") + '</p>' +
+        (p.admin_note ? '<p class="muted small">Admin note: ' + esc(p.admin_note) + '</p>' : "") +
+        '<div class="admin-actions">' +
+        '<button class="btn ghost" type="button" data-partner-id="' + esc(p.institution_id) + '" data-partner-action="verify">Verify</button>' +
+        '<button class="btn ghost" type="button" data-partner-id="' + esc(p.institution_id) + '" data-partner-action="pause">Pause</button>' +
+        '<button class="btn ghost" type="button" data-partner-id="' + esc(p.institution_id) + '" data-partner-action="reject">Reject</button>' +
+        '<button class="btn ghost" type="button" data-partner-id="' + esc(p.institution_id) + '" data-partner-action="pending">Reset pending</button>' +
+        '<button class="btn ghost" type="button" data-partner-id="' + esc(p.institution_id) + '" data-partner-action="' + (p.listed ? "unlist" : "list") + '">' + (p.listed ? "Unlist" : "List") + '</button>' +
+        '<button class="btn ghost" type="button" data-partner-id="' + esc(p.institution_id) + '" data-partner-action="note">Admin note</button>' +
+        '</div></div>';
+    }).join("") || '<p class="muted">No partner accounts yet. Create the first only after confirming a real institution relationship.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load partners.</p>';
+    setDeny("aPartnerDeny", e.message);
+  }
+}
+async function patchPartnerAdmin(institutionId, patch) {
+  try {
+    await api("/api/admin/partners/" + institutionId, { method: "PATCH", body: JSON.stringify(patch) });
+    setDeny("aPartnerDeny", "");
+    setOk("Partner updated.", "aPartnerOk");
+    await loadPartnersAdmin();
+    await loadStats();
+  } catch (e) { setOk("", "aPartnerOk"); setDeny("aPartnerDeny", e.message); }
+}
+async function loadPartnerMembersAdmin() {
+  var list = document.getElementById("aPartnerMemberList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/partner-members");
+    list.innerHTML = (j.members || []).map(function (m) {
+      var p = m.profile || {};
+      var i = m.institution || {};
+      return '<div class="admin-item"><h4>' + esc(p.name || "Member") + ' ' + partnerAdminBadge(m.status) + ' <span class="badge published">' + esc(m.member_role) + '</span></h4>' +
+        '<div class="muted small">' + esc(p.email || "no email") + ' • ' + esc(i.name || ("Institution #" + m.institution_id)) + ' • added ' + esc(phase4AdminDate(m.created_at)) + '</div>' +
+        '<div class="admin-actions">' +
+        '<button class="btn ghost" type="button" data-pmember-inst="' + esc(m.institution_id) + '" data-pmember-user="' + esc(m.user_id) + '" data-pmember-action="' + (m.status === "active" ? "revoked" : "active") + '">' + (m.status === "active" ? "Revoke" : "Reactivate") + '</button>' +
+        '<button class="btn ghost" type="button" data-pmember-inst="' + esc(m.institution_id) + '" data-pmember-user="' + esc(m.user_id) + '" data-pmember-action="role" data-role="' + esc(m.member_role === "owner" ? "editor" : "owner") + '">Make ' + (m.member_role === "owner" ? "editor" : "owner") + '</button>' +
+        '</div></div>';
+    }).join("") || '<p class="muted">No partner members yet. Attach an existing Fidonect account above.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load partner members.</p>';
+  }
+}
+async function attachPartnerMember() {
+  var institutionId = document.getElementById("aPartnerMemberInstitution").value;
+  var email = document.getElementById("aPartnerMemberEmail").value.trim();
+  if (!institutionId || !email) { setDeny("aPartnerDeny", "Choose a partner institution and enter the member email."); return; }
+  try {
+    await api("/api/admin/partner-members", { method: "POST", body: JSON.stringify({ institution_id: Number(institutionId), email: email, member_role: document.getElementById("aPartnerMemberRole").value }) });
+    setDeny("aPartnerDeny", "");
+    setOk("Partner member attached.", "aPartnerOk");
+    document.getElementById("aPartnerMemberEmail").value = "";
+    await loadPartnerMembersAdmin();
+  } catch (e) { setOk("", "aPartnerOk"); setDeny("aPartnerDeny", e.message); }
+}
+async function patchPartnerMemberAdmin(institutionId, userId, patch) {
+  try {
+    await api("/api/admin/partner-members/" + institutionId + "/" + userId, { method: "PATCH", body: JSON.stringify(patch) });
+    setDeny("aPartnerDeny", "");
+    setOk("Partner member updated.", "aPartnerOk");
+    await loadPartnerMembersAdmin();
+  } catch (e) { setOk("", "aPartnerOk"); setDeny("aPartnerDeny", e.message); }
+}
+async function loadPartnerAnnouncementsAdmin() {
+  var list = document.getElementById("aPAnnouncementList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/partner-announcements");
+    setDeny("aPAnnouncementDeny", "");
+    list.innerHTML = (j.announcements || []).map(function (a) {
+      var i = a.institution || {};
+      var author = a.author || {};
+      return '<div class="admin-item"><h4>' + esc(a.title) + ' ' + partnerAdminBadge(a.status) + '</h4>' +
+        '<div class="muted small">' + esc(i.name || ("Institution #" + a.institution_id)) + ' • ' + esc(a.category || "general") + ' • Author: ' + esc(author.name || "unknown") + ' • ' + esc(author.email || "no email") + '</div>' +
+        '<p>' + esc(a.body) + '</p>' +
+        (a.link_url ? '<p class="muted small">Link: <a href="' + esc(a.link_url) + '" target="_blank" rel="noopener noreferrer">' + esc(a.link_url) + '</a></p>' : "") +
+        (a.admin_note ? '<p class="muted small">Admin note: ' + esc(a.admin_note) + '</p>' : "") +
+        '<div class="admin-actions">' +
+        '<button class="btn ghost" type="button" data-pann-id="' + esc(a.id) + '" data-pann-action="approved">Approve</button>' +
+        '<button class="btn ghost" type="button" data-pann-id="' + esc(a.id) + '" data-pann-action="rejected">Reject</button>' +
+        '<button class="btn ghost" type="button" data-pann-id="' + esc(a.id) + '" data-pann-action="paused">Pause</button>' +
+        '<button class="btn ghost" type="button" data-pann-id="' + esc(a.id) + '" data-pann-action="pending">Reset pending</button>' +
+        '<button class="btn ghost" type="button" data-pann-id="' + esc(a.id) + '" data-pann-action="note">Admin note</button>' +
+        '</div></div>';
+    }).join("") || '<p class="muted">No partner announcements yet.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load partner announcements.</p>';
+    setDeny("aPAnnouncementDeny", e.message);
+  }
+}
+async function patchPartnerAnnouncementAdmin(id, patch) {
+  try {
+    await api("/api/admin/partner-announcements/" + id, { method: "PATCH", body: JSON.stringify(patch) });
+    setDeny("aPAnnouncementDeny", "");
+    setOk("Announcement updated.", "aPAnnouncementOk");
+    await loadPartnerAnnouncementsAdmin();
+    await loadStats();
+  } catch (e) { setOk("", "aPAnnouncementOk"); setDeny("aPAnnouncementDeny", e.message); }
+}
+async function loadAlumniAdmin() {
+  var list = document.getElementById("aAlumniList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/alumni");
+    setDeny("aAlumniDeny", "");
+    list.innerHTML = (j.alumni || []).map(function (a) {
+      var p = a.profile || {};
+      var i = a.institution || {};
+      return '<div class="admin-item"><h4>' + esc(p.name || "Alumnus") + ' ' + partnerAdminBadge(a.status) +
+        (a.listed ? '<span class="badge verified">listed publicly</span>' : '<span class="badge draft">not listed</span>') + '</h4>' +
+        '<div class="muted small">' + esc(p.email || "no email") + ' • ' + esc(a.institution_name) + (i.location ? ' • ' + esc(i.location) : '') + ' • Class of ' + esc(a.graduation_year) + '</div>' +
+        '<p>' + esc(a.bio) + '</p>' +
+        '<p class="muted small">Role: ' + esc(a.current_role || "—") + (a.current_organisation ? ' at ' + esc(a.current_organisation) : "") + ' • Industry: ' + esc(a.industry || "—") + '</p>' +
+        '<p class="muted small">Help: ' + esc((a.help_areas || []).join(", ") || "—") + ' • Mentoring: ' + (a.open_to_mentoring ? "yes" : "no") + ' • Referrals: ' + (a.open_to_referrals ? "yes" : "no") + '</p>' +
+        '<p class="muted small">Private verification: ' + esc(a.verification_method) + (a.verification_detail ? ' • ' + esc(a.verification_detail) : "") + '</p>' +
+        (a.admin_note ? '<p class="muted small">Admin note: ' + esc(a.admin_note) + '</p>' : "") +
+        '<div class="admin-actions">' +
+        '<button class="btn ghost" type="button" data-alumni-user="' + esc(a.user_id) + '" data-alumni-action="verified">Verify</button>' +
+        '<button class="btn ghost" type="button" data-alumni-user="' + esc(a.user_id) + '" data-alumni-action="rejected">Reject</button>' +
+        '<button class="btn ghost" type="button" data-alumni-user="' + esc(a.user_id) + '" data-alumni-action="paused">Pause</button>' +
+        '<button class="btn ghost" type="button" data-alumni-user="' + esc(a.user_id) + '" data-alumni-action="pending">Reset pending</button>' +
+        '<button class="btn ghost" type="button" data-alumni-user="' + esc(a.user_id) + '" data-alumni-action="' + (a.listed ? "unlist" : "list") + '">' + (a.listed ? "Unlist" : "List") + '</button>' +
+        '<button class="btn ghost" type="button" data-alumni-user="' + esc(a.user_id) + '" data-alumni-action="note">Admin note</button>' +
+        '</div></div>';
+    }).join("") || '<p class="muted">No alumni applications yet.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load alumni applications.</p>';
+    setDeny("aAlumniDeny", e.message);
+  }
+}
+async function patchAlumniAdmin(userId, patch) {
+  try {
+    await api("/api/admin/alumni/" + userId, { method: "PATCH", body: JSON.stringify(patch) });
+    setDeny("aAlumniDeny", "");
+    setOk("Alumni profile updated.", "aAlumniOk");
+    await loadAlumniAdmin();
+    await loadStats();
+  } catch (e) { setOk("", "aAlumniOk"); setDeny("aAlumniDeny", e.message); }
+}
+async function loadOpportunityAdmin() {
+  var list = document.getElementById("aOpportunityList");
+  if (!list) return;
+  try {
+    var j = await api("/api/admin/opportunities");
+    setDeny("aOpportunityDeny", "");
+    list.innerHTML = (j.opportunities || []).map(function (o) {
+      var i = o.institution || {};
+      var poster = o.poster || {};
+      return '<div class="admin-item"><h4>' + esc(o.title) + ' ' + partnerAdminBadge(o.status) + '</h4>' +
+        '<div class="muted small">' + esc(o.organisation) + ' • ' + esc(i.name || ("Institution #" + o.institution_id)) + ' • ' + esc(o.role_type) + ' • ' + esc(o.work_mode) + (o.location ? ' • ' + esc(o.location) : "") + '</div>' +
+        '<p>' + esc(o.description) + '</p>' +
+        (o.eligibility ? '<p class="muted small">Eligibility: ' + esc(o.eligibility) + '</p>' : "") +
+        (o.deadline ? '<p class="muted small">Deadline: ' + esc(o.deadline) + '</p>' : "") +
+        '<p class="muted small">Application: <a href="' + esc(o.application_url) + '" target="_blank" rel="noopener noreferrer">' + esc(o.application_url) + '</a></p>' +
+        (o.source_url ? '<p class="muted small">Private source: <a href="' + esc(o.source_url) + '" target="_blank" rel="noopener noreferrer">' + esc(o.source_url) + '</a></p>' : "") +
+        '<p class="muted small">Posted by: ' + esc(poster.name || "unknown") + ' • ' + esc(poster.email || "no email") + '</p>' +
+        (o.admin_note ? '<p class="muted small">Admin note: ' + esc(o.admin_note) + '</p>' : "") +
+        '<div class="admin-actions">' +
+        '<button class="btn ghost" type="button" data-opp-id="' + esc(o.id) + '" data-opp-action="approved">Approve</button>' +
+        '<button class="btn ghost" type="button" data-opp-id="' + esc(o.id) + '" data-opp-action="rejected">Reject</button>' +
+        '<button class="btn ghost" type="button" data-opp-id="' + esc(o.id) + '" data-opp-action="closed">Close</button>' +
+        '<button class="btn ghost" type="button" data-opp-id="' + esc(o.id) + '" data-opp-action="pending">Reset pending</button>' +
+        '<button class="btn ghost" type="button" data-opp-id="' + esc(o.id) + '" data-opp-action="note">Admin note</button>' +
+        '</div></div>';
+    }).join("") || '<p class="muted">No opportunities yet.</p>';
+  } catch (e) {
+    list.innerHTML = '<p class="muted">Could not load opportunities.</p>';
+    setDeny("aOpportunityDeny", e.message);
+  }
+}
+async function patchOpportunityAdmin(id, patch) {
+  try {
+    await api("/api/admin/opportunities/" + id, { method: "PATCH", body: JSON.stringify(patch) });
+    setDeny("aOpportunityDeny", "");
+    setOk("Opportunity updated.", "aOpportunityOk");
+    await loadOpportunityAdmin();
+    await loadStats();
+  } catch (e) { setOk("", "aOpportunityOk"); setDeny("aOpportunityDeny", e.message); }
+}
+document.getElementById("aPartnerList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button[data-partner-action]") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-partner-id");
+  var action = b.getAttribute("data-partner-action");
+  if (!id || !action) return;
+  if (action === "note") {
+    var note = phase4AdminNotePrompt();
+    if (note !== undefined) patchPartnerAdmin(id, { admin_note: note });
+  } else if (action === "list") patchPartnerAdmin(id, { listed: true });
+  else if (action === "unlist") patchPartnerAdmin(id, { listed: false });
+  else patchPartnerAdmin(id, { status: action });
+});
+document.getElementById("aPartnerMemberList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button[data-pmember-action]") : null;
+  if (!b) return;
+  var inst = b.getAttribute("data-pmember-inst");
+  var user = b.getAttribute("data-pmember-user");
+  var action = b.getAttribute("data-pmember-action");
+  if (!inst || !user || !action) return;
+  if (action === "role") patchPartnerMemberAdmin(inst, user, { member_role: b.getAttribute("data-role") });
+  else patchPartnerMemberAdmin(inst, user, { status: action });
+});
+document.getElementById("aPAnnouncementList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button[data-pann-action]") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-pann-id");
+  var action = b.getAttribute("data-pann-action");
+  if (!id || !action) return;
+  if (action === "note") {
+    var note = phase4AdminNotePrompt();
+    if (note !== undefined) patchPartnerAnnouncementAdmin(id, { admin_note: note });
+  } else patchPartnerAnnouncementAdmin(id, { status: action });
+});
+document.getElementById("aAlumniList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button[data-alumni-action]") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-alumni-user");
+  var action = b.getAttribute("data-alumni-action");
+  if (!id || !action) return;
+  if (action === "note") {
+    var note = phase4AdminNotePrompt();
+    if (note !== undefined) patchAlumniAdmin(id, { admin_note: note });
+  } else if (action === "list") patchAlumniAdmin(id, { listed: true });
+  else if (action === "unlist") patchAlumniAdmin(id, { listed: false });
+  else patchAlumniAdmin(id, { status: action });
+});
+document.getElementById("aOpportunityList").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button[data-opp-action]") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-opp-id");
+  var action = b.getAttribute("data-opp-action");
+  if (!id || !action) return;
+  if (action === "note") {
+    var note = phase4AdminNotePrompt();
+    if (note !== undefined) patchOpportunityAdmin(id, { admin_note: note });
+  } else patchOpportunityAdmin(id, { status: action });
+});
+document.getElementById("aPartnerCreate").onclick = createPartnerAccount;
+document.getElementById("aPartnerClear").onclick = clearPartnerForm;
+document.getElementById("aPartnerMemberAdd").onclick = attachPartnerMember;
 document.getElementById("aLogin").onclick = async function () {
   var m = document.getElementById("aMsg"); m.textContent = "Signing in…";
   try {
