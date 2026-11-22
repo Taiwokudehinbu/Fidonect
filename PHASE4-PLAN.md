@@ -1,6 +1,6 @@
 # Phase 4 Plan — Institution Partnerships, Alumni, Recruitment
 
-Status: **Approved by the owner. Phase 4A runtime code, migration, tests, admin surfaces, and rollout documentation are implemented. The migration still needs to be applied to Supabase production and verified end-to-end.**
+Status: **Approved by the owner. Phase 4A runtime code, migration, tests, admin surfaces, and rollout documentation are implemented and deployed to `https://fidonect.vercel.app` (production smoke 20/20; the three public pages show honest "being set up" states until the migration runs). The migration still needs to be applied to Supabase production and verified end-to-end.**
 
 Phase 3A is live and verified. Phase 3B (marketplace, bookings, payments) remains deferred per PRD §69.
 
