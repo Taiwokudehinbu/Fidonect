@@ -13,7 +13,9 @@
 
 begin;
 
--- 1. Pick unused real rows so the test is repeatable on a live database.
+-- 1. Pick unused, non-admin real rows so the test is repeatable on a live
+-- database. Admin accounts are excluded because they are allowed to verify
+-- partners and alumni; the test checks the non-admin member rules.
 select
   set_config('p4.partner_user', coalesce((
     select p.id::text
@@ -21,6 +23,9 @@ select
     where not exists (
       select 1 from public.institution_partner_members m where m.user_id = p.id
     )
+      and not exists (
+        select 1 from public.user_roles ur where ur.user_id = p.id
+      )
     order by p.created_at nulls last, p.id
     limit 1
   ), ''), true),
@@ -30,6 +35,9 @@ select
     where coalesce(p.visibility, 'public') <> 'private'
       and not exists (
         select 1 from public.alumni_profiles a where a.user_id = p.id
+      )
+      and not exists (
+        select 1 from public.user_roles ur where ur.user_id = p.id
       )
     order by p.created_at nulls last, p.id
     limit 1
@@ -56,7 +64,7 @@ begin
      or coalesce(current_setting('p4.alumni_user', true), '') = ''
      or coalesce(current_setting('p4.inst', true), '') = ''
      or coalesce(current_setting('p4.inst_name', true), '') = '' then
-    raise exception 'Phase 4 test needs 1 institution without a partner and usable profile(s)';
+    raise exception 'Phase 4 test needs 1 institution without a partner and non-admin profile(s)';
   end if;
 end $$;
 
