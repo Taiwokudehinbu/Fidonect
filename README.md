@@ -145,7 +145,7 @@ directory.
   contact requests; no bookings or payments
 - Phase 3B (deferred): marketplace and any transaction/payment flow (out of the
   initial scope per PRD §69)
-- Phase 4A (implemented; apply its migration before use): admin-verified
+- Phase 4A (live and verified in production): admin-verified
   institution partners, admin-approved partner announcements, opt-in
   admin-reviewed alumni profiles, and an admin-approved opportunity board with
   external official application links

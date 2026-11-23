@@ -164,6 +164,9 @@ test("Phase 4 rollback flow test is transaction-scoped and exercises the guarded
   ]) {
     assert.ok(sql.includes(marker), marker + " must be covered");
   }
+  // Admin accounts may verify partners and alumni, so the fixtures must pick
+  // non-admin profiles or the deliberate self-verification assertions fail.
+  assert.equal((sql.match(/select 1 from public\.user_roles ur where ur\.user_id = p\.id/g) || []).length, 2);
 });
 
 test("public UI and admin review surfaces include honest Phase 4 states", () => {
