@@ -30,6 +30,19 @@ test("Phase 4 migration is additive and does not remove or rewrite existing data
   assert.doesNotMatch(phase4Sql, /insert into public\.(institutions|profiles|connections|messages)/i);
 });
 
+test("Phase 4 SQL avoids PostgreSQL reserved keywords as column names", () => {
+  // current_role is a reserved keyword in PostgreSQL and cannot be used as a
+  // bare column name. The alumni job title column is job_title; the API and UI
+  // use the same name. This guards against reintroducing the 42601 failure.
+  assert.doesNotMatch(phase4Sql, /\bcurrent_role\b/i);
+  const view = viewSql("alumni_directory", "revoke all on public.alumni_directory");
+  assert.match(view, /a\.job_title/);
+  assert.match(server, /job_title/);
+  assert.match(indexHtml, /a\.job_title/);
+  assert.doesNotMatch(indexHtml, /current_role/);
+  assert.doesNotMatch(adminHtml, /current_role/);
+});
+
 test("every Phase 4 base table has RLS and least-privilege grants", () => {
   for (const table of [
     "institution_partners", "institution_partner_members", "partner_announcements",

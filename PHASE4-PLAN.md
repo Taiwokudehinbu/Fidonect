@@ -172,7 +172,7 @@ One row per alumni applicant.
 - `institution_id`, `institution_name`.
 - `graduation_year`.
 - `faculty`, `department`, `programme` — optional.
-- `current_role`, `current_organisation`, `industry`, `location` — optional.
+- `job_title`, `current_organisation`, `industry`, `location` - optional.
 - `bio`.
 - `help_areas` — up to 8 short items.
 - `open_to_mentoring`, `open_to_referrals` — booleans.

@@ -302,7 +302,7 @@ create table if not exists public.alumni_profiles (
   faculty text check (faculty is null or char_length(faculty) <= 160),
   department text check (department is null or char_length(department) <= 160),
   programme text check (programme is null or char_length(programme) <= 160),
-  current_role text check (current_role is null or char_length(current_role) <= 160),
+  job_title text check (job_title is null or char_length(job_title) <= 160),
   current_organisation text check (
     current_organisation is null or char_length(current_organisation) <= 160
   ),
@@ -599,7 +599,7 @@ select
   a.faculty,
   a.department,
   a.programme,
-  a.current_role,
+  a.job_title,
   a.current_organisation,
   a.industry,
   a.location,

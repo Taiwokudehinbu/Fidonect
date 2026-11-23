@@ -844,7 +844,7 @@ async function loadAlumniAdmin() {
         (a.listed ? '<span class="badge verified">listed publicly</span>' : '<span class="badge draft">not listed</span>') + '</h4>' +
         '<div class="muted small">' + esc(p.email || "no email") + ' • ' + esc(a.institution_name) + (i.location ? ' • ' + esc(i.location) : '') + ' • Class of ' + esc(a.graduation_year) + '</div>' +
         '<p>' + esc(a.bio) + '</p>' +
-        '<p class="muted small">Role: ' + esc(a.current_role || "—") + (a.current_organisation ? ' at ' + esc(a.current_organisation) : "") + ' • Industry: ' + esc(a.industry || "—") + '</p>' +
+        '<p class="muted small">Role: ' + esc(a.job_title || "—") + (a.current_organisation ? ' at ' + esc(a.current_organisation) : "") + ' • Industry: ' + esc(a.industry || "—") + '</p>' +
         '<p class="muted small">Help: ' + esc((a.help_areas || []).join(", ") || "—") + ' • Mentoring: ' + (a.open_to_mentoring ? "yes" : "no") + ' • Referrals: ' + (a.open_to_referrals ? "yes" : "no") + '</p>' +
         '<p class="muted small">Private verification: ' + esc(a.verification_method) + (a.verification_detail ? ' • ' + esc(a.verification_detail) : "") + '</p>' +
         (a.admin_note ? '<p class="muted small">Admin note: ' + esc(a.admin_note) + '</p>' : "") +

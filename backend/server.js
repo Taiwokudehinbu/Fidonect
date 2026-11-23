@@ -2246,8 +2246,8 @@ async function requireContentAdmin(req, res) {
 
 const PARTNER_PUBLIC_FIELDS = "institution_id,institution_name,location,ownership,kind,public_summary,official_url,verified_at,updated_at";
 const ANNOUNCEMENT_PUBLIC_FIELDS = "id,institution_id,institution_name,title,body,category,link_url,published_at,expires_at,updated_at,partner_verified_at";
-const ALUMNI_PUBLIC_FIELDS = "user_id,name,photo_url,user_type,institution_id,institution_name,graduation_year,faculty,department,programme,current_role,current_organisation,industry,location,bio,help_areas,open_to_mentoring,open_to_referrals,verified_at,updated_at,institution_location,ownership,kind";
-const ALUMNI_OWN_FIELDS = "user_id,institution_id,institution_name,graduation_year,faculty,department,programme,current_role,current_organisation,industry,location,bio,help_areas,open_to_mentoring,open_to_referrals,verification_method,verification_detail,listed,status,verified_at,created_at,updated_at";
+const ALUMNI_PUBLIC_FIELDS = "user_id,name,photo_url,user_type,institution_id,institution_name,graduation_year,faculty,department,programme,job_title,current_organisation,industry,location,bio,help_areas,open_to_mentoring,open_to_referrals,verified_at,updated_at,institution_location,ownership,kind";
+const ALUMNI_OWN_FIELDS = "user_id,institution_id,institution_name,graduation_year,faculty,department,programme,job_title,current_organisation,industry,location,bio,help_areas,open_to_mentoring,open_to_referrals,verification_method,verification_detail,listed,status,verified_at,created_at,updated_at";
 const OPPORTUNITY_PUBLIC_FIELDS = "id,institution_id,institution_name,title,organisation,description,location,work_mode,role_type,eligibility,deadline,application_url,published_at,updated_at,partner_verified_at";
 
 const PARTNER_STATUSES = ["pending", "verified", "rejected", "paused"];
@@ -2372,7 +2372,7 @@ function p4AlumniInput(body, partial) {
   const year = p4Year(src, "graduation_year", !partial);
   if (year.error) return year;
   if (year.present) out.graduation_year = year.value;
-  for (const [field, max] of Object.entries({ faculty: 160, department: 160, programme: 160, current_role: 160, current_organisation: 160, industry: 120, location: 120 })) {
+  for (const [field, max] of Object.entries({ faculty: 160, department: 160, programme: 160, job_title: 160, current_organisation: 160, industry: 120, location: 120 })) {
     const value = p4Text(src, field, 0, max, false);
     if (value.error) return value;
     if (value.present) out[field] = value.value;
@@ -2634,7 +2634,7 @@ app.get("/api/alumni", async (req, res) => {
   if (industry) query = query.ilike("industry", "%" + industry + "%");
   if (req.query.open_to_mentoring === "true") query = query.eq("open_to_mentoring", true);
   if (req.query.open_to_referrals === "true") query = query.eq("open_to_referrals", true);
-  if (q) query = query.or("name.ilike.%" + q + "%,institution_name.ilike.%" + q + "%,current_role.ilike.%" + q + "%,current_organisation.ilike.%" + q + "%,industry.ilike.%" + q + "%,bio.ilike.%" + q + "%");
+  if (q) query = query.or("name.ilike.%" + q + "%,institution_name.ilike.%" + q + "%,job_title.ilike.%" + q + "%,current_organisation.ilike.%" + q + "%,industry.ilike.%" + q + "%,bio.ilike.%" + q + "%");
   const { data, error, count } = await query
     .order("verified_at", { ascending: false })
     .order("graduation_year", { ascending: false })
@@ -2713,7 +2713,7 @@ app.post("/api/alumni/apply", rateLimit("alumniapply", 20, 60 * 1000), async (re
     faculty: parsed.data.faculty || null,
     department: parsed.data.department || null,
     programme: parsed.data.programme || null,
-    current_role: parsed.data.current_role || null,
+    job_title: parsed.data.job_title || null,
     current_organisation: parsed.data.current_organisation || null,
     industry: parsed.data.industry || null,
     location: parsed.data.location || null,

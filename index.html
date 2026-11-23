@@ -1488,7 +1488,7 @@ function alumniCardHTML(a){
 var flags="";
 if(a.open_to_mentoring)flags+='<span class="verified">Open to mentoring</span>';
 if(a.open_to_referrals)flags+='<span class="verified">Open to referrals</span>';
-var role=[a.current_role,a.current_organisation].filter(Boolean).join(" at ");
+var role=[a.job_title,a.current_organisation].filter(Boolean).join(" at ");
 var areas=(a.help_areas||[]).map(function(x){return '<span class="pill">'+esc(x)+'</span>';}).join("");
 return '<article class="card alumni-card">'+
 '<div class="mentor-head">'+avatarHTML({name:a.name,photo_url:a.photo_url},44)+'<div><h3>'+esc(a.name)+'</h3><div class="muted small">'+esc(a.institution_name)+' • Class of '+esc(a.graduation_year)+'</div></div></div>'+
@@ -1549,7 +1549,7 @@ document.getElementById("alumniGraduationYear").value=a.graduation_year||"";
 document.getElementById("alumniFaculty").value=a.faculty||"";
 document.getElementById("alumniDepartment").value=a.department||"";
 document.getElementById("alumniProgramme").value=a.programme||"";
-document.getElementById("alumniCurrentRole").value=a.current_role||"";
+document.getElementById("alumniCurrentRole").value=a.job_title||"";
 document.getElementById("alumniCurrentOrganisation").value=a.current_organisation||"";
 document.getElementById("alumniIndustryInput").value=a.industry||"";
 document.getElementById("alumniLocation").value=a.location||"";
@@ -1566,7 +1566,7 @@ status.innerHTML='<span class="alumni-status '+esc(a.status)+'">'+esc(a.status)+
 async function submitAlumniApplication(){
 var s=await ensureSession(),msg=document.getElementById("alumniApplyMsg");
 if(!s){msg.textContent="Log in to apply for the alumni directory.";return;}
-var body={school:document.getElementById("alumniSchool").value.trim(),institution_name:document.getElementById("alumniSchool").value.trim(),graduation_year:Number(document.getElementById("alumniGraduationYear").value),faculty:document.getElementById("alumniFaculty").value.trim(),department:document.getElementById("alumniDepartment").value.trim(),programme:document.getElementById("alumniProgramme").value.trim(),current_role:document.getElementById("alumniCurrentRole").value.trim(),current_organisation:document.getElementById("alumniCurrentOrganisation").value.trim(),industry:document.getElementById("alumniIndustryInput").value.trim(),location:document.getElementById("alumniLocation").value.trim(),help_areas:document.getElementById("alumniHelpAreas").value.split(",").map(function(x){return x.trim();}).filter(Boolean),bio:document.getElementById("alumniBio").value.trim(),verification_method:document.getElementById("alumniMethod").value,verification_detail:document.getElementById("alumniDetail").value.trim(),open_to_mentoring:document.getElementById("alumniMentoringOptIn").checked,open_to_referrals:document.getElementById("alumniReferralsOptIn").checked,listed:document.getElementById("alumniListed").checked};
+var body={school:document.getElementById("alumniSchool").value.trim(),institution_name:document.getElementById("alumniSchool").value.trim(),graduation_year:Number(document.getElementById("alumniGraduationYear").value),faculty:document.getElementById("alumniFaculty").value.trim(),department:document.getElementById("alumniDepartment").value.trim(),programme:document.getElementById("alumniProgramme").value.trim(),job_title:document.getElementById("alumniCurrentRole").value.trim(),current_organisation:document.getElementById("alumniCurrentOrganisation").value.trim(),industry:document.getElementById("alumniIndustryInput").value.trim(),location:document.getElementById("alumniLocation").value.trim(),help_areas:document.getElementById("alumniHelpAreas").value.split(",").map(function(x){return x.trim();}).filter(Boolean),bio:document.getElementById("alumniBio").value.trim(),verification_method:document.getElementById("alumniMethod").value,verification_detail:document.getElementById("alumniDetail").value.trim(),open_to_mentoring:document.getElementById("alumniMentoringOptIn").checked,open_to_referrals:document.getElementById("alumniReferralsOptIn").checked,listed:document.getElementById("alumniListed").checked};
 msg.textContent="Submitting for review…";
 try{
 var r=await fetch(apiBase()+"/api/alumni/apply",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(body)});
